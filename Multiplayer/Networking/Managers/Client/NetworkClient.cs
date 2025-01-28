@@ -814,15 +814,7 @@ public class NetworkClient : NetworkManager
         if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
             return;
 
-        CarDamageModel carDamage = trainCar.CarDamage;
-        float difference = Mathf.Abs(packet.Health - carDamage.currentHealth);
-        if (difference < 0.0001)
-            return;
-
-        if (packet.Health < carDamage.currentHealth)
-            carDamage.DamageCar(difference);
-        else
-            carDamage.RepairCar(difference);
+        packet.Health.LoadTo(trainCar);
     }
 
     private void OnClientboundRerailTrainPacket(ClientboundRerailTrainPacket packet)

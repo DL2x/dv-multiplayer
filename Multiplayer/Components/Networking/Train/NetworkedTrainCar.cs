@@ -101,7 +101,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private bool cargoHealthDirty;
     private bool cargoIsLoading;
     public byte CargoModelIndex = byte.MaxValue;
-    private bool healthDirty;
+    private bool carHealthDirty;
     private bool sendCouplers;
     private bool sendCables;
     private bool fireboxDirty;
@@ -242,8 +242,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         NetworkLifecycle.Instance.OnTick -= Common_OnTick;
         NetworkLifecycle.Instance.OnTick -= Server_OnTick;
-        //if (UnloadWatcher.isUnloading)
-        //    return;
+
+        NetworkLifecycle.Instance.Server.PlayerDisconnect -= Server_OnPlayerDisconnect;
 
         trainCarsToNetworkedTrainCars.Remove(TrainCar);
 
@@ -331,7 +331,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         TrainCar.logicCar.CargoUnloaded += Server_OnCargoUnloaded;
 
         if (TrainCar.CargoDamage)
-            TrainCar.CargoDamage.CargoEffectiveHealthStateUpdate += Server_OnHealthUpdate;
+            TrainCar.CargoDamage.CargoEffectiveHealthStateUpdate += Server_CargoHealthUpdate;
 
         Server_DirtyAllState();
     }
@@ -343,7 +343,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         cargoStateDirty = true;
         cargoHealthDirty = true;
         cargoIsLoading = true;
-        healthDirty = true;
+        carHealthDirty = true;
         BogieTracksDirty = true;
         sendCouplers = true;
         sendCables = true;
@@ -416,14 +416,14 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         CargoModelIndex = byte.MaxValue;
     }
 
-    private void Server_OnHealthUpdate(float health)
+    private void Server_CargoHealthUpdate(float health)
     {
         cargoHealthDirty = true;
     }
 
     private void Server_CarHealthUpdate(float health)
     {
-        healthDirty = true;
+        carHealthDirty = true;
     }
 
     private void Server_MainResUpdate(float normalizedPressure, float pressure)
@@ -557,10 +557,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void Server_SendHealthState()
     {
-        if (!healthDirty)
+        if (!carHealthDirty)
             return;
-        healthDirty = false;
-        NetworkLifecycle.Instance.Server.SendCarHealthUpdate(NetId, TrainCar.CarDamage.currentHealth);
+        carHealthDirty = false;
+        NetworkLifecycle.Instance.Server.SendCarHealthUpdate(NetId, TrainCarHealthData.From(TrainCar));
     }
 
     public bool Server_ValidateCouplerInteraction(CommonCouplerInteractionPacket packet, ITransportPeer peer)
