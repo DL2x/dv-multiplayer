@@ -200,7 +200,7 @@ public class NetworkClient : NetworkManager
     {
         Ping = latency;
 
-        if (latency > 150)
+        if (latency > LATENCY_FLAG)
             LogWarning($"High Ping Detected! {latency}ms");
     }
 

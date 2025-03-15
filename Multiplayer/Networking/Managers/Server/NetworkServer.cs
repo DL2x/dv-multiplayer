@@ -233,16 +233,20 @@ public class NetworkServer : NetworkManager
 
         SendPacketToAll(clientboundPingUpdatePacket, DeliveryMethod.ReliableUnordered, peer);
 
-        SendPacket(peer, new ClientboundTickSyncPacket
-        {
-            ServerTick = NetworkLifecycle.Instance.Tick
-        }, DeliveryMethod.ReliableUnordered);
-
-        if (latency > 150)
+        if (latency > LATENCY_FLAG)
         {
             serverPlayers.TryGetValue((byte)peer.Id, out var player);
             LogWarning($"High Ping Detected! Player: \"{player?.Username}\", ping: {latency}ms");
         }
+
+        // Ensure we don't send a TickSync packet to ourselves
+        if (peer.Id == SelfPeer.Id)
+            return;
+
+        SendPacket(peer, new ClientboundTickSyncPacket
+        {
+            ServerTick = NetworkLifecycle.Instance.Tick
+        }, DeliveryMethod.ReliableUnordered);
     }
 
     public override void OnConnectionRequest(NetDataReader requestData, IConnectionRequest request)

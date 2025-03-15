@@ -12,6 +12,8 @@ namespace Multiplayer.Networking.Managers;
 
 public abstract class NetworkManager
 {
+    protected const int LATENCY_FLAG = 150;
+
     protected readonly NetPacketProcessor netPacketProcessor;
     protected readonly NetDataWriter cachedWriter = new();
 
