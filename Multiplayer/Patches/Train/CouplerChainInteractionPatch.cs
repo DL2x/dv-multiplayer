@@ -16,9 +16,9 @@ public static class ChainCouplerInteractionPatch
 
         CouplerInteractionType flag = CouplerInteractionType.Start;
         if (__instance.state == ChainCouplerInteraction.State.Attached_Tightening_Couple || __instance.state == ChainCouplerInteraction.State.Attached_Tight)
-            flag |= CouplerInteractionType.CouplerTighten;
+            flag = CouplerInteractionType.CouplerTighten;
         else if (__instance.state == ChainCouplerInteraction.State.Attached_Loosening_Uncouple || __instance.state == ChainCouplerInteraction.State.Attached_Loose)
-            flag |= CouplerInteractionType.CouplerLoosen;
+            flag = CouplerInteractionType.CouplerLoosen;
         else
             Multiplayer.LogDebug(() =>
             {

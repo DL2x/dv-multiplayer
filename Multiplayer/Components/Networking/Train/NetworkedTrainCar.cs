@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using DV.CabControls;
 using DV.Customization.Paint;
 using DV.MultipleUnit;
 using DV.Simulation.Brake;
@@ -166,7 +167,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             //Multiplayer.LogDebug(() => $"TrainCar.Start() [{TrainCar?.ID}, {NetId}], Coupler exists: {coupler != null}, Is front: {coupler.isFrontCoupler}, ChainScript exists: {coupler.ChainScript != null}");
 
             //Locos with tenders and tenders only have one chainscript each, no trainscript is used for the hitch between the loco and tender
-            if(coupler.ChainScript != null)
+            if (coupler.ChainScript != null)
                 coupler.ChainScript.StateChanged += (state) => { Client_CouplerStateChange(state, coupler); };
         }
 
@@ -477,24 +478,24 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         sendCouplers = false;
 
-        if(!TrainCar.frontCoupler.IsCoupled())
-        //    NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.frontCoupler,TrainCar.frontCoupler.coupledTo,false, false);
-        //else
-            NetworkLifecycle.Instance.Server.SendTrainUncouple(TrainCar.frontCoupler,true,true, false);
+        if (!TrainCar.frontCoupler.IsCoupled())
+            //    NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.frontCoupler,TrainCar.frontCoupler.coupledTo,false, false);
+            //else
+            NetworkLifecycle.Instance.Server.SendTrainUncouple(TrainCar.frontCoupler, true, true, false);
 
-        if(!TrainCar.rearCoupler.IsCoupled())
-        //    NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.rearCoupler,TrainCar.rearCoupler.coupledTo,false, false);
-        //else
+        if (!TrainCar.rearCoupler.IsCoupled())
+            //    NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.rearCoupler,TrainCar.rearCoupler.coupledTo,false, false);
+            //else
             NetworkLifecycle.Instance.Server.SendTrainUncouple(TrainCar.rearCoupler, true, true, false);
 
         if (!TrainCar.frontCoupler.hoseAndCock.IsHoseConnected)
-        //    NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.frontCoupler, TrainCar.frontCoupler.coupledTo, false);
-        //else
+            //    NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.frontCoupler, TrainCar.frontCoupler.coupledTo, false);
+            //else
             NetworkLifecycle.Instance.Client.SendHoseDisconnected(TrainCar.frontCoupler, true);
 
         if (!TrainCar.rearCoupler.hoseAndCock.IsHoseConnected)
-        //    NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.rearCoupler, TrainCar.rearCoupler.coupledTo, false);
-        //else
+            //    NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.rearCoupler, TrainCar.rearCoupler.coupledTo, false);
+            //else
             NetworkLifecycle.Instance.Client.SendHoseDisconnected(TrainCar.rearCoupler, true);
 
         NetworkLifecycle.Instance.Client.SendCockState(NetId, TrainCar.frontCoupler, TrainCar.frontCoupler.IsCockOpen);
@@ -829,6 +830,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         TrainCar otherCar = null;
         Coupler otherCoupler = null;
 
+        ButtonBase buttonBase = coupler?.ChainScript?.screwButton.GetComponent<ButtonBase>();
+
         Multiplayer.LogDebug(() => $"Common_ReceiveCouplerInteraction() couplerNetId: {NetId}, coupler is front: {packet.IsFrontCoupler}, flags: {flags}, otherCouplerNetId: {packet.OtherNetId}, otherCoupler is front: {packet.IsFrontOtherCoupler}");
 
         if (coupler == null)
@@ -867,7 +870,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                     StartCoroutine(DangleCoupler(coupler));
                     break;
                 case ChainCouplerInteraction.State.Attached_Loose:
-                    if(coupler.ChainScript.state == ChainCouplerInteraction.State.Attached_Tight)
+                    if (coupler.ChainScript.state == ChainCouplerInteraction.State.Attached_Tight)
                         coupler.ChainScript.fsm.Fire(ChainCouplerInteraction.Trigger.Screw_Used);
                     else
                         StartCoroutine(LooseAttachCoupler(coupler, originalCoupledTo));
@@ -891,8 +894,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             //Another player must be interacting, so let's block us from tampering with it
             if (coupler?.ChainScript?.knobGizmo)
                 coupler.ChainScript.knobGizmo.InteractionAllowed = false;
-            if(coupler?.ChainScript?.screwButtonBase)
-                coupler.ChainScript.screwButtonBase.InteractionAllowed = false;
+            if (buttonBase)
+                buttonBase.InteractionAllowed = false;
 
             return;
         }
@@ -943,7 +946,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                 Multiplayer.LogDebug(() => $"7 Common_ReceiveCouplerInteraction() [{TrainCar?.ID}, {NetId}], coupler is front: {packet.IsFrontCoupler}, flags: {flags}");
                 coupler.ChainScript.fsm.Fire(ChainCouplerInteraction.Trigger.Screw_Used);
             }
-            else if(coupler.ChainScript.CurrentState == ChainCouplerInteraction.State.Disabled && coupler.state == ChainCouplerInteraction.State.Attached_Tight)
+            else if (coupler.ChainScript.CurrentState == ChainCouplerInteraction.State.Disabled && coupler.state == ChainCouplerInteraction.State.Attached_Tight)
             {
                 //if it's disabled we'll use the internal routines and the state will restore when this player sees the coupling next
                 coupler.SetChainTight(false);
@@ -971,7 +974,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             bool chainInteraction = !flags.HasFlag(CouplerInteractionType.HoseConnect);
 
             Multiplayer.LogDebug(() => $"10 Common_ReceiveCouplerInteraction() [{TrainCar?.ID}, {NetId}], coupler is front: {packet.IsFrontCoupler}, flags: [{flags}], other coupler: {otherCoupler != null}, chainInteraction: {chainInteraction}");
-            if(otherCoupler != null)
+            if (otherCoupler != null)
             {
                 Multiplayer.LogDebug(() => $"10A Common_ReceiveCouplerInteraction() [{TrainCar?.ID}, {NetId}], coupler state: {coupler.state}, other coupler state: {otherCoupler.state}, coupler coupledTo: {coupler?.coupledTo?.train?.ID}, other coupledTo: {otherCoupler?.coupledTo?.train?.ID}, chainInteraction: {chainInteraction}");
                 var car = coupler.CoupleTo(otherCoupler, viaChainInteraction: chainInteraction);
@@ -996,7 +999,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             bool chainInteraction = !flags.HasFlag(CouplerInteractionType.HoseDisconnect);
 
             Multiplayer.LogDebug(() => $"11 Common_ReceiveCouplerInteraction() [{TrainCar?.ID}, {NetId}], coupler is front: {packet.IsFrontCoupler}, flags: {flags}, chainInteraction: {chainInteraction}");
-            CouplerLogic.Uncouple(coupler,viaChainInteraction: chainInteraction);
+            CouplerLogic.Uncouple(coupler, viaChainInteraction: chainInteraction);
 
             /* fix for bug in vanilla game */
             coupler.state = ChainCouplerInteraction.State.Parked;
@@ -1031,8 +1034,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         //presumably the interaction is now complete, release control to player
         if (coupler?.ChainScript?.knobGizmo)
             coupler.ChainScript.knobGizmo.InteractionAllowed = true;
-        if (coupler?.ChainScript?.screwButtonBase)
-            coupler.ChainScript.screwButtonBase.InteractionAllowed = true;
+        if (buttonBase)
+            buttonBase.InteractionAllowed = true;
     }
 
     private IEnumerator LooseAttachCoupler(Coupler coupler, Coupler otherCoupler)
@@ -1047,7 +1050,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         ChainCouplerInteraction ccInteraction = coupler.ChainScript;
 
-        if(ccInteraction.CurrentState == ChainCouplerInteraction.State.Disabled)
+        if (ccInteraction.CurrentState == ChainCouplerInteraction.State.Disabled)
         {
             //since it's disabled FSM events won't fire. Force a coupling if required, otherwise set state ready for player visibility trigger
 
@@ -1092,7 +1095,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (ccInteraction.CurrentState == ChainCouplerInteraction.State.Disabled)
         {
             //since it's disabled FSM events won't fire, but state will be restored when the coupling is visible to the current player
-            if(coupler.state == ChainCouplerInteraction.State.Attached_Loose && coupler.coupledTo != null)
+            if (coupler.state == ChainCouplerInteraction.State.Attached_Loose && coupler.coupledTo != null)
                 coupler.Uncouple(true, false, false, true);
 
             coupler.state = ChainCouplerInteraction.State.Parked;
