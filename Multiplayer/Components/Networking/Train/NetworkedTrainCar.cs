@@ -1127,6 +1127,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         //Drop the chain
         coupler.ChainScript.fsm.Fire(ChainCouplerInteraction.Trigger.Dropped_By_Player);
     }
+
     private IEnumerator DangleCoupler(Coupler coupler)
     {
         ChainCouplerInteraction ccInteraction = coupler.ChainScript;
@@ -1219,13 +1220,13 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         if (movementPart.typeFlag == TrainsetMovementPart.MovementType.RigidBody)
         {
-            Vector3 expectedPosition = movementPart.RigidbodySnapshot.Position + WorldMover.currentMove;
+            //Vector3 expectedPosition = movementPart.RigidbodySnapshot.Position + WorldMover.currentMove;
             //Multiplayer.LogDebug(() => $"Processing derailed physics for car {CurrentID} at tick {tick}, current position: {TrainCar.transform.position} expected position: {expectedPosition}");
 
             TrainCar.Derail();
             movementPart.RigidbodySnapshot.Apply(TrainCar.rb);
 
-            Client_trainRigidbodyQueue.ReceiveSnapshot(movementPart.RigidbodySnapshot, tick);
+        //    Client_trainRigidbodyQueue.ReceiveSnapshot(movementPart.RigidbodySnapshot, tick);
 
             //Multiplayer.LogDebug(() => $"Derailed car {TrainCar.ID} positioned at {TrainCar.transform.position}");
         }

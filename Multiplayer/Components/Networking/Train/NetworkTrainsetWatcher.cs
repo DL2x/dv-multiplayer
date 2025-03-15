@@ -134,8 +134,8 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
                     networkedTrainCar.NetId,
                     trainCar.GetForwardSpeed(),
                     trainCar.stress.slowBuildUpStress,
-                    BogieData.FromBogie(trainCar.Bogies[0], networkedTrainCar.BogieTracksDirty),
-                    BogieData.FromBogie(trainCar.Bogies[1], networkedTrainCar.BogieTracksDirty),
+                    BogieData.FromBogie(trainCar.Bogies[0]),
+                    BogieData.FromBogie(trainCar.Bogies[1]),
                     position,   //only used in full sync
                     rotation    //only used in full sync
                 );

@@ -13,7 +13,7 @@ public abstract class TickedQueue<T> : MonoBehaviour
     private uint lastTick;
     private uint lastReceivedTick;
     private readonly Queue<(uint, T)> snapshots = new();
-    private string identifier;
+    protected string identifier;
 
     protected virtual void OnEnable()
     {
