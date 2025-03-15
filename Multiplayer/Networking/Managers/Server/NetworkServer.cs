@@ -136,7 +136,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonChangeJunctionPacket, ITransportPeer>(OnCommonChangeJunctionPacket);
         netPacketProcessor.SubscribeReusable<CommonRotateTurntablePacket, ITransportPeer>(OnCommonRotateTurntablePacket);
         netPacketProcessor.SubscribeReusable<CommonCouplerInteractionPacket, ITransportPeer>(OnCommonCouplerInteractionPacket);
-        netPacketProcessor.SubscribeReusable<CommonTrainCouplePacket, ITransportPeer>(OnCommonTrainCouplePacket);
+        //netPacketProcessor.SubscribeReusable<CommonTrainCouplePacket, ITransportPeer>(OnCommonTrainCouplePacket);
         netPacketProcessor.SubscribeReusable<CommonTrainUncouplePacket, ITransportPeer>(OnCommonTrainUncouplePacket);
         netPacketProcessor.SubscribeReusable<CommonHoseConnectedPacket, ITransportPeer>(OnCommonHoseConnectedPacket);
         netPacketProcessor.SubscribeReusable<CommonHoseDisconnectedPacket, ITransportPeer>(OnCommonHoseDisconnectedPacket);
@@ -844,7 +844,7 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonChangeJunctionPacket(CommonChangeJunctionPacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonRotateTurntablePacket(CommonRotateTurntablePacket packet, ITransportPeer peer)
@@ -886,10 +886,10 @@ public class NetworkServer : NetworkManager
         }
         
     }
-    private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet, ITransportPeer peer)
-    {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
-    }
+    //private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet, ITransportPeer peer)
+    //{
+    //    SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+    //}
 
     private void OnCommonTrainUncouplePacket(CommonTrainUncouplePacket packet, ITransportPeer peer)
     {
@@ -923,7 +923,7 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonBrakeCylinderReleasePacket(CommonBrakeCylinderReleasePacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonHandbrakePositionPacket(CommonHandbrakePositionPacket packet, ITransportPeer peer)

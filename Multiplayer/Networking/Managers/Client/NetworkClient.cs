@@ -178,7 +178,7 @@ public class NetworkClient : NetworkManager
     public override void OnPeerDisconnected(ITransportPeer peer, DisconnectReason disconnectReason)
     {
 
-        LogDebug(()=>$"OnPeerDisconnected({peer.Id}, {disconnectReason}) disconnect message: {disconnectMessage}");
+        LogDebug(() => $"OnPeerDisconnected({peer.Id}, {disconnectReason}) disconnect message: {disconnectMessage}");
 
         NetworkLifecycle.Instance.Stop();
 
@@ -222,7 +222,7 @@ public class NetworkClient : NetworkManager
         if (packet.Accepted)
         {
             Log($"Received player accepted packet");
-            
+
             if (NetworkLifecycle.Instance.IsHost(SelfPeer))
                 SendReadyPacket();
             else
@@ -511,7 +511,7 @@ public class NetworkClient : NetworkManager
         }
 
         //Protect other players from getting deleted in race conditions - this should be a temporary fix, if another playe's game object is deleted we should just recreate it
-        if(networkedTrainCar == null || networkedTrainCar.gameObject == null || networkedTrainCar.TrainCar == null)
+        if (networkedTrainCar == null || networkedTrainCar.gameObject == null || networkedTrainCar.TrainCar == null)
         {
             LogDebug(() => $"OnClientboundDestroyTrainCarPacket({packet?.NetId}) networkedTrainCar: {networkedTrainCar != null}, go: {(networkedTrainCar?.gameObject) != null}, trainCar: {networkedTrainCar?.TrainCar != null}");
         }
@@ -531,6 +531,7 @@ public class NetworkClient : NetworkManager
 
     public void OnClientboundTrainPhysicsPacket(ClientboundTrainsetPhysicsPacket packet)
     {
+        //LogDebug(() => $"Received Physics packet for netId: {packet.FirstNetId}, tick: {packet.Tick}");
         NetworkTrainsetWatcher.Instance.Client_HandleTrainsetPhysicsUpdate(packet);
     }
 
@@ -590,8 +591,8 @@ public class NetworkClient : NetworkManager
             return;
         }
 
-        string carId = $"[{ trainCar?.ID}, { packet.NetId}]";
-        string otherCarId = $"[{ otherTrainCar?.ID}, { packet.OtherNetId}]";
+        string carId = $"[{trainCar?.ID}, {packet.NetId}]";
+        string otherCarId = $"[{otherTrainCar?.ID}, {packet.OtherNetId}]";
 
         //LogDebug(() => $"OnCommonHoseConnectedPacket() trainCar: {carId}, isFront: {packet.IsFront}, otherTrainCar: {otherCarId}, isFront: {packet.OtherIsFront}, playAudio: {packet.PlayAudio}");
 
@@ -610,9 +611,9 @@ public class NetworkClient : NetworkManager
             Coupler connectedTo = null;
             Coupler otherConnectedTo = null;
 
-            if(coupler?.hoseAndCock?.connectedTo != null)
+            if (coupler?.hoseAndCock?.connectedTo != null)
                 NetworkedTrainCar.TryGetCoupler(coupler.hoseAndCock.connectedTo, out connectedTo);
-            if(otherCoupler?.hoseAndCock?.connectedTo != null)
+            if (otherCoupler?.hoseAndCock?.connectedTo != null)
                 NetworkedTrainCar.TryGetCoupler(otherCoupler.hoseAndCock.connectedTo, out otherConnectedTo);
 
             LogWarning($"OnCommonHoseConnectedPacket() trainCar: {carId}, isFront: {packet.IsFront}, IsHoseConnected: {coupler?.hoseAndCock?.IsHoseConnected}, connectedTo: {connectedTo?.train?.ID}," +
@@ -826,7 +827,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundRerailTrainPacket(ClientboundRerailTrainPacket packet)
     {
-        
+
         if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
             return;
         if (!NetworkedRailTrack.Get(packet.TrackId, out NetworkedRailTrack networkedRailTrack))
@@ -1100,29 +1101,29 @@ public class NetworkClient : NetworkManager
     }
 
 
-    public void SendTrainCouple(Coupler coupler, Coupler otherCoupler, bool playAudio, bool viaChainInteraction)
-    {
-        ushort couplerNetId = coupler.train.GetNetId();
-        ushort otherCouplerNetId = otherCoupler.train.GetNetId();
+    //public void SendTrainCouple(Coupler coupler, Coupler otherCoupler, bool playAudio, bool viaChainInteraction)
+    //{
+    //    ushort couplerNetId = coupler.train.GetNetId();
+    //    ushort otherCouplerNetId = otherCoupler.train.GetNetId();
 
-        if (couplerNetId == 0 || otherCouplerNetId == 0)
-        {
-            LogWarning($"SendTrainCouple failed. Coupler: {coupler.name} {couplerNetId}, OtherCoupler: {otherCoupler.name} {otherCouplerNetId}");
-            return;
-        }
+    //    if (couplerNetId == 0 || otherCouplerNetId == 0)
+    //    {
+    //        LogWarning($"SendTrainCouple failed. Coupler: {coupler.name} {couplerNetId}, OtherCoupler: {otherCoupler.name} {otherCouplerNetId}");
+    //        return;
+    //    }
 
-        SendPacketToServer(new CommonTrainCouplePacket
-        {
-            NetId = couplerNetId, //coupler.train.GetNetId(),
-            IsFrontCoupler = coupler.isFrontCoupler,
-            State = (byte)coupler.state,
-            OtherNetId = otherCouplerNetId, //otherCoupler.train.GetNetId(),
-            OtherState = (byte)otherCoupler.state,
-            OtherCarIsFrontCoupler = otherCoupler.isFrontCoupler,
-            PlayAudio = playAudio,
-            ViaChainInteraction = viaChainInteraction
-        }, DeliveryMethod.ReliableUnordered);
-    }
+    //    SendPacketToServer(new CommonTrainCouplePacket
+    //    {
+    //        NetId = couplerNetId, //coupler.train.GetNetId(),
+    //        IsFrontCoupler = coupler.isFrontCoupler,
+    //        State = (byte)coupler.state,
+    //        OtherNetId = otherCouplerNetId, //otherCoupler.train.GetNetId(),
+    //        OtherState = (byte)otherCoupler.state,
+    //        OtherCarIsFrontCoupler = otherCoupler.isFrontCoupler,
+    //        PlayAudio = playAudio,
+    //        ViaChainInteraction = viaChainInteraction
+    //    }, DeliveryMethod.ReliableUnordered);
+    //}
 
     public void SendHoseConnected(Coupler coupler, Coupler otherCoupler, bool playAudio)
     {
