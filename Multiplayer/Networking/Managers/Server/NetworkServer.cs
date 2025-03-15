@@ -393,18 +393,35 @@ public class NetworkServer : NetworkManager
         Multiplayer.LogDebug(() => $"Sending Firebox States netId {netId}: {fireboxContents}, {fireboxOn}");
     }
 
-    public void SendCargoState(TrainCar trainCar, ushort netId, bool isLoading, byte cargoModelIndex)
+    public void SendCargoState(NetworkedTrainCar netTraincar, bool isLoading, byte cargoModelIndex)
     {
-        Car logicCar = trainCar.logicCar;
+        Car logicCar = netTraincar?.TrainCar?.logicCar;
+
+        if (logicCar == null)
+        {
+            LogWarning($"Attempted to send cargo state for {netTraincar?.CurrentID}, but logic car does not exist!");
+            return;
+        }
+
         CargoType cargoType = isLoading ? logicCar.CurrentCargoTypeInCar : logicCar.LastUnloadedCargoType;
         SendPacketToAll(new ClientboundCargoStatePacket
         {
-            NetId = netId,
+            NetId = netTraincar.NetId,
             IsLoading = isLoading,
             CargoType = (ushort)cargoType,
             CargoAmount = logicCar.LoadedCargoAmount,
+            CargoHealth = netTraincar.TrainCar.CargoDamage.HealthPercentage,
             CargoModelIndex = cargoModelIndex,
             WarehouseMachineId = logicCar.CargoOriginWarehouse?.ID
+        }, DeliveryMethod.ReliableOrdered, SelfPeer);
+    }
+
+    public void SendCargoHealthUpdate(ushort netId, float currentHealth)
+    {
+        SendPacketToAll(new ClientboundCargoHealthUpdatePacket
+        {
+            NetId = netId,
+            CargoHealth = currentHealth,
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 

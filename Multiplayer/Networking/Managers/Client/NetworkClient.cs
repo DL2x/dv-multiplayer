@@ -152,6 +152,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundBrakeStateUpdatePacket>(OnClientboundBrakeStateUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundFireboxStatePacket>(OnClientboundFireboxStatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundCargoStatePacket>(OnClientboundCargoStatePacket);
+        netPacketProcessor.SubscribeReusable<ClientboundCargoHealthUpdatePacket>(OnClientboundCargoHealthUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundCarHealthUpdatePacket>(OnClientboundCarHealthUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundRerailTrainPacket>(OnClientboundRerailTrainPacket);
         netPacketProcessor.SubscribeReusable<ClientboundWindowsBrokenPacket>(OnClientboundWindowsBrokenPacket);
@@ -725,6 +726,8 @@ public class NetworkClient : NetworkManager
         if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
+        LogDebug(() => $"OnClientboundCargoStatePacket() {networkedTrainCar.CurrentID}, health: {packet.CargoHealth}");
+
         networkedTrainCar.CargoModelIndex = packet.CargoModelIndex;
         Car logicCar = networkedTrainCar.TrainCar.logicCar;
 
@@ -757,7 +760,11 @@ public class NetworkClient : NetworkManager
                 cargoAmount -= logicCar.LoadedCargoAmount;
 
             if (cargoAmount > 0)
+            {
                 logicCar.LoadCargo(cargoAmount, (CargoType)packet.CargoType, warehouse);
+            }
+
+            networkedTrainCar.TrainCar.CargoDamage.LoadCargoDamageState(packet.CargoHealth);
         }
         else
         {
@@ -781,6 +788,24 @@ public class NetworkClient : NetworkManager
             if (cargoAmount > 0)
                 logicCar.UnloadCargo(cargoAmount, (CargoType)packet.CargoType, warehouse);
         }
+    }
+
+    private void OnClientboundCargoHealthUpdatePacket(ClientboundCargoHealthUpdatePacket packet)
+    {
+        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+            return;
+
+        CargoDamageModel cargoDamageModel = networkedTrainCar.TrainCar.CargoDamage;
+
+        if (networkedTrainCar.TrainCar == null || cargoDamageModel == null)
+            return;
+
+        float deltaHealth = cargoDamageModel.currentHealth - packet.CargoHealth;
+
+        LogDebug(() => $"OnClientboundCargoHealthUpdatePacket() {networkedTrainCar.CurrentID}, current health: {cargoDamageModel.currentHealth}, new health: {packet.CargoHealth}, delta: {cargoDamageModel}, applySensitivity: {packet.CargoHealth > 0}");
+
+        if (deltaHealth > 0)
+            cargoDamageModel.ApplyDamageToCargo(deltaHealth, packet.CargoHealth > 0);
     }
 
     private void OnClientboundCarHealthUpdatePacket(ClientboundCarHealthUpdatePacket packet)

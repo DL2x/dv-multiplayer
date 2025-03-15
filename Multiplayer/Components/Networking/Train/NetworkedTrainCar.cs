@@ -95,7 +95,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private bool brakeOverheatDirty;
 
     public bool BogieTracksDirty;
-    private bool cargoDirty;
+    private bool cargoStateDirty;
+    private bool cargoHealthDirty;
     private bool cargoIsLoading;
     public byte CargoModelIndex = byte.MaxValue;
     private bool healthDirty;
@@ -325,6 +326,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         TrainCar.logicCar.CargoLoaded += Server_OnCargoLoaded;
         TrainCar.logicCar.CargoUnloaded += Server_OnCargoUnloaded;
+        TrainCar.CargoDamage.CargoEffectiveHealthStateUpdate += Server_OnHealthUpdate;
 
         Server_DirtyAllState();
     }
@@ -333,7 +335,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         handbrakeDirty = true;
         mainResPressureDirty = true;
-        cargoDirty = true;
+        cargoStateDirty = true;
+        cargoHealthDirty = true;
         cargoIsLoading = true;
         healthDirty = true;
         BogieTracksDirty = true;
@@ -397,15 +400,20 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void Server_OnCargoLoaded(CargoType obj)
     {
-        cargoDirty = true;
+        cargoStateDirty = true;
         cargoIsLoading = true;
     }
 
     private void Server_OnCargoUnloaded()
     {
-        cargoDirty = true;
+        cargoStateDirty = true;
         cargoIsLoading = false;
         CargoModelIndex = byte.MaxValue;
+    }
+
+    private void Server_OnHealthUpdate(float health)
+    {
+        cargoHealthDirty = true;
     }
 
     private void Server_CarHealthUpdate(float health)
@@ -443,6 +451,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         Server_SendCouplers();
         Server_SendCables();
         Server_SendCargoState();
+        Server_SendHealthUpdate();
         Server_SendHealthState();
 
         TicksSinceSync++; //keep track of last full sync
@@ -519,12 +528,26 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void Server_SendCargoState()
     {
-        if (!cargoDirty)
+        if (!cargoStateDirty)
             return;
-        cargoDirty = false;
+        cargoStateDirty = false;
         if (cargoIsLoading && TrainCar.logicCar.CurrentCargoTypeInCar == CargoType.None)
             return;
-        NetworkLifecycle.Instance.Server.SendCargoState(TrainCar, NetId, cargoIsLoading, CargoModelIndex);
+
+        NetworkLifecycle.Instance.Server.SendCargoState(this, cargoIsLoading, CargoModelIndex);
+    }
+
+    private void Server_SendHealthUpdate()
+    {
+        if (!cargoHealthDirty)
+            return;
+
+        cargoHealthDirty = false;
+
+        if (TrainCar.logicCar.CurrentCargoTypeInCar == CargoType.None)
+            return;
+
+        NetworkLifecycle.Instance.Server.SendCargoHealthUpdate(NetId, TrainCar.CargoDamage.currentHealth);
     }
 
     private void Server_SendHealthState()
