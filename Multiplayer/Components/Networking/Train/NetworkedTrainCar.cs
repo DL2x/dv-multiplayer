@@ -327,7 +327,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         TrainCar.logicCar.CargoLoaded += Server_OnCargoLoaded;
         TrainCar.logicCar.CargoUnloaded += Server_OnCargoUnloaded;
-        TrainCar.CargoDamage.CargoEffectiveHealthStateUpdate += Server_OnHealthUpdate;
+
+        if (TrainCar.CargoDamage)
+            TrainCar.CargoDamage.CargoEffectiveHealthStateUpdate += Server_OnHealthUpdate;
 
         Server_DirtyAllState();
     }
