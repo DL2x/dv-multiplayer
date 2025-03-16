@@ -6,6 +6,7 @@ public class ClientboundCargoStatePacket
     public bool IsLoading { get; set; }
     public ushort CargoType { get; set; }
     public float CargoAmount { get; set; }
+    public float CargoHealth { get; set; }
     public byte CargoModelIndex { get; set; }
     public string WarehouseMachineId { get; set; }
 }

@@ -18,6 +18,7 @@ using Steamworks;
 using Steamworks.Data;
 using Multiplayer.Utils;
 using Multiplayer.Networking.TransportLayers;
+using Multiplayer.Components.MainMenu;
 
 namespace Multiplayer.Networking.Managers.Server;
 public class LobbyServerManager : MonoBehaviour
@@ -41,7 +42,7 @@ public class LobbyServerManager : MonoBehaviour
     private string private_key;
 
     //Steam Lobby
-    public static readonly string[] EXCLUDE_PARAMS = {"id", "ipv4", "ipv6", "port", "LocalIPv4", "LocalIPv6", "Ping", "isPublic", "LastSeen", "CurrentPlayers", "MaxPlayers"};
+    public static readonly string[] EXCLUDE_PARAMS = {"id", "ipv4", "ipv6", "port", "LocalIPv4", "LocalIPv6", "Ping", "Visibility", "LastSeen", "CurrentPlayers", "MaxPlayers"};
     private Lobby? lobby;
 
     private bool initialised = false;
@@ -84,7 +85,7 @@ public class LobbyServerManager : MonoBehaviour
         server.Log("Public IPv6: " + server.serverData.ipv6);
         server.Log("Private IPv4: " + server.serverData.LocalIPv4);
 
-        if (server.serverData.isPublic)
+        if (server.serverData.Visibility >= ServerVisibility.Private)
         {
             Multiplayer.Log($"Registering server at: {Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}");
             StartCoroutine(RegisterWithLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}"));
@@ -138,7 +139,7 @@ public class LobbyServerManager : MonoBehaviour
                     SteamworksUtils.SetLobbyData((Lobby)lobby, server.serverData, EXCLUDE_PARAMS);
                 }
             }
-        }else if (!server.serverData.isPublic || !sendUpdates)
+        }else if (server.serverData.Visibility == ServerVisibility.Private || !sendUpdates)
         {
             server.serverData.CurrentPlayers = server.PlayerCount;
         }
@@ -164,16 +165,18 @@ public class LobbyServerManager : MonoBehaviour
             server.Log("Steam Lobby created successfully!");
             server.LogDebug(() => $"Steam lobby ID: {lobby?.Id}");
 
-            lobby?.SetData(SteamworksUtils.LOBBY_MP_MOD_KEY, string.Empty); //We'll add this in for filtering
+            lobby?.SetData(SteamworksUtils.LOBBY_MP_MOD_KEY, SteamworksUtils.LOBBY_MP_MOD_KEY); //We'll add this in for filtering
             lobby?.SetData(SteamworksUtils.LOBBY_NET_LOCATION_KEY, SteamNetworkingUtils.LocalPingLocation.ToString()); //for ping estimation
 
             SteamworksUtils.SetLobbyData((Lobby)lobby, server.serverData, EXCLUDE_PARAMS);
 
-            //todo implement public/private/friends
-            if (server.serverData.isPublic)
-                lobby?.SetPublic();
-            else
+            //Set correct visibility
+            if (server.serverData.Visibility == ServerVisibility.Private)
                 lobby?.SetPrivate();
+            else if (server.serverData.Visibility == ServerVisibility.Friends)
+                lobby?.SetFriendsOnly();
+            else if (server.serverData.Visibility == ServerVisibility.Public)
+                lobby?.SetPublic();
 
             lobby?.SetJoinable(true);
         }

@@ -136,7 +136,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonChangeJunctionPacket, ITransportPeer>(OnCommonChangeJunctionPacket);
         netPacketProcessor.SubscribeReusable<CommonRotateTurntablePacket, ITransportPeer>(OnCommonRotateTurntablePacket);
         netPacketProcessor.SubscribeReusable<CommonCouplerInteractionPacket, ITransportPeer>(OnCommonCouplerInteractionPacket);
-        netPacketProcessor.SubscribeReusable<CommonTrainCouplePacket, ITransportPeer>(OnCommonTrainCouplePacket);
+        //netPacketProcessor.SubscribeReusable<CommonTrainCouplePacket, ITransportPeer>(OnCommonTrainCouplePacket);
         netPacketProcessor.SubscribeReusable<CommonTrainUncouplePacket, ITransportPeer>(OnCommonTrainUncouplePacket);
         netPacketProcessor.SubscribeReusable<CommonHoseConnectedPacket, ITransportPeer>(OnCommonHoseConnectedPacket);
         netPacketProcessor.SubscribeReusable<CommonHoseDisconnectedPacket, ITransportPeer>(OnCommonHoseDisconnectedPacket);
@@ -261,6 +261,16 @@ public class NetworkServer : NetworkManager
 
         SendPacketToAll(clientboundPingUpdatePacket, DeliveryMethod.ReliableUnordered, peer);
 
+        if (latency > LATENCY_FLAG)
+        {
+            serverPlayers.TryGetValue((byte)peer.Id, out var player);
+            LogWarning($"High Ping Detected! Player: \"{player?.Username}\", ping: {latency}ms");
+        }
+
+        // Ensure we don't send a TickSync packet to ourselves
+        if (peer.Id == SelfPeer.Id)
+            return;
+
         SendPacket(peer, new ClientboundTickSyncPacket
         {
             ServerTick = NetworkLifecycle.Instance.Tick
@@ -379,6 +389,7 @@ public class NetworkServer : NetworkManager
 
     public void SendTrainsetPhysicsUpdate(ClientboundTrainsetPhysicsPacket packet, bool reliable)
     {
+        //LogDebug(() => $"Sending Physics packet for netId: {packet.FirstNetId}, tick: {packet.Tick}");
         SendPacketToAll(packet, reliable ? DeliveryMethod.ReliableOrdered : DeliveryMethod.Unreliable, SelfPeer);
     }
 
@@ -410,18 +421,35 @@ public class NetworkServer : NetworkManager
         LogDebug(() => $"Sending Firebox States netId {netId}: {fireboxContents}, {fireboxOn}");
     }
 
-    public void SendCargoState(TrainCar trainCar, ushort netId, bool isLoading, byte cargoModelIndex)
+    public void SendCargoState(NetworkedTrainCar netTraincar, bool isLoading, byte cargoModelIndex)
     {
-        Car logicCar = trainCar.logicCar;
+        Car logicCar = netTraincar?.TrainCar?.logicCar;
+
+        if (logicCar == null)
+        {
+            LogWarning($"Attempted to send cargo state for {netTraincar?.CurrentID}, but logic car does not exist!");
+            return;
+        }
+
         CargoType cargoType = isLoading ? logicCar.CurrentCargoTypeInCar : logicCar.LastUnloadedCargoType;
         SendPacketToAll(new ClientboundCargoStatePacket
         {
-            NetId = netId,
+            NetId = netTraincar.NetId,
             IsLoading = isLoading,
             CargoType = (ushort)cargoType,
             CargoAmount = logicCar.LoadedCargoAmount,
+            CargoHealth = netTraincar.TrainCar.CargoDamage.HealthPercentage,
             CargoModelIndex = cargoModelIndex,
             WarehouseMachineId = logicCar.CargoOriginWarehouse?.ID
+        }, DeliveryMethod.ReliableOrdered, SelfPeer);
+    }
+
+    public void SendCargoHealthUpdate(ushort netId, float currentHealth)
+    {
+        SendPacketToAll(new ClientboundCargoHealthUpdatePacket
+        {
+            NetId = netId,
+            CargoHealth = currentHealth,
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 
@@ -493,6 +521,31 @@ public class NetworkServer : NetworkManager
         {
             HasDebt = hasDebt
         }, DeliveryMethod.ReliableUnordered, SelfPeer);
+    }
+
+    public void SendTrainUncouple(Coupler coupler, bool playAudio, bool dueToBrokenCouple, bool viaChainInteraction)
+    {
+        ushort couplerNetId = coupler.train.GetNetId();
+
+        if (couplerNetId == 0)
+        {
+            LogWarning($"SendTrainUncouple failed. Coupler: {coupler.name} {couplerNetId}");
+            return;
+        }
+
+        LogDebug(() => $"SendTrainUncouple({coupler.train.ID}, {coupler.isFrontCoupler}, {dueToBrokenCouple}, {viaChainInteraction})");
+
+        SendPacketToAll(
+            new CommonTrainUncouplePacket
+            {
+                NetId = couplerNetId,
+                IsFrontCoupler = coupler.isFrontCoupler,
+                PlayAudio = playAudio,
+                ViaChainInteraction = viaChainInteraction,
+                DueToBrokenCouple = dueToBrokenCouple,
+            },
+            DeliveryMethod.ReliableOrdered
+        );
     }
 
     public void SendJobsCreatePacket(NetworkedStationController networkedStation, NetworkedJob[] jobs, ITransportPeer peer = null)
@@ -836,7 +889,7 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonChangeJunctionPacket(CommonChangeJunctionPacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonRotateTurntablePacket(CommonRotateTurntablePacket packet, ITransportPeer peer)
@@ -878,10 +931,10 @@ public class NetworkServer : NetworkManager
         }
         
     }
-    private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet, ITransportPeer peer)
-    {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
-    }
+    //private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet, ITransportPeer peer)
+    //{
+    //    SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+    //}
 
     private void OnCommonTrainUncouplePacket(CommonTrainUncouplePacket packet, ITransportPeer peer)
     {
@@ -915,7 +968,7 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonBrakeCylinderReleasePacket(CommonBrakeCylinderReleasePacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonHandbrakePositionPacket(CommonHandbrakePositionPacket packet, ITransportPeer peer)

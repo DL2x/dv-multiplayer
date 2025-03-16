@@ -9,19 +9,20 @@ public enum BogieFlags : byte
 {
     None = 0,
     IncludesTrackData = 1,
-    HasDerailed = 2
+    HasDerailed = 2,
+    TrackReversed = 4
 }
 public readonly struct BogieData
 {
-    private readonly BogieFlags DataFlags;
+    public readonly BogieFlags DataFlags;
     public readonly double PositionAlongTrack;
     public readonly ushort TrackNetId;
-    public readonly int TrackDirection;
 
-    public bool IncludesTrackData => DataFlags.HasFlag(BogieFlags.IncludesTrackData);
-    public bool HasDerailed => DataFlags.HasFlag(BogieFlags.HasDerailed);
+    public readonly int TrackDirection => DataFlags.HasFlag(BogieFlags.TrackReversed) ? -1 : 1;
+    public readonly bool IncludesTrackData => DataFlags.HasFlag(BogieFlags.IncludesTrackData);
+    public readonly bool HasDerailed => DataFlags.HasFlag(BogieFlags.HasDerailed);
 
-    private BogieData(BogieFlags flags, double positionAlongTrack, ushort trackNetId, int trackDirection)
+    private BogieData(BogieFlags flags, double positionAlongTrack, ushort trackNetId)
     {
         // Prevent invalid state combinations
         if (flags.HasFlag(BogieFlags.HasDerailed))
@@ -30,32 +31,34 @@ public readonly struct BogieData
         DataFlags = flags;
         PositionAlongTrack = positionAlongTrack;
         TrackNetId = trackNetId;
-        TrackDirection = trackDirection;
     }
 
-    public static BogieData FromBogie(Bogie bogie, bool includeTrack)
+    public static BogieData FromBogie(Bogie bogie)
     {
-        bool includesTrackData = includeTrack && !bogie.HasDerailed && bogie.track;
+        bool includesTrackData = !bogie.HasDerailed && bogie.track;
 
         BogieFlags flags = BogieFlags.None;
+
         if (includesTrackData) flags |= BogieFlags.IncludesTrackData;
         if (bogie.HasDerailed) flags |= BogieFlags.HasDerailed;
+        if (bogie.trackDirection == -1) flags |= BogieFlags.TrackReversed;
 
         return new BogieData(
             flags,
             bogie.traveller?.Span ?? -1.0,
-            includesTrackData ? bogie.track.Networked().NetId : (ushort)0,
-            bogie.trackDirection
+            includesTrackData ? bogie.track.Networked().NetId : (ushort)0
         );
     }
 
     public static void Serialize(NetDataWriter writer, BogieData data)
     {
         writer.Put((byte)data.DataFlags);
-        if (!data.HasDerailed) writer.Put(data.PositionAlongTrack);
-        if (!data.IncludesTrackData) return;
-        writer.Put(data.TrackNetId);
-        writer.Put(data.TrackDirection);
+
+        if (!data.HasDerailed)
+            writer.Put(data.PositionAlongTrack);
+
+        if (data.IncludesTrackData)
+            writer.Put(data.TrackNetId);
     }
 
     public static BogieData Deserialize(NetDataReader reader)
@@ -69,13 +72,9 @@ public readonly struct BogieData
 
         // Read track data if included
         ushort trackNetId = 0;
-        int trackDirection = 0;
         if (flags.HasFlag(BogieFlags.IncludesTrackData))
-        {
             trackNetId = reader.GetUShort();
-            trackDirection = reader.GetInt();
-        }
 
-        return new BogieData(flags, positionAlongTrack, trackNetId, trackDirection);
+        return new BogieData(flags, positionAlongTrack, trackNetId);
     }
 }

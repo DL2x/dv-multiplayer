@@ -188,8 +188,8 @@ public readonly struct TrainsetSpawnPart
             trainCar.GetForwardSpeed(),
             transform.position - WorldMover.currentMove,
             transform.rotation,
-            BogieData.FromBogie(trainCar.Bogies[0], true),
-            BogieData.FromBogie(trainCar.Bogies[1], true),
+            BogieData.FromBogie(trainCar.Bogies[0]),
+            BogieData.FromBogie(trainCar.Bogies[1]),
             BrakeSystemData.From(trainCar.brakeSystem)
         );
     }

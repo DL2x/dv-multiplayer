@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using DV.CabControls;
 using DV.Customization.Paint;
 using DV.MultipleUnit;
 using DV.Simulation.Brake;
@@ -53,7 +54,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         return trainCarIdToNetworkedTrainCars.TryGetValue(carId, out networkedTrainCar);
     }
-    public static bool  GetTrainCarFromTrainId(string carId, out TrainCar trainCar)
+    public static bool GetTrainCarFromTrainId(string carId, out TrainCar trainCar)
     {
         return trainCarIdToTrainCars.TryGetValue(carId, out trainCar);
     }
@@ -68,9 +69,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private const int MAX_COUPLER_ITERATIONS = 10;
     private const float MAX_FIREBOX_DELTA = 0.1f;
     private const float MAX_PORT_DELTA = 0.001f;
+    private const uint MIN_KINEMATIC_CYCLES = 10;
 
 
-    public string CurrentID {  get; private set; }
+    public string CurrentID { get; private set; }
     public TrainCar TrainCar;
     public uint TicksSinceSync = uint.MaxValue;
     public bool HasPlayers => PlayerManager.Car == TrainCar || GetComponentInChildren<NetworkedPlayer>() != null;
@@ -93,7 +95,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private bool brakeOverheatDirty;
 
     public bool BogieTracksDirty;
-    private bool cargoDirty;
+    private bool cargoStateDirty;
+    private bool cargoHealthDirty;
     private bool cargoIsLoading;
     public byte CargoModelIndex = byte.MaxValue;
     private bool healthDirty;
@@ -111,7 +114,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private int rearInteractionPeer;
     #region Client
 
-    public bool Client_Initialized {get; private set;}
+    public bool Client_Initialized { get; private set; }
     public TickedQueue<float> Client_trainSpeedQueue;
     public TickedQueue<RigidbodySnapshot> Client_trainRigidbodyQueue;
     public TickedQueue<BogieData> client_bogie1Queue;
@@ -121,6 +124,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private Coupler couplerInteraction;
     private ChainCouplerInteraction.State originalState;
     private Coupler originalCoupledTo;
+
+    private uint kinematicCycles = 0;
     #endregion
 
     protected override bool IsIdServerAuthoritative => true;
@@ -133,13 +138,14 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         trainCarsToNetworkedTrainCars[TrainCar] = this;
 
         TrainCar.LogicCarInitialized += OnLogicCarInitialised;
-        
+
         bogie1 = TrainCar.Bogies[0];
         bogie2 = TrainCar.Bogies[1];
 
         if (NetworkLifecycle.Instance.IsHost())
         {
             NetworkTrainsetWatcher.Instance.CheckInstance(); // Ensure the NetworkTrainsetWatcher is initialized
+            Client_Initialized = true;
         }
         else
         {
@@ -154,14 +160,16 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         brakeSystem = TrainCar.brakeSystem;
 
+        Multiplayer.LogDebug(() => $"TrainCar Created: {TrainCar?.ID}, {NetId}");
+
         foreach (Coupler coupler in TrainCar.couplers)
         {
             hoseToCoupler[coupler.hoseAndCock] = coupler;
 
-            Multiplayer.LogDebug(() => $"TrainCar.Start() [{TrainCar?.ID}, {NetId}], Coupler exists: {coupler != null}, Is front: {coupler.isFrontCoupler}, ChainScript exists: {coupler.ChainScript != null}");
+            //Multiplayer.LogDebug(() => $"TrainCar.Start() [{TrainCar?.ID}, {NetId}], Coupler exists: {coupler != null}, Is front: {coupler.isFrontCoupler}, ChainScript exists: {coupler.ChainScript != null}");
 
             //Locos with tenders and tenders only have one chainscript each, no trainscript is used for the hitch between the loco and tender
-            if(coupler.ChainScript != null)
+            if (coupler.ChainScript != null)
                 coupler.ChainScript.StateChanged += (state) => { Client_CouplerStateChange(state, coupler); };
         }
 
@@ -176,11 +184,11 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             foreach (KeyValuePair<string, Port> kvp in simulationFlow.fullPortIdToPort)
                 if (kvp.Value.valueType == PortValueType.CONTROL || NetworkLifecycle.Instance.IsHost())
                     kvp.Value.ValueUpdatedInternally += _ => { Common_OnPortUpdated(kvp.Value); };
-                
+
             dirtyFuses = new HashSet<string>(simulationFlow.fullFuseIdToFuse.Count);
             foreach (KeyValuePair<string, Fuse> kvp in simulationFlow.fullFuseIdToFuse)
                 kvp.Value.StateUpdated += _ => { Common_OnFuseUpdated(kvp.Value); };
-        
+
             if (simController.firebox != null)
             {
                 firebox = simController.firebox;
@@ -188,7 +196,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                 firebox.fireboxIgnitionPort.ValueUpdatedInternally += Client_OnIgnite;      //Player igniting firebox
             }
         }
-         
+
         brakeSystem.HandbrakePositionChanged += Common_OnHandbrakePositionChanged;
         brakeSystem.BrakeCylinderReleased += Common_OnBrakeCylinderReleased;
 
@@ -205,6 +213,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
             bogie1.TrackChanged += Server_BogieTrackChanged;
             bogie2.TrackChanged += Server_BogieTrackChanged;
+
+            TrainCar.frontCoupler.Uncoupled += Server_CouplerUncoupled;
+            TrainCar.rearCoupler.Uncoupled += Server_CouplerUncoupled;
+
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate += Server_CarHealthUpdate;
 
             brakeSystem.MainResPressureChanged += Server_MainResUpdate;
@@ -251,7 +263,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             brakeSystem.BrakeCylinderReleased -= Common_OnBrakeCylinderReleased;
         }
 
-        if(TrainCar.PaintExterior != null)
+        if (TrainCar.PaintExterior != null)
             TrainCar.PaintExterior.OnThemeChanged -= Common_OnPaintThemeChange;
         if (TrainCar.PaintInterior != null)
             TrainCar.PaintInterior.OnThemeChanged -= Common_OnPaintThemeChange;
@@ -261,9 +273,12 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             bogie1.TrackChanged -= Server_BogieTrackChanged;
             bogie2.TrackChanged -= Server_BogieTrackChanged;
 
+            TrainCar.frontCoupler.Uncoupled -= Server_CouplerUncoupled;
+            TrainCar.rearCoupler.Uncoupled -= Server_CouplerUncoupled;
+
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate -= Server_CarHealthUpdate;
 
-            if(brakeSystem != null)
+            if (brakeSystem != null)
             {
                 brakeSystem.MainResPressureChanged -= Server_MainResUpdate;
                 brakeSystem.heatController.OverheatingActiveStateChanged -= Server_BrakeHeatUpdate;
@@ -303,7 +318,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         {
             Multiplayer.LogWarning("OnLogicCarInitialised Car Not Initialised!");
         }
-        
+
     }
     private IEnumerator Server_WaitForLogicCar()
     {
@@ -312,6 +327,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         TrainCar.logicCar.CargoLoaded += Server_OnCargoLoaded;
         TrainCar.logicCar.CargoUnloaded += Server_OnCargoUnloaded;
+        TrainCar.CargoDamage.CargoEffectiveHealthStateUpdate += Server_OnHealthUpdate;
 
         Server_DirtyAllState();
     }
@@ -320,7 +336,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         handbrakeDirty = true;
         mainResPressureDirty = true;
-        cargoDirty = true;
+        cargoStateDirty = true;
+        cargoHealthDirty = true;
         cargoIsLoading = true;
         healthDirty = true;
         BogieTracksDirty = true;
@@ -384,15 +401,20 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void Server_OnCargoLoaded(CargoType obj)
     {
-        cargoDirty = true;
+        cargoStateDirty = true;
         cargoIsLoading = true;
     }
 
     private void Server_OnCargoUnloaded()
     {
-        cargoDirty = true;
+        cargoStateDirty = true;
         cargoIsLoading = false;
         CargoModelIndex = byte.MaxValue;
+    }
+
+    private void Server_OnHealthUpdate(float health)
+    {
+        cargoHealthDirty = true;
     }
 
     private void Server_CarHealthUpdate(float health)
@@ -415,6 +437,11 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         fireboxDirty = true;
     }
 
+    private void Server_CouplerUncoupled(object _, UncoupleEventArgs args)
+    {
+        sendCouplers |= args.dueToBrokenCouple;
+    }
+
     private void Server_OnTick(uint tick)
     {
         if (UnloadWatcher.isUnloading)
@@ -422,9 +449,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         Server_SendBrakeStates();
         Server_SendFireBoxState();
-        //Server_SendCouplers();
+        Server_SendCouplers();
         Server_SendCables();
         Server_SendCargoState();
+        Server_SendHealthUpdate();
         Server_SendHealthState();
 
         TicksSinceSync++; //keep track of last full sync
@@ -460,17 +488,25 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         sendCouplers = false;
 
-        if(TrainCar.frontCoupler.IsCoupled())
-            NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.frontCoupler,TrainCar.frontCoupler.coupledTo,false, false);
+        if (!TrainCar.frontCoupler.IsCoupled())
+            //    NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.frontCoupler,TrainCar.frontCoupler.coupledTo,false, false);
+            //else
+            NetworkLifecycle.Instance.Server.SendTrainUncouple(TrainCar.frontCoupler, true, true, false);
 
-        if(TrainCar.rearCoupler.IsCoupled())
-            NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.rearCoupler,TrainCar.rearCoupler.coupledTo,false, false);
+        if (!TrainCar.rearCoupler.IsCoupled())
+            //    NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.rearCoupler,TrainCar.rearCoupler.coupledTo,false, false);
+            //else
+            NetworkLifecycle.Instance.Server.SendTrainUncouple(TrainCar.rearCoupler, true, true, false);
 
-        if (TrainCar.frontCoupler.hoseAndCock.IsHoseConnected)
-            NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.frontCoupler, TrainCar.frontCoupler.coupledTo, false);
+        if (!TrainCar.frontCoupler.hoseAndCock.IsHoseConnected)
+            //    NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.frontCoupler, TrainCar.frontCoupler.coupledTo, false);
+            //else
+            NetworkLifecycle.Instance.Client.SendHoseDisconnected(TrainCar.frontCoupler, true);
 
-        if (TrainCar.rearCoupler.hoseAndCock.IsHoseConnected)
-            NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.rearCoupler, TrainCar.rearCoupler.coupledTo, false);
+        if (!TrainCar.rearCoupler.hoseAndCock.IsHoseConnected)
+            //    NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.rearCoupler, TrainCar.rearCoupler.coupledTo, false);
+            //else
+            NetworkLifecycle.Instance.Client.SendHoseDisconnected(TrainCar.rearCoupler, true);
 
         NetworkLifecycle.Instance.Client.SendCockState(NetId, TrainCar.frontCoupler, TrainCar.frontCoupler.IsCockOpen);
         NetworkLifecycle.Instance.Client.SendCockState(NetId, TrainCar.rearCoupler, TrainCar.rearCoupler.IsCockOpen);
@@ -481,7 +517,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return;
         sendCables = false;
 
-        if(TrainCar.muModule == null)
+        if (TrainCar.muModule == null)
             return;
 
         if (TrainCar.muModule.frontCable.IsConnected)
@@ -493,12 +529,26 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void Server_SendCargoState()
     {
-        if (!cargoDirty)
+        if (!cargoStateDirty)
             return;
-        cargoDirty = false;
+        cargoStateDirty = false;
         if (cargoIsLoading && TrainCar.logicCar.CurrentCargoTypeInCar == CargoType.None)
             return;
-        NetworkLifecycle.Instance.Server.SendCargoState(TrainCar, NetId, cargoIsLoading, CargoModelIndex);
+
+        NetworkLifecycle.Instance.Server.SendCargoState(this, cargoIsLoading, CargoModelIndex);
+    }
+
+    private void Server_SendHealthUpdate()
+    {
+        if (!cargoHealthDirty)
+            return;
+
+        cargoHealthDirty = false;
+
+        if (TrainCar.logicCar.CurrentCargoTypeInCar == CargoType.None)
+            return;
+
+        NetworkLifecycle.Instance.Server.SendCargoHealthUpdate(NetId, TrainCar.CargoDamage.currentHealth);
     }
 
     private void Server_SendHealthState()
@@ -539,7 +589,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                 rearInteractionPeer = peer.Id;
             }
         }
-        else 
+        else
         {
             if (packet.IsFrontCoupler)
                 frontInteracting = false;
@@ -561,7 +611,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             Multiplayer.LogWarning($"Server_OnPlayerDisconnect() Coupler interaction in unknown state [{CurrentID}, {NetId}] isFront: {frontInteractionPeer == id}");
             if (frontInteractionPeer == id)
             {
-                frontInteracting = false ;
+                frontInteracting = false;
                 //NetworkLifecycle.Instance.Client.SendCouplerInteraction(cou, coupler, otherCoupler);
             }
             else
@@ -642,7 +692,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         float[] portValues = new float[portIds.Length];
         foreach (string portId in dirtyPorts)
         {
-            if(simulationFlow.TryGetPort(portId, out Port port))
+            if (simulationFlow.TryGetPort(portId, out Port port))
             {
                 float value = port.Value;
                 portValues[i] = value;
@@ -672,7 +722,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         foreach (string fuseId in dirtyFuses)
         {
-            if(simulationFlow.TryGetFuse(fuseId, out Fuse fuse))
+            if (simulationFlow.TryGetFuse(fuseId, out Fuse fuse))
                 fuseValues[i] = fuse.State;
             else
                 Multiplayer.LogWarning($"SendFuses() [{CurrentID}, {NetId}] Failed to find fuse \"{fuseId}\"");
@@ -741,7 +791,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void Common_OnPaintThemeChange(TrainCarPaint paintController)
     {
-        if(paintController == null)
+        if (paintController == null)
             return;
 
         Multiplayer.LogDebug(() => $"Common_OnPaintThemeChange() target: {paintController.TargetArea}, theme: {paintController.CurrentTheme.name}");
@@ -750,7 +800,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         var theme = PaintThemeLookup.Instance.GetThemeIndex(paintController.CurrentTheme);
 
         Multiplayer.LogDebug(() => $"Common_OnPaintThemeChange() sending [{CurrentID},{NetId}], target: {paintController.TargetArea}, theme: [{paintController.CurrentTheme.name},{theme}]");
-        NetworkLifecycle.Instance?.Client.SendPaintThemeChangePacket(NetId,target,theme);
+        NetworkLifecycle.Instance?.Client.SendPaintThemeChangePacket(NetId, target, theme);
     }
 
     private void Common_OnFuseUpdated(Fuse fuse)
@@ -804,6 +854,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         TrainCar otherCar = null;
         Coupler otherCoupler = null;
 
+        ButtonBase buttonBase = coupler?.ChainScript?.screwButton.GetComponent<ButtonBase>();
+
         Multiplayer.LogDebug(() => $"Common_ReceiveCouplerInteraction() couplerNetId: {NetId}, coupler is front: {packet.IsFrontCoupler}, flags: {flags}, otherCouplerNetId: {packet.OtherNetId}, otherCoupler is front: {packet.IsFrontOtherCoupler}");
 
         if (coupler == null)
@@ -842,7 +894,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                     StartCoroutine(DangleCoupler(coupler));
                     break;
                 case ChainCouplerInteraction.State.Attached_Loose:
-                    if(coupler.ChainScript.state == ChainCouplerInteraction.State.Attached_Tight)
+                    if (coupler.ChainScript.state == ChainCouplerInteraction.State.Attached_Tight)
                         coupler.ChainScript.fsm.Fire(ChainCouplerInteraction.Trigger.Screw_Used);
                     else
                         StartCoroutine(LooseAttachCoupler(coupler, originalCoupledTo));
@@ -866,8 +918,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             //Another player must be interacting, so let's block us from tampering with it
             if (coupler?.ChainScript?.knobGizmo)
                 coupler.ChainScript.knobGizmo.InteractionAllowed = false;
-            if(coupler?.ChainScript?.screwButtonBase)
-                coupler.ChainScript.screwButtonBase.InteractionAllowed = false;
+            if (buttonBase)
+                buttonBase.InteractionAllowed = false;
 
             return;
         }
@@ -918,7 +970,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                 Multiplayer.LogDebug(() => $"7 Common_ReceiveCouplerInteraction() [{TrainCar?.ID}, {NetId}], coupler is front: {packet.IsFrontCoupler}, flags: {flags}");
                 coupler.ChainScript.fsm.Fire(ChainCouplerInteraction.Trigger.Screw_Used);
             }
-            else if(coupler.ChainScript.CurrentState == ChainCouplerInteraction.State.Disabled && coupler.state == ChainCouplerInteraction.State.Attached_Tight)
+            else if (coupler.ChainScript.CurrentState == ChainCouplerInteraction.State.Disabled && coupler.state == ChainCouplerInteraction.State.Attached_Tight)
             {
                 //if it's disabled we'll use the internal routines and the state will restore when this player sees the coupling next
                 coupler.SetChainTight(false);
@@ -946,7 +998,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             bool chainInteraction = !flags.HasFlag(CouplerInteractionType.HoseConnect);
 
             Multiplayer.LogDebug(() => $"10 Common_ReceiveCouplerInteraction() [{TrainCar?.ID}, {NetId}], coupler is front: {packet.IsFrontCoupler}, flags: [{flags}], other coupler: {otherCoupler != null}, chainInteraction: {chainInteraction}");
-            if(otherCoupler != null)
+            if (otherCoupler != null)
             {
                 Multiplayer.LogDebug(() => $"10A Common_ReceiveCouplerInteraction() [{TrainCar?.ID}, {NetId}], coupler state: {coupler.state}, other coupler state: {otherCoupler.state}, coupler coupledTo: {coupler?.coupledTo?.train?.ID}, other coupledTo: {otherCoupler?.coupledTo?.train?.ID}, chainInteraction: {chainInteraction}");
                 var car = coupler.CoupleTo(otherCoupler, viaChainInteraction: chainInteraction);
@@ -971,7 +1023,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             bool chainInteraction = !flags.HasFlag(CouplerInteractionType.HoseDisconnect);
 
             Multiplayer.LogDebug(() => $"11 Common_ReceiveCouplerInteraction() [{TrainCar?.ID}, {NetId}], coupler is front: {packet.IsFrontCoupler}, flags: {flags}, chainInteraction: {chainInteraction}");
-            CouplerLogic.Uncouple(coupler,viaChainInteraction: chainInteraction);
+            CouplerLogic.Uncouple(coupler, viaChainInteraction: chainInteraction);
 
             /* fix for bug in vanilla game */
             coupler.state = ChainCouplerInteraction.State.Parked;
@@ -1006,8 +1058,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         //presumably the interaction is now complete, release control to player
         if (coupler?.ChainScript?.knobGizmo)
             coupler.ChainScript.knobGizmo.InteractionAllowed = true;
-        if (coupler?.ChainScript?.screwButtonBase)
-            coupler.ChainScript.screwButtonBase.InteractionAllowed = true;
+        if (buttonBase)
+            buttonBase.InteractionAllowed = true;
     }
 
     private IEnumerator LooseAttachCoupler(Coupler coupler, Coupler otherCoupler)
@@ -1022,7 +1074,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         ChainCouplerInteraction ccInteraction = coupler.ChainScript;
 
-        if(ccInteraction.CurrentState == ChainCouplerInteraction.State.Disabled)
+        if (ccInteraction.CurrentState == ChainCouplerInteraction.State.Disabled)
         {
             //since it's disabled FSM events won't fire. Force a coupling if required, otherwise set state ready for player visibility trigger
 
@@ -1067,7 +1119,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (ccInteraction.CurrentState == ChainCouplerInteraction.State.Disabled)
         {
             //since it's disabled FSM events won't fire, but state will be restored when the coupling is visible to the current player
-            if(coupler.state == ChainCouplerInteraction.State.Attached_Loose && coupler.coupledTo != null)
+            if (coupler.state == ChainCouplerInteraction.State.Attached_Loose && coupler.coupledTo != null)
                 coupler.Uncouple(true, false, false, true);
 
             coupler.state = ChainCouplerInteraction.State.Parked;
@@ -1102,6 +1154,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         //Drop the chain
         coupler.ChainScript.fsm.Fire(ChainCouplerInteraction.Trigger.Dropped_By_Player);
     }
+
     private IEnumerator DangleCoupler(Coupler coupler)
     {
         ChainCouplerInteraction ccInteraction = coupler.ChainScript;
@@ -1194,21 +1247,28 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         if (movementPart.typeFlag == TrainsetMovementPart.MovementType.RigidBody)
         {
-            //Multiplayer.LogDebug(() => $"Client_ReceiveTrainPhysicsUpdate({TrainCar.ID}, {tick}): is RigidBody");
-            TrainCar.Derail();
-            TrainCar.stress.ResetTrainStress();
-            if (TrainCar.rb != null)
-                TrainCar.rb.constraints = RigidbodyConstraints.FreezeAll;
+            //Vector3 expectedPosition = movementPart.RigidbodySnapshot.Position + WorldMover.currentMove;
+            //Multiplayer.LogDebug(() => $"Processing derailed physics for car {CurrentID} at tick {tick}, current position: {TrainCar.transform.position} expected position: {expectedPosition}");
 
-            Client_trainRigidbodyQueue.ReceiveSnapshot(movementPart.RigidbodySnapshot, tick);
+            TrainCar.Derail();
+            movementPart.RigidbodySnapshot.Apply(TrainCar.rb);
+
+        //    Client_trainRigidbodyQueue.ReceiveSnapshot(movementPart.RigidbodySnapshot, tick);
+
+            //Multiplayer.LogDebug(() => $"Derailed car {TrainCar.ID} positioned at {TrainCar.transform.position}");
         }
         else
         {
             //move the car to the correct position first - maybe?
             if (movementPart.typeFlag.HasFlag(TrainsetMovementPart.MovementType.Position))
             {
-                TrainCar.transform.position = movementPart.Position + WorldMover.currentMove;
-                TrainCar.transform.rotation = movementPart.Rotation;
+                Vector3 worldPos = movementPart.Position + WorldMover.currentMove;
+
+                if (TrainCar.rb != null)
+                {
+                    TrainCar.rb.MovePosition(worldPos);
+                    TrainCar.rb.MoveRotation(movementPart.Rotation);
+                }
 
                 //clear the queues?
                 Client_trainSpeedQueue.Clear();
@@ -1224,11 +1284,20 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             client_bogie1Queue.ReceiveSnapshot(movementPart.Bogie1, tick);
             client_bogie2Queue.ReceiveSnapshot(movementPart.Bogie2, tick);
 
-            
         }
 
-        if (!TrainCar.derailed && TrainCar.rb != null)
-            TrainCar.rb.constraints = RigidbodyConstraints.None;
+        bool kinematic = movementPart.Speed < NetworkTrainsetWatcher.VELOCITY_THRESHOLD && (movementPart.RigidbodySnapshot != null && movementPart.RigidbodySnapshot.Velocity.magnitude < NetworkTrainsetWatcher.VELOCITY_THRESHOLD);
+
+        if (kinematic && kinematicCycles < MIN_KINEMATIC_CYCLES)
+            kinematicCycles++;
+        else
+            TrainCar.rb.isKinematic = kinematic;
+
+        if (!kinematic)
+        {
+            kinematicCycles = 0;
+            TrainCar.rb.isKinematic = kinematic;
+        }
     }
 
     public void Client_ReceiveBrakeStateUpdate(ClientboundBrakeStateUpdatePacket packet)
@@ -1292,7 +1361,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     public void Client_CouplerStateChange(ChainCouplerInteraction.State state, Coupler coupler)
     {
-        Multiplayer.LogDebug(() => $"1 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}], coupler is front: {coupler?.isFrontCoupler}");
+        //Multiplayer.LogDebug(() => $"1 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}], coupler is front: {coupler?.isFrontCoupler}");
 
         //if we are processing a packet, then these state changes are likely triggered by a received update, not player interaction
         //in future, maybe patch OnGrab() or add logic to add/remove action subscriptions
@@ -1309,7 +1378,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                 originalState = coupler.state;
                 originalCoupledTo = coupler.coupledTo;
                 interactionFlags = CouplerInteractionType.Start;
-                Multiplayer.LogDebug(() => $"3 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}]");
+                //Multiplayer.LogDebug(() => $"3 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}]");
                 break;
 
             case ChainCouplerInteraction.State.Attached_Loose:
@@ -1318,7 +1387,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                     //couldn't find an appropriate constant in the game code, other than the default value
                     //at B99.3 this distance is 1.5f for both default and constant/magic number
                     otherCoupler = coupler.GetFirstCouplerInRange();
-                    Multiplayer.LogDebug(() => $"4 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}] coupledTo: {coupler?.coupledTo?.train?.ID}, first Coupler: {otherCoupler?.train?.ID}");
+                    //Multiplayer.LogDebug(() => $"4 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}] coupledTo: {coupler?.coupledTo?.train?.ID}, first Coupler: {otherCoupler?.train?.ID}");
                     interactionFlags = CouplerInteractionType.CouplerCouple;
                 }
                 break;
@@ -1326,7 +1395,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             case ChainCouplerInteraction.State.Parked:
                 if (couplerInteraction != null)
                 {
-                    Multiplayer.LogDebug(() => $"6 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}]");
+                    //Multiplayer.LogDebug(() => $"6 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}]");
                     interactionFlags = CouplerInteractionType.CouplerPark;
                 }
                 break;
@@ -1334,7 +1403,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             case ChainCouplerInteraction.State.Dangling:
                 if (couplerInteraction != null)
                 {
-                    Multiplayer.LogDebug(() => $"7 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}]");
+                    //Multiplayer.LogDebug(() => $"7 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}]");
                     interactionFlags = CouplerInteractionType.CouplerDrop;
                 }
                 break;
@@ -1346,7 +1415,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         if (interactionFlags != CouplerInteractionType.NoAction)
         {
-            Multiplayer.LogDebug(() => $"8 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}], coupler is front: {coupler?.isFrontCoupler}, Sending: {interactionFlags}");
+            //Multiplayer.LogDebug(() => $"8 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}], coupler is front: {coupler?.isFrontCoupler}, Sending: {interactionFlags}");
             NetworkLifecycle.Instance.Client.SendCouplerInteraction(interactionFlags, coupler, otherCoupler);
 
             //finished interaction, clear flag
@@ -1355,7 +1424,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
             return;
         }
-        Multiplayer.LogDebug(() => $"9 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}]");
+        //Multiplayer.LogDebug(() => $"9 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}]");
     }
     #endregion
 }
