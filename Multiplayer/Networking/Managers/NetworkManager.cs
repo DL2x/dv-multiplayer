@@ -63,6 +63,8 @@ public abstract class NetworkManager
         netPacketProcessor.RegisterNestedType(TrainsetSpawnPart.Serialize, TrainsetSpawnPart.Deserialize);
         netPacketProcessor.RegisterNestedType(TrainCarHealthData.Serialize, TrainCarHealthData.Deserialize);
         netPacketProcessor.RegisterNestedType(PitStopStationMappingData.Serialize, PitStopStationMappingData.Deserialize);
+        netPacketProcessor.RegisterNestedType(LocoResourceModuleData.Serialize, LocoResourceModuleData.Deserialize);
+        netPacketProcessor.RegisterNestedType(PitStopPlugData.Serialize, PitStopPlugData.Deserialize);
         netPacketProcessor.RegisterNestedType(Vector2Serializer.Serialize, Vector2Serializer.Deserialize);
         netPacketProcessor.RegisterNestedType(Vector3Serializer.Serialize, Vector3Serializer.Deserialize);
     }

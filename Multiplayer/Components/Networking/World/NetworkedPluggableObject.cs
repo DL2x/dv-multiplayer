@@ -28,7 +28,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     protected override bool IsIdServerAuthoritative => true;
 
     #region Server Variables
-    public PlugInteractionType CurrentInteration {  get; set; }
+    public PlugInteractionType CurrentInteraction {  get; set; }
     public ServerPlayer HeldBy { get; private set; }
     public ushort TrainCarNetId { get; private set; }
     public bool IsConnectedLeft { get; private set; }
@@ -55,9 +55,12 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
         Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Awake() {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
     }
 
-    private IEnumerator Start()
+    protected IEnumerator Start()
     {
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Start() {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
         yield return new WaitUntil(() => PluggableObject?.controlBase != null);
+
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Start() Controlbase {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
 
         grabHandler = this.GetComponent<GrabHandlerGizmoItem>();
 
@@ -94,7 +97,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
         //todo: implement validation code (player distance, player interacting, etc.)
 
         //validate and update
-        CurrentInteration = interactionType;
+        CurrentInteraction = interactionType;
 
         if (interactionType == PlugInteractionType.DockSocket)
         {
@@ -272,8 +275,12 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     #region Client
     private void OnGrabbed(ControlImplBase control)
     {
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.OnGrabbed() pre [{transform.parent.name}, {NetId}] station: {Station?.StationName}");
+
         if (NetworkLifecycle.Instance.IsProcessingPacket)
             return;
+
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.OnGrabbed() post [{transform.parent.name}, {NetId}] station: {Station?.StationName}");
 
         //Prevent new players/players entering the area from sending packets until initalised
         if (!Refreshed)

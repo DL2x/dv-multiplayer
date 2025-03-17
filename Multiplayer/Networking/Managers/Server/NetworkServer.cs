@@ -54,8 +54,8 @@ public class NetworkServer : NetworkManager
     public IReadOnlyCollection<ServerPlayer> ServerPlayers => serverPlayers.Values;
     public int PlayerCount => ServerPlayers.Count;
 
-    private static ITransportPeer SelfPeer => NetworkLifecycle.Instance.Client?.SelfPeer;
-    public static byte SelfId => (byte)SelfPeer.Id;
+    public ITransportPeer SelfPeer => NetworkLifecycle.Instance.Client?.SelfPeer;
+    public byte SelfId => (byte)SelfPeer.Id;
     private readonly ModInfo[] serverMods;
 
     public readonly IDifficulty Difficulty;
@@ -577,13 +577,15 @@ public class NetworkServer : NetworkManager
         }
     }
 
-    public void SendPitStopBulkDataPacket(ushort netId, PitStopStationData[] stationData, PitStopPlugData[] plugData , ITransportPeer peer = null)
+    public void SendPitStopBulkDataPacket(ushort netId, int carCount, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData , ITransportPeer peer = null)
     {
         LogDebug(() => $"SendPitStopBulkDataPacket({netId}, {stationData.Count()}, {plugData.Count()}, {peer?.Id})");
 
         var packet = new ClientboundPitStopBulkUpdatePacket
         {
-            PitStopData = stationData,
+            NetId = netId,
+            CarCount = carCount,
+            ResourceData = stationData,
             PlugData = plugData,
         };
 
@@ -591,6 +593,13 @@ public class NetworkServer : NetworkManager
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered);
         else
             SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
+    }
+
+    public void SendPitStopInteractionPacket(ITransportPeer peer, CommonPitStopInteractionPacket packet)
+    {
+        LogDebug(() => $"SendPitStopInteractionPacket({peer.Id}, {packet.NetId})");
+
+        SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
     public void SendChat(string message, ITransportPeer exclude = null)
@@ -1207,27 +1216,10 @@ public class NetworkServer : NetworkManager
     private void OnCommonPitStopInteractionPacket(CommonPitStopInteractionPacket packet, ITransportPeer peer)
     {
 
-        if(NetworkedPitStopStation.Get(packet.NetId, out NetworkedPitStopStation controller))
-        {
-            if (controller.ValidateInteraction(packet))
-            {
-                //passed validation, send to all but the originator
-                SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
-            }
-            else
-            {
-                //Failed to validate, player needs to rollback interaction
-                SendPacket(peer, new CommonPitStopInteractionPacket
-                {
-                    NetId = packet.NetId,
-                    InteractionType = (byte)PitStopStationInteractionType.Reject
-                }, DeliveryMethod.ReliableOrdered);
-            }
-        }
+        if (NetworkedPitStopStation.Get(packet.NetId, out NetworkedPitStopStation controller))
+            controller.ProcessInteractionPacketAsHost(packet, peer);
         else
-        {
-            LogError($"OnCommonPitStopInteractionPacket() Failed to find PitStopStation with netId: {packet.NetId}");
-        }
+            LogWarning($"OnCommonPitStopInteractionPacket() Failed to find PitStopStation with netId: {packet.NetId}");
     }
     private void OnCommonPitStopPlugInteractionPacket(CommonPitStopPlugInteractionPacket packet, ITransportPeer peer)
     {

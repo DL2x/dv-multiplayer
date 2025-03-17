@@ -8,5 +8,5 @@
     "LoadAfter":  [
                       "RemoteDispatch"
                   ],
-    "Repository":  "https://www.andrewcraigmackenzie.com/unitymods/Releases.json"
+    "Repository":  "https://raw.githubusercontent.com/AMacro/dv-multiplayer/refs/heads/beta/releases.json"
 }

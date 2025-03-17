@@ -20,8 +20,8 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
         return new PitStopPlugData
             (
                 plugData.NetId,
-                plugData.CurrentInteration,
-                plugData.HeldBy.Id,
+                plugData.CurrentInteraction,
+                plugData.HeldBy?.Id ?? 0,
                 plugData.TrainCarNetId,
                 plugData.IsConnectedLeft,
                 plugData.transform.AbsolutePosition(),

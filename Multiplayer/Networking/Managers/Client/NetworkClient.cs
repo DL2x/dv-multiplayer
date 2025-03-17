@@ -1008,7 +1008,7 @@ public class NetworkClient : NetworkManager
         Log($"Pit stop interaction received for {netPitStop.StationName}");
 
         LogDebug(() => $"OnCommonPitStopInteractionPacket() [{netPitStop.StationName}, {packet.NetId}], interaction: [{packet.InteractionType}], resource: {packet?.ResourceType}, State: {packet.State}");
-        netPitStop.ProcessPacket(packet);
+        netPitStop.ProcessInteractionPacketAsClient(packet);
     }
 
     private void OnCommonPitStopPlugInteractionPacket(CommonPitStopPlugInteractionPacket packet)

@@ -9,6 +9,7 @@ namespace Multiplayer.Networking.Packets.Clientbound.World;
 public class ClientboundPitStopBulkUpdatePacket
 {
     public ushort NetId { get; set; }
-    public PitStopStationData[] PitStopData { get; set; }
+    public int CarCount { get; set; }
+    public LocoResourceModuleData[] ResourceData { get; set; }
     public PitStopPlugData[] PlugData { get; set; }
 }
