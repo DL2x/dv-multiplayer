@@ -1007,7 +1007,7 @@ public class NetworkClient : NetworkManager
 
         Log($"Pit stop interaction received for {netPitStop.StationName}");
 
-        LogDebug(() => $"OnCommonPitStopInteractionPacket() [{netPitStop.StationName}, {packet.NetId}], interaction: [{packet.InteractionType}], resource: {packet?.ResourceType}, State: {packet.State}");
+        LogDebug(() => $"OnCommonPitStopInteractionPacket() [{netPitStop.StationName}, {packet.NetId}], interaction: [{packet.InteractionType}], resource: {packet?.ResourceType}, State: {packet.Value}");
         netPitStop.ProcessInteractionPacketAsClient(packet);
     }
 
@@ -1213,7 +1213,7 @@ public class NetworkClient : NetworkManager
     //    {
     //        NetId = couplerNetId, //coupler.train.GetNetId(),
     //        IsFrontCoupler = coupler.isFrontCoupler,
-    //        State = (byte)coupler.state,
+    //        Value = (byte)coupler.state,
     //        OtherNetId = otherCouplerNetId, //otherCoupler.train.GetNetId(),
     //        OtherState = (byte)otherCoupler.state,
     //        OtherCarIsFrontCoupler = otherCoupler.isFrontCoupler,
@@ -1431,7 +1431,7 @@ public class NetworkClient : NetworkManager
             NetId = netId,
             InteractionType = (byte)interaction,
             ResourceType = res,
-            State = state
+            Value = state
         }, DeliveryMethod.ReliableOrdered);
     }
 
