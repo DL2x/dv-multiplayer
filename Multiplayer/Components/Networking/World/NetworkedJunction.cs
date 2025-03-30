@@ -18,11 +18,13 @@ public class NetworkedJunction : IdMonoBehaviour<ushort, NetworkedJunction>
         base.Awake();
         Junction = GetComponent<Junction>();
         Junction.Switched += Junction_Switched;
+
+        initialised = NetworkLifecycle.Instance.IsHost();
     }
 
     private void Junction_Switched(Junction.SwitchMode switchMode, int branch)
     {
-        if (NetworkLifecycle.Instance.IsProcessingPacket)
+        if (NetworkLifecycle.Instance.IsProcessingPacket || !initialised)
             return;
 
         NetworkLifecycle.Instance.Client.SendJunctionSwitched(NetId, (byte)branch, switchMode);

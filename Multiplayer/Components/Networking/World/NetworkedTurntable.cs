@@ -20,6 +20,8 @@ public class NetworkedTurntable : IdMonoBehaviour<byte, NetworkedTurntable>
         base.Awake();
         TurntableRailTrack = GetComponent<TurntableRailTrack>();
         NetworkLifecycle.Instance.OnTick += OnTick;
+
+        initialised = NetworkLifecycle.Instance.IsHost();
     }
 
     protected override void OnDestroy()
