@@ -6,7 +6,7 @@ namespace Multiplayer.Components.Networking;
 
 public abstract class TickedQueue<T> : MonoBehaviour
 {
-    private const float WARNING_THRESHOLD_SECONDS = 1.0f;
+    private const float WARNING_THRESHOLD_SECONDS = 3.0f;
     private const uint QUEUE_LENGTH_WARNING = (uint)(NetworkLifecycle.TICK_RATE * WARNING_THRESHOLD_SECONDS);
     private const uint SNAPSHOT_GAP_WARNING = (uint)(NetworkLifecycle.TICK_RATE * WARNING_THRESHOLD_SECONDS);
 
