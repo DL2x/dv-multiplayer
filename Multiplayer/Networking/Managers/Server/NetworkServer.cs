@@ -613,9 +613,7 @@ public class NetworkServer : NetworkManager
 
         Log($"Processing login packet for {packet.Username} ({guid}){(Multiplayer.Settings.LogIps ? $" at {request.RemoteEndPoint.Address}" : "")}");
 
-        //if the visibility is friends only, bypass the password check
-        if (serverData.Visibility != Components.MainMenu.ServerVisibility.Friends &&
-            Multiplayer.Settings.Password != packet.Password)
+        if (Multiplayer.Settings.Password != packet.Password)
         {
             LogWarning("Denied login due to invalid password!");
             ClientboundLoginResponsePacket denyPacket = new()
