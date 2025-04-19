@@ -62,7 +62,7 @@ public class NetworkServer : NetworkManager
     private bool IsLoaded;
 
     //we don't care if the client doesn't have these mods
-    public static string[] modWhiteList = ["RuntimeUnityEditor", "BookletOrganizer"];
+    public static string[] modWhiteList = ["RuntimeUnityEditor", "BookletOrganizer", "RemoteDispatch"];
 
     public NetworkServer(IDifficulty difficulty, Settings settings, bool isSinglePlayer, LobbyServerData serverData) : base(settings)
     {
