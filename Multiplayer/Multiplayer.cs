@@ -60,8 +60,11 @@ public static class Multiplayer
 
             Locale.Load(ModEntry.Path);
 
+            var gameVer = BuildInfo.BUILD_VERSION_MAJOR.ToString() +
+                (string.IsNullOrEmpty(BuildInfo.BUILD_VERSION_SUFFIX) ? "" : "." + BuildInfo.BUILD_VERSION_SUFFIX);
+
             Log($"\r\nMultiplayer JSON Version: {ModEntry.Info.Version}, Internal Version: {Ver}\r\n" +
-                $"Game version: {BuildInfo.BUILD_VERSION_MAJOR.ToString()}\r\n" +
+                $"Game version: {gameVer}\r\n" +
                 $"Buildbot version: {BuildInfo.BUILDBOT_INFO.ToString()}\r\n" +
                 $"LiteNetLib version: {LiteNetLibVer()}\r\n");
 
