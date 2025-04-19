@@ -1,3 +1,4 @@
+using DV;
 using DV.Localization;
 using DV.UIFramework;
 using Multiplayer.Components.MainMenu;
@@ -7,7 +8,9 @@ using Multiplayer.Patches.MainMenu;
 using Steamworks;
 using Steamworks.Data;
 using System;
+using System.Collections;
 using System.Linq;
+using UnityEngine;
 
 namespace Multiplayer.Utils;
 
@@ -105,11 +108,22 @@ public static class SteamworksUtils
         return 0;
     }
 
-    public static void JoinFromCommandLine()
+    public static IEnumerator JoinFromCommandLine()
     {
-        if (hasJoinedCL)
-            return;
+        float time = Time.time;
+
+        Multiplayer.LogDebug(() => $"JoinFromCommandLine() {DVSteamworks.Success}");
+
+        if (hasJoinedCL || BuildInfo.BUILD_DESTINATION != "steam")
+            yield break;
+
         hasJoinedCL = true;
+
+        //allow steamworks to initialise
+        yield return new WaitUntil(()=>{ return DVSteamworks.Success || (Time.deltaTime - time) > 5; });
+
+        if (!DVSteamworks.Success)
+            yield break;
 
         var id = GetLobbyIdFromArgs();
         var sId = new SteamId
@@ -119,6 +133,8 @@ public static class SteamworksUtils
 
         var lobby = new Lobby(sId);
         lobby.Refresh();
+
+        QueueLobbyInvite(lobby);
     }
 
     private static bool CanHandleLobbyRequest()
@@ -134,15 +150,19 @@ public static class SteamworksUtils
         if (!CanHandleLobbyRequest())
             return;
 
+        lobby.Refresh();
+
         QueueLobbyInvite(lobby);
     }
 
     public static void OnLobbyInviteRequest(Friend friend, Lobby lobby)
     {
-        Multiplayer.Log($"Received lobby invite: {lobby.Id}");
+        Multiplayer.Log($"Received lobby invite from '{friend.Name}' ({friend.Id}), Lobby: {lobby.Id}");
 
         if (!CanHandleLobbyRequest())
             return;
+
+        lobby.Refresh();
 
         NetworkLifecycle.Instance.QueueMainMenuEvent(() =>
         {
@@ -163,8 +183,9 @@ public static class SteamworksUtils
 
             popup.Closed += (PopupResult result) =>
             {
+                Multiplayer.LogDebug(()=>$"Agreed to join: {result.closedBy}");
                 if (result.closedBy == PopupClosedByAction.Positive)
-                    QueueLobbyInvite(lobby);
+                    QueueLobbyInvite(lobby); 
             }; 
 
         });

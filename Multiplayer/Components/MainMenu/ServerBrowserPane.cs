@@ -18,6 +18,7 @@ using LiteNetLib;
 using System.Collections.Generic;
 using Steamworks;
 using Steamworks.Data;
+using System.Threading.Tasks;
 
 namespace Multiplayer.Components.MainMenu
 {
@@ -26,11 +27,14 @@ namespace Multiplayer.Components.MainMenu
         private enum ConnectionState
         {
             NotConnected,
+            JoiningLobby,
+            AwaitingPassword,
             AttemptingSteamRelay,
             AttemptingIPv6,
             AttemptingIPv6Punch,
             AttemptingIPv4,
             AttemptingIPv4Punch,
+            Connected,
             Failed,
             Aborted
         }
@@ -131,17 +135,17 @@ namespace Multiplayer.Components.MainMenu
             timePassed += Time.deltaTime;
 
             if (!serverRefreshing)
-            {              
+            {
                 if (timePassed >= AUTO_REFRESH_TIME)
                 {
                     RefreshAction();
                 }
-                else if(timePassed >= REFRESH_MIN_TIME)
+                else if (timePassed >= REFRESH_MIN_TIME)
                 {
                     buttonRefresh.ToggleInteractable(true);
                 }
             }
-            else if(remoteRefreshComplete)
+            else if (remoteRefreshComplete)
             {
                 RefreshGridView();
                 IndexChanged(gridView); //Revalidate any selected servers
@@ -159,29 +163,20 @@ namespace Multiplayer.Components.MainMenu
                 pingTimer = 0f;
             }
 
-            if (lobbyToJoin != null && lobbyToJoin?.Data?.Count() > 0)
+            if (lobbyToJoin != null && connectionState == ConnectionState.NotConnected)
             {
-                //For invites
-                Multiplayer.Log($"Player Invite initiated");
-                if (lobbyToJoin != null)
+                //For invites/requests
+                Multiplayer.Log($"Player invite initiated/request");
+
+                if (lobbyToJoin.Value.Id.IsValid)
                 {
                     direct = false;
-                    selectedLobby = lobbyToJoin;
+                    var _ = JoinLobby((Lobby)lobbyToJoin);
+                }
+                else
+                {
+                    Multiplayer.LogWarning("Received invalid lobby invite");
                     lobbyToJoin = null;
-
-                    string hasPass = selectedLobby?.GetData(SteamworksUtils.LOBBY_HAS_PASSWORD);
-                    Multiplayer.Log($"Player Invite ({selectedLobby?.Id}) Has Password: {hasPass}");
-
-                    if (string.IsNullOrEmpty(hasPass))
-                    {
-                        Multiplayer.Log($"Player Invite ({selectedLobby?.Id}) Attempting connection...");
-                        AttemptConnection();
-                    }
-                    else
-                    {
-                        Multiplayer.Log($"Player Invite ({selectedLobby?.Id}) Ask Password...");
-                        ShowPasswordPopup();
-                    }
                 }
             }
         }
@@ -192,7 +187,7 @@ namespace Multiplayer.Components.MainMenu
                 return;
 
             Multiplayer.Log($"Steam not detected, prompt for restart.");
-            MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Please restart the game with Steam running", ()=>{});
+            MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Please restart the game with Steam running", () => { });
         }
 
         private void CleanUI()
@@ -225,7 +220,7 @@ namespace Multiplayer.Components.MainMenu
 
             //Create new objects
             GameObject serverScroll = Instantiate(scrollViewGO, serverNameGO.transform.position, Quaternion.identity, serverWindowGO.transform);
-            
+
 
             /* 
              * Setup server name 
@@ -287,7 +282,7 @@ namespace Multiplayer.Components.MainMenu
             scrollRect.content = contentRT;
 
             // Create TextMeshProUGUI object
-            GameObject textContainerGO = new ("Details Container", typeof(HorizontalLayoutGroup));
+            GameObject textContainerGO = new("Details Container", typeof(HorizontalLayoutGroup));
             textContainerGO.transform.SetParent(content.transform, false);
             contentRT.localPosition = new Vector3(contentRT.localPosition.x + 10, contentRT.localPosition.y, contentRT.localPosition.z);
 
@@ -309,7 +304,7 @@ namespace Multiplayer.Components.MainMenu
             textRT.offsetMax = new Vector2(0, 0);
 
             // Set content size to fit text
-            contentRT.sizeDelta = new Vector2(contentRT.sizeDelta.x -50, detailsPane.preferredHeight);
+            contentRT.sizeDelta = new Vector2(contentRT.sizeDelta.x - 50, detailsPane.preferredHeight);
 
             // Update buttons on the multiplayer pane
             GameObject goDirectIP = this.gameObject.UpdateButton("ButtonTextIcon Overwrite", "ButtonTextIcon Manual", Locale.SERVER_BROWSER__MANUAL_CONNECT_KEY, null, Multiplayer.AssetIndex.multiplayerIcon);
@@ -378,7 +373,7 @@ namespace Multiplayer.Components.MainMenu
         private void RefreshAction()
         {
             if (serverRefreshing)
-                return;          
+                return;
 
             if (selectedServer != null)
                 serverIDOnRefresh = selectedServer.id;
@@ -395,43 +390,41 @@ namespace Multiplayer.Components.MainMenu
         }
         private void JoinAction()
         {
-            if (selectedServer != null)
+            if (selectedServer == null || connectionState != ConnectionState.NotConnected)
+                return;
+
+            buttonDirectIP.ToggleInteractable(false);
+            buttonJoin.ToggleInteractable(false);
+
+            //not making a direct connection
+            direct = false;
+            portNumber = -1;
+
+            var lobby = GetLobbyFromServer(selectedServer);
+            if (lobby != null)
             {
-                buttonDirectIP.ToggleInteractable(false);
-                buttonJoin.ToggleInteractable(false);
-
-                //not making a direct connection
-                direct = false;
-                portNumber = -1;
-                var lobby = GetLobbyFromServer(selectedServer);
-                if (lobby != null)
-                {
-                    selectedLobby = (Lobby)lobby;
-                    password = null; //clear the password
-
-                    if (selectedServer.HasPassword)
-                    {
-                        ShowPasswordPopup();
-                        return;
-                    }
-
-                    AttemptConnection();
-
-                }
+                selectedLobby = (Lobby)lobby;
+                _ = JoinLobby((Lobby)selectedLobby);
+            }
+            else
+            {
+                Multiplayer.LogWarning($"JoinAction called but lobby is null");
+                AttemptFail();
             }
         }
 
         private void DirectAction()
         {
-            //Debug.Log($"DirectAction()");
+            if(connectionState != ConnectionState.NotConnected)
+                return;
+
             buttonDirectIP.ToggleInteractable(false);
-            buttonJoin.ToggleInteractable(false)    ;
+            buttonJoin.ToggleInteractable(false);
 
             //making a direct connection
             direct = true;
             password = null;
 
-            //ShowSteamID();
             ShowIpPopup();
         }
 
@@ -443,7 +436,7 @@ namespace Multiplayer.Components.MainMenu
             if (gridView.SelectedModelIndex >= 0)
             {
                 selectedServer = gridViewModel[gridView.SelectedModelIndex];
-                
+
                 UpdateDetailsPane();
 
                 //Check if we can connect to this server
@@ -484,7 +477,7 @@ namespace Multiplayer.Components.MainMenu
 
                 //note: built-in localisations have a trailing colon e.g. 'Game mode:'
 
-                details  = "<alpha=#50>" + LocalizationAPI.L("launcher/game_mode", []) + "</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>";
+                details = "<alpha=#50>" + LocalizationAPI.L("launcher/game_mode", []) + "</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>";
                 details += "<alpha=#50>" + LocalizationAPI.L("launcher/difficulty", []) + "</color> " + LobbyServerData.GetDifficultyFromInt(selectedServer.Difficulty) + "<br>";
                 details += "<alpha=#50>" + LocalizationAPI.L("launcher/in_game_time_passed", []) + "</color> " + selectedServer.TimePassed + "<br>";
                 details += "<alpha=#50>" + Locale.SERVER_BROWSER__PLAYERS + ":</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>";
@@ -574,34 +567,6 @@ namespace Multiplayer.Components.MainMenu
             };
         }
 
-        //private void ShowSteamID()
-        //{
-        //    var popup = MainMenuThingsAndStuff.Instance.ShowRenamePopup();
-        //    if (popup == null)
-        //    {
-        //        Multiplayer.LogError("Popup not found.");
-        //        return;
-        //    }
-
-        //    popup.labelTMPro.text = "SteamID";
-        //    //popup.GetComponentInChildren<TMP_InputField>().text = Multiplayer.Settings.LastRemoteIP;
-
-        //    popup.Closed += result =>
-        //    {
-        //        if (result.closedBy == PopupClosedByAction.Abortion)
-        //        {
-        //            buttonDirectIP.ToggleInteractable(true);
-        //            IndexChanged(gridView); //re-enable the join button if a valid gridview item is selected
-        //            return;
-        //        }
-
-        //        steamId = popup.GetComponentInChildren<TMP_InputField>().text;
-        //        Multiplayer.LogDebug(() => $"Attempting to connecto SteamID: {steamId}");
-
-        //        ShowPasswordPopup();
-        //    };
-        //}
-
         private void ShowPortPopup()
         {
 
@@ -634,7 +599,7 @@ namespace Multiplayer.Components.MainMenu
                     ShowPasswordPopup();
                 }
 
-            }; 
+            };
 
         }
 
@@ -658,15 +623,17 @@ namespace Multiplayer.Components.MainMenu
                 //Set us up to allow a blank password
                 DestroyImmediate(popup.GetComponentInChildren<PopupTextInputFieldController>());
                 popup.GetOrAddComponent<PopupTextInputFieldControllerNoValidation>();
-             }
+            }
 
             popup.Closed += result =>
             {
                 if (result.closedBy == PopupClosedByAction.Abortion)
                 {
-                    buttonDirectIP.ToggleInteractable(true);
+                    AttemptFail();
                     return;
                 }
+
+                password = result.data;
 
                 if (direct)
                 {
@@ -676,9 +643,7 @@ namespace Multiplayer.Components.MainMenu
                     Multiplayer.Settings.LastRemotePassword = result.data;
                 }
 
-                password = result.data;
-
-                AttemptConnection();
+                InitiateConnection();
             };
         }
 
@@ -695,7 +660,7 @@ namespace Multiplayer.Components.MainMenu
             connectingPopup = popup;
 
             Localize loc = popup.positiveButton.GetComponentInChildren<Localize>();
-            loc.key ="cancel";
+            loc.key = "cancel";
             loc.UpdateLocalization();
 
 
@@ -705,49 +670,29 @@ namespace Multiplayer.Components.MainMenu
             {
                 connectionState = ConnectionState.Aborted;
             };
-            
+
         }
-        
+
         #region workflow
         private void UpdatePings()
         {
             UpdatePingsSteam();
         }
 
-        private async void AttemptConnection()
+        private void InitiateConnection()
         {
 
-            Multiplayer.Log($"AttemptConnection Direct: {direct}, Address: {address}, Lobby: {selectedLobby?.Id.ToString()}");
+            Multiplayer.Log($"Initiating connection. Direct: {direct}, Address: {address}, Lobby: {selectedLobby?.Id.ToString()}");
 
             attempt = 0;
-            connectionState = ConnectionState.NotConnected;
             ShowConnectingPopup();
 
-            if (!direct)
+            if (!direct && joinedLobby != null)
             {
-                if(selectedLobby != null)
-                {
-                    joinedLobby = selectedLobby; //store the lobby for when we disconnect
-
-                    connectionState = ConnectionState.AttemptingSteamRelay;
-
-                    var joinResult = await joinedLobby?.Join();
-                    if (joinResult == RoomEnter.Success)
-                    {
-                        string hostId = ((Lobby)joinedLobby).Owner.Id.Value.ToString();
-                        NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, OnDisconnect);
-                    }
-                    else
-                    {
-                        Multiplayer.LogDebug(() => "AttemptConnection() Leaving Lobby");
-                        joinedLobby?.Leave();
-                        joinedLobby = null;
-                        Multiplayer.Log($"Failed to join lobby: {joinResult}");
-                        AttemptFail();
-                    }
-
-                    return;
-                }
+                connectionState = ConnectionState.AttemptingSteamRelay;
+                string hostId = ((Lobby)joinedLobby).Owner.Id.Value.ToString();
+                NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, OnDisconnect);
+                return;
             }
 
             Multiplayer.Log($"AttemptConnection address: {address}");
@@ -764,13 +709,12 @@ namespace Multiplayer.Components.MainMenu
                 {
                     AttemptIPv6();
                 }
-
-                return;
             }
-
-            Multiplayer.LogError($"IP address invalid: {address}");
-
-            AttemptFail();
+            else
+            {
+                Multiplayer.LogError($"IP address invalid: {address}");
+                AttemptFail();
+            }
         }
 
         private void AttemptIPv6()
@@ -874,6 +818,9 @@ namespace Multiplayer.Components.MainMenu
                 connectingPopup = null;  // Clear the reference
             }
 
+            joinedLobby?.Leave();
+            joinedLobby = null;
+
             if (gameObject != null && gameObject.activeInHierarchy)
             {
                 if (gridView != null)
@@ -882,51 +829,30 @@ namespace Multiplayer.Components.MainMenu
                 if (buttonDirectIP != null && buttonDirectIP.gameObject != null)
                     buttonDirectIP.ToggleInteractable(true);
             }
+
+            StartCoroutine(ResetConnectionState());
+        }
+
+        private IEnumerator ResetConnectionState()
+        {
+            yield return new WaitForSeconds(1.0f);
+            connectionState = ConnectionState.NotConnected;
         }
 
         private void OnDisconnect(DisconnectReason reason, string message)
         {
             Multiplayer.Log($"Disconnected due to: {reason}, \"{message}\"");
 
-            string displayMessage = message;
+            string displayMessage = !string.IsNullOrEmpty(message)
+                ? message
+                : GetDisplayMessageForDisconnect(reason);
 
             Multiplayer.LogDebug(() => "OnDisconnect() Leaving Lobby");
             joinedLobby?.Leave();
             joinedLobby = null;
 
-            if (string.IsNullOrEmpty(message))
-            {
-                //fallback for no message (server initiated disconnects should have a message)               
-                //if (reason == DisconnectReason.ConnectionFailed)
-                //{
-                //    switch (connectionState)
-                //    {
-                //        case ConnectionState.AttemptingIPv6:
-                //            if (Multiplayer.Settings.EnableNatPunch)
-                //                AttemptIPv6Punch();
-                //            else
-                //                AttemptIPv4();
-                //            return;
-                //        case ConnectionState.AttemptingIPv6Punch:
-                //            AttemptIPv4();
-                //            return;
-                //        case ConnectionState.AttemptingIPv4:
-                //            if (Multiplayer.Settings.EnableNatPunch)
-                //            {
-                //                AttemptIPv4Punch();
-                //                return;
-                //            }
-                //            break;
-                //    }
-                //}
-
-                displayMessage = GetDisplayMessageForDisconnect(reason);
-                AttemptFail();
-            }
-            else
-            {
-                connectionState = ConnectionState.NotConnected;
-            }
+            connectionState = ConnectionState.NotConnected;
+            AttemptFail();
 
             NetworkLifecycle.Instance.QueueMainMenuEvent(() =>
             {
@@ -978,7 +904,7 @@ namespace Multiplayer.Components.MainMenu
                     remoteServers.Add(server);
 
                     Multiplayer.LogDebug(() => $"ListActiveLobbies() lobby {server.Name}, {lobby.MemberCount}/{lobby.MaxMembers}");
-                    
+
                 }
             }
             remoteRefreshComplete = true;
@@ -990,7 +916,7 @@ namespace Multiplayer.Components.MainMenu
             {
                 if (server is LobbyServerData lobbyServer)
                 {
-                    if (ulong.TryParse(server.id,out ulong id))
+                    if (ulong.TryParse(server.id, out ulong id))
                     {
                         Lobby? lobby = lobbies.FirstOrDefault(l => l.Id.Value == id);
                         if (lobby != null)
@@ -1101,6 +1027,56 @@ namespace Multiplayer.Components.MainMenu
             }
 
             return input;
+        }
+
+        private async Task<bool> JoinLobby(Lobby lobby)
+        {
+
+            if (connectionState != ConnectionState.NotConnected)
+            {
+                Multiplayer.LogWarning($"Cannot join lobby while in state: {connectionState}");
+                return false;
+            }
+
+            connectionState = ConnectionState.JoiningLobby;
+            Multiplayer.Log($"Attempting to join lobby ({lobby.Id})");
+
+            var joinResult = await lobby.Join();
+
+            if (joinResult == RoomEnter.Success)
+            {
+                Multiplayer.Log($"Lobby joined ({lobby.Id})");
+                
+                joinedLobby = lobby;
+                lobbyToJoin = null;
+
+                string hasPass = lobby.GetData(SteamworksUtils.LOBBY_HAS_PASSWORD);
+                Multiplayer.Log($"Lobby ({lobby.Id}) has password: {hasPass}");
+
+                if (string.IsNullOrEmpty(hasPass))
+                {
+                    Multiplayer.Log($"Attempting connection...");
+                    InitiateConnection();
+                }
+                else
+                {
+                    connectionState = ConnectionState.AwaitingPassword;
+                    Multiplayer.Log($"Prompting for password...");
+                    ShowPasswordPopup();
+                }
+
+                return true;
+            }
+            else
+            {
+                Multiplayer.LogDebug(() => "JoinLobby() Leaving Lobby");
+                lobby.Leave();
+                joinedLobby = null;
+                Multiplayer.Log($"Failed to join lobby: {joinResult}");
+                AttemptFail();
+            }
+
+            return false;
         }
     }
 }
