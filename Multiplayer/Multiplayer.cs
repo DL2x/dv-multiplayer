@@ -63,10 +63,10 @@ public static class Multiplayer
             var gameVer = BuildInfo.BUILD_VERSION_MAJOR.ToString() +
                 (string.IsNullOrEmpty(BuildInfo.BUILD_VERSION_SUFFIX) ? "" : "." + BuildInfo.BUILD_VERSION_SUFFIX);
 
-            Log($"\r\nMultiplayer JSON Version: {ModEntry.Info.Version}, Internal Version: {Ver}\r\n" +
-                $"Game version: {gameVer}\r\n" +
-                $"Buildbot version: {BuildInfo.BUILDBOT_INFO.ToString()}\r\n" +
-                $"LiteNetLib version: {LiteNetLibVer()}\r\n");
+            Log($"\r\n\tMultiplayer JSON Version: {ModEntry.Info.Version}, Internal Version: {Ver}\r\n" +
+                $"\tGame version: {gameVer}\r\n" +
+                $"\tBuildbot version: {BuildInfo.BUILDBOT_INFO.ToString()}\r\n" +
+                $"\tLiteNetLib version: {LiteNetLibVer()}\r\n");
 
 
             Log("Patching...");
