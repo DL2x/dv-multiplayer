@@ -104,6 +104,7 @@ public static class DvExtensions
     {
         // Reset the tooltip keys for the button
         UIElementTooltip tooltip = button.GetComponent<UIElementTooltip>();
+        tooltip.initialized = false;
         tooltip.disabledKey = null;
         tooltip.enabledKey = null;
 
