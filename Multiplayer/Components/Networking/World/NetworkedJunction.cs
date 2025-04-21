@@ -6,7 +6,7 @@ namespace Multiplayer.Components.Networking.World;
 public class NetworkedJunction : IdMonoBehaviour<ushort, NetworkedJunction>
 {
     private static NetworkedJunction[] _indexedJunctions;
-    public static NetworkedJunction[] IndexedJunctions => _indexedJunctions ??= WorldData.Instance.TrackRootParent.GetComponentsInChildren<NetworkedJunction>().OrderBy(nj => nj.NetId).ToArray();
+    public static NetworkedJunction[] IndexedJunctions => _indexedJunctions ??= RailTrackRegistry.Instance.TrackRootParent.GetComponentsInChildren<NetworkedJunction>().OrderBy(nj => nj.NetId).ToArray();
 
     protected override bool IsIdServerAuthoritative => false;
 

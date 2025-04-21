@@ -7,10 +7,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Multiplayer.Components.SaveGame;
@@ -93,5 +90,10 @@ public class Client_GameSession : IGameSession, IThing, IDisposable
     int IGameSession.TrimSaves(SaveType type, int maxCount, ISaveGame excluded)
     {
         return 0;
+    }
+
+    bool IGameSession.CanCreateNewSaves(SaveType saveType)
+    {
+        return false;
     }
 }
