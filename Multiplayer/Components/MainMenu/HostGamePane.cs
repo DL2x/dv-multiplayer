@@ -39,7 +39,6 @@ public class HostGamePane : MonoBehaviour
     TextMeshProUGUI serverDetails;
 
     SliderDV maxPlayers;
-    Toggle gamePublic;
     Selector gameVisibility;
     ButtonDV startButton;
 

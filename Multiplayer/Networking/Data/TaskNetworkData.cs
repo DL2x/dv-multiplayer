@@ -29,7 +29,7 @@ public abstract class TaskNetworkData<T> : TaskNetworkData where T : TaskNetwork
 
     protected void SerializeCommon(NetDataWriter writer)
     {
-        //Multiplayer.Log($"TaskNetworkData.SerializeCommon() State {(byte)State}, {State}");
+        //Multiplayer.Log($"TaskNetworkData.SerializeCommon() Value {(byte)Value}, {Value}");
         writer.Put((byte)State);
         //Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskStartTime {TaskStartTime}");
         writer.Put(TaskStartTime);
@@ -46,7 +46,7 @@ public abstract class TaskNetworkData<T> : TaskNetworkData where T : TaskNetwork
     protected void DeserializeCommon(NetDataReader reader)
     {
         State = (TaskState)reader.GetByte();
-        //Multiplayer.Log($"TaskNetworkData.DeserializeCommon() State {State}");
+        //Multiplayer.Log($"TaskNetworkData.DeserializeCommon() Value {Value}");
         TaskStartTime = reader.GetFloat();
         //Multiplayer.Log($"TaskNetworkData.DeserializeCommon() TaskStartTime {TaskStartTime}");
         TaskFinishTime = reader.GetFloat();
