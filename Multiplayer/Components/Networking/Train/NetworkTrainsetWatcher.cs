@@ -128,6 +128,9 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
                 {
                     position = trainCar.transform.position - WorldMover.currentMove;
                     rotation = trainCar.transform.rotation;
+
+                    //reset this car's states
+                    networkedTrainCar.TicksSinceSync = 0;
                 }
 
                 trainsetParts[i] = new TrainsetMovementPart(
@@ -142,7 +145,7 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
             }
 
             //reset this car's states
-            networkedTrainCar.TicksSinceSync = 0;
+            //networkedTrainCar.TicksSinceSync = 0;
             networkedTrainCar.BogieTracksDirty = false;
         }
 
