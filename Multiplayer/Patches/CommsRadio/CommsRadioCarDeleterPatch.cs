@@ -46,7 +46,7 @@ public static class CommsRadioCarDeleterPatch
         if (playMoneyRemovedSound && __instance.moneyRemovedSound != null)
             __instance.moneyRemovedSound.Play2D();
         // The TrainCar may already be deleted when we're done waiting, so we play the sound manually.
-        __instance.removeCarSound.Play(trainPosition, minDistance: CommsRadioController.CAR_AUDIO_SOURCE_MIN_DISTANCE, parent: WorldMover.Instance.originShiftParent);
+        __instance.removeCarSound.Play(trainPosition, minDistance: CommsRadioController.CAR_AUDIO_SOURCE_MIN_DISTANCE, parent: WorldMover.OriginShiftParent);
         CommsRadioController.PlayAudioFromRadio(__instance.confirmSound, __instance.transform);
     }
 

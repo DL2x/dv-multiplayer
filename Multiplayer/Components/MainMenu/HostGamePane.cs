@@ -242,18 +242,34 @@ public class HostGamePane : MonoBehaviour
         /*
          *  Server visibility field 
          */
+        selectorPrefab.SetActive(false);
         go = GameObject.Instantiate(selectorPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta).transform, false);
-        go.name = "Visibility";
-        go.FindChildByName("[text label]").GetComponent<Localize>().key = Locale.SERVER_HOST_VISIBILITY_KEY;
-        go.ResetTooltip();
-        go.FindChildByName("[text label]").GetComponent<Localize>().UpdateLocalization();
-        DestroyImmediate(go.GetComponent<SettingChangeSource>());
+        selectorPrefab.SetActive(true);
         gameVisibility = go.GetOrAddComponent<Selector>();
+
+        //clean-up
+        
+        if (gameVisibility.labelTMPro?.gameObject.TryGetComponent<I2.Loc.Localize>(out var loc) ?? false)
+            GameObject.DestroyImmediate(loc);
+        if (gameVisibility.labelTMPro?.gameObject.TryGetComponent<DV.Localization.Localize>(out var loc2) ?? false)
+            GameObject.DestroyImmediate(loc2);
+
+        DestroyImmediate(go.GetComponent<SettingChangeSource>());
+
+        go.name = "Visibility";
+        gameVisibility.initialized = false;
+
         gameVisibility.LocalizedLabel = true;
         gameVisibility.SetLabel(Locale.SERVER_HOST_VISIBILITY_KEY);
+        gameVisibility.labelTMPro.GetComponent<Localize>().key = Locale.SERVER_HOST_VISIBILITY_KEY;
+
         gameVisibility.LocalizedValues = true;
         gameVisibility.SetValues(Locale.SERVER_HOST_VISIBILITY_MODES.ToList());
         gameVisibility.SetSelectedIndex(3);
+
+        go.SetActive(true);
+        go.ResetTooltip();
+
         gameVisibility.ToggleInteractable(true);
 
         /*
@@ -275,17 +291,28 @@ public class HostGamePane : MonoBehaviour
         /*
          *  Server max players field 
          */
+        sliderPrefab.SetActive(false);
         go = GameObject.Instantiate(sliderPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta).transform, false);
-        go.name = "Max Players";
-        go.FindChildByName("[text label]").GetComponent<Localize>().key = Locale.SERVER_HOST_MAX_PLAYERS_KEY;
-        go.ResetTooltip();
-        go.FindChildByName("[text label]").GetComponent<Localize>().UpdateLocalization();
-        DestroyImmediate(go.GetComponent<SettingChangeSource>());
+        sliderPrefab.SetActive(true);
         maxPlayers = go.GetComponent<SliderDV>();
+
+        go.name = "Max Players";
+        var labelGo = go.FindChildByName("[text label]");
+
+        if (labelGo?.gameObject.TryGetComponent<I2.Loc.Localize>(out loc) ?? false)
+            GameObject.DestroyImmediate(loc);
+
+        DestroyImmediate(go.GetComponent<SettingChangeSource>());
+
+        labelGo.GetComponent<Localize>().key = Locale.SERVER_HOST_MAX_PLAYERS_KEY;
+        go.ResetTooltip();
+        //labelGo.GetComponent<Localize>().UpdateLocalization();
+        
         maxPlayers.stepIncrement = 1;
         maxPlayers.minValue = MIN_PLAYERS;
         maxPlayers.maxValue = MAX_PLAYERS;
         maxPlayers.value = Mathf.Clamp(Multiplayer.Settings.MaxPlayers,MIN_PLAYERS,MAX_PLAYERS);
+        go.SetActive(true);
         maxPlayers.interactable = true;
 
         /*
@@ -296,7 +323,7 @@ public class HostGamePane : MonoBehaviour
         port = go.GetComponent<TMP_InputField>();
         port.characterValidation = TMP_InputField.CharacterValidation.Integer;
         port.characterLimit = MAX_PORT_LEN;
-        port.placeholder.GetComponent<TMP_Text>().text = "7777";
+        port.placeholder.GetComponent<TMP_Text>().text = DEFAULT_PORT.ToString();
         port.text = (Multiplayer.Settings.Port >= MIN_PORT && Multiplayer.Settings.Port <= MAX_PORT) ?  Multiplayer.Settings.Port.ToString() : DEFAULT_PORT.ToString();
 
         /*

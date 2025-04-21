@@ -28,8 +28,6 @@ public abstract class NetworkManager
 
     protected NetworkManager(Settings settings)
     {
-        Multiplayer.LogDebug(() => $"NetworkManager Constructor");
-
         netPacketProcessor = new NetPacketProcessor();
         //transport = new LiteNetLibTransport();
         transport = new SteamWorksTransport();
@@ -41,7 +39,6 @@ public abstract class NetworkManager
         transport.OnNetworkError += OnNetworkError;
         transport.OnNetworkLatencyUpdate += OnNetworkLatencyUpdate;
 
-        
         RegisterNestedTypes();
 
         OnSettingsUpdated(settings);

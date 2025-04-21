@@ -62,7 +62,7 @@ public class NetworkServer : NetworkManager
     private bool IsLoaded;
 
     //we don't care if the client doesn't have these mods
-    public static string[] modWhiteList = ["RuntimeUnityEditor", "BookletOrganizer"];
+    public static string[] modWhiteList = ["RuntimeUnityEditor", "BookletOrganizer", "RemoteDispatch"];
 
     public NetworkServer(IDifficulty difficulty, Settings settings, bool isSinglePlayer, LobbyServerData serverData) : base(settings)
     {
@@ -795,7 +795,7 @@ public class NetworkServer : NetworkManager
         SendPacket(peer, new ClientboundBeginWorldSyncPacket(), DeliveryMethod.ReliableOrdered);
 
         // Send weather state
-        SendPacket(peer, WeatherDriver.Instance.GetSaveData().ToObject<ClientboundWeatherPacket>(), DeliveryMethod.ReliableOrdered);
+        SendPacket(peer, WeatherDriver.Instance.GetSaveData(Globals.G.GameParams.WeatherEditorAlwaysAllowed).ToObject<ClientboundWeatherPacket>(), DeliveryMethod.ReliableOrdered);
 
         // Send junctions and turntables
         SendPacket(peer, new ClientboundRailwayStatePacket
@@ -1084,7 +1084,7 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        Job job = JobsManager.Instance.GetJobOfCar(trainCar);
+        Job job = JobsManager.Instance.GetJobOfCar(trainCar.logicCar);
         switch (job?.State)
         {
             case JobState.Available:

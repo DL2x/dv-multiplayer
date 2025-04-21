@@ -75,6 +75,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     public string CurrentID { get; private set; }
     public TrainCar TrainCar;
     public uint TicksSinceSync = uint.MaxValue;
+
+    public uint lastTickProcessed = 0;
     public bool HasPlayers => PlayerManager.Car == TrainCar || GetComponentInChildren<NetworkedPlayer>() != null;
 
     private Bogie bogie1;
@@ -99,7 +101,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private bool cargoHealthDirty;
     private bool cargoIsLoading;
     public byte CargoModelIndex = byte.MaxValue;
-    private bool healthDirty;
+    private bool carHealthDirty;
     private bool sendCouplers;
     private bool sendCables;
     private bool fireboxDirty;
@@ -240,8 +242,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         NetworkLifecycle.Instance.OnTick -= Common_OnTick;
         NetworkLifecycle.Instance.OnTick -= Server_OnTick;
-        //if (UnloadWatcher.isUnloading)
-        //    return;
+
+        NetworkLifecycle.Instance.Server.PlayerDisconnect -= Server_OnPlayerDisconnect;
 
         trainCarsToNetworkedTrainCars.Remove(TrainCar);
 
@@ -329,7 +331,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         TrainCar.logicCar.CargoUnloaded += Server_OnCargoUnloaded;
 
         if (TrainCar.CargoDamage)
-            TrainCar.CargoDamage.CargoEffectiveHealthStateUpdate += Server_OnHealthUpdate;
+            TrainCar.CargoDamage.CargoEffectiveHealthStateUpdate += Server_CargoHealthUpdate;
 
         Server_DirtyAllState();
     }
@@ -341,7 +343,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         cargoStateDirty = true;
         cargoHealthDirty = true;
         cargoIsLoading = true;
-        healthDirty = true;
+        carHealthDirty = true;
         BogieTracksDirty = true;
         sendCouplers = true;
         sendCables = true;
@@ -414,14 +416,14 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         CargoModelIndex = byte.MaxValue;
     }
 
-    private void Server_OnHealthUpdate(float health)
+    private void Server_CargoHealthUpdate(float health)
     {
         cargoHealthDirty = true;
     }
 
     private void Server_CarHealthUpdate(float health)
     {
-        healthDirty = true;
+        carHealthDirty = true;
     }
 
     private void Server_MainResUpdate(float normalizedPressure, float pressure)
@@ -555,9 +557,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void Server_SendHealthState()
     {
-        if (!healthDirty)
+        if (!carHealthDirty)
             return;
-        healthDirty = false;
+        carHealthDirty = false;
         NetworkLifecycle.Instance.Server.SendCarHealthUpdate(NetId, TrainCarHealthData.From(TrainCar));
     }
 
@@ -1247,6 +1249,14 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (TrainCar.isEligibleForSleep)
             TrainCar.ForceOptimizationState(false);
 
+        if (tick <= lastTickProcessed)
+        {
+            Multiplayer.LogWarning($"Received physics update for car {CurrentID} at tick {tick}, but last tick processed was {lastTickProcessed}");
+            return;
+        }
+
+        lastTickProcessed = tick;
+
         if (movementPart.typeFlag == TrainsetMovementPart.MovementType.RigidBody)
         {
             //Vector3 expectedPosition = movementPart.RigidbodySnapshot.Position + WorldMover.currentMove;
@@ -1285,7 +1295,6 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             TrainCar.stress.slowBuildUpStress = movementPart.SlowBuildUpStress;
             client_bogie1Queue.ReceiveSnapshot(movementPart.Bogie1, tick);
             client_bogie2Queue.ReceiveSnapshot(movementPart.Bogie2, tick);
-
         }
 
         bool kinematic = movementPart.Speed < NetworkTrainsetWatcher.VELOCITY_THRESHOLD && (movementPart.RigidbodySnapshot != null && movementPart.RigidbodySnapshot.Velocity.magnitude < NetworkTrainsetWatcher.VELOCITY_THRESHOLD);

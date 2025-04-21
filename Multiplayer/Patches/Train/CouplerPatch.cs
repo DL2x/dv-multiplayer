@@ -42,6 +42,7 @@ public static class CouplerPatch
             return;
         }
 
+        Multiplayer.LogDebug(() => $"DisconnectAirHose({__instance?.train?.ID}, {__instance.isFrontCoupler})");
         NetworkLifecycle.Instance.Client?.SendHoseDisconnected(__instance, playAudio); 
     }
 

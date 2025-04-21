@@ -32,7 +32,7 @@ public class ClientPlayerManager
 
     public void AddPlayer(byte id, string username)
     {
-        GameObject go = Object.Instantiate(playerPrefab, WorldMover.Instance.originShiftParent);
+        GameObject go = Object.Instantiate(playerPrefab, WorldMover.OriginShiftParent);
         go.layer = LayerMask.NameToLayer(Layers.Player);
         NetworkedPlayer networkedPlayer = go.AddComponent<NetworkedPlayer>();
         networkedPlayer.Id = id;

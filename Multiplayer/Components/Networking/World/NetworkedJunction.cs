@@ -6,7 +6,7 @@ namespace Multiplayer.Components.Networking.World;
 public class NetworkedJunction : IdMonoBehaviour<ushort, NetworkedJunction>
 {
     private static NetworkedJunction[] _indexedJunctions;
-    public static NetworkedJunction[] IndexedJunctions => _indexedJunctions ??= WorldData.Instance.TrackRootParent.GetComponentsInChildren<NetworkedJunction>().OrderBy(nj => nj.NetId).ToArray();
+    public static NetworkedJunction[] IndexedJunctions => _indexedJunctions ??= RailTrackRegistry.Instance.TrackRootParent.GetComponentsInChildren<NetworkedJunction>().OrderBy(nj => nj.NetId).ToArray();
 
     protected override bool IsIdServerAuthoritative => false;
 
@@ -18,11 +18,13 @@ public class NetworkedJunction : IdMonoBehaviour<ushort, NetworkedJunction>
         base.Awake();
         Junction = GetComponent<Junction>();
         Junction.Switched += Junction_Switched;
+
+        initialised = NetworkLifecycle.Instance.IsHost();
     }
 
     private void Junction_Switched(Junction.SwitchMode switchMode, int branch)
     {
-        if (NetworkLifecycle.Instance.IsProcessingPacket)
+        if (NetworkLifecycle.Instance.IsProcessingPacket || !initialised)
             return;
 
         NetworkLifecycle.Instance.Client.SendJunctionSwitched(NetId, (byte)branch, switchMode);

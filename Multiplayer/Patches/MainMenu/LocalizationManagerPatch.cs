@@ -20,7 +20,7 @@ namespace Multiplayer.Patches.MainMenu
             Translation = string.Empty;
 
             // Check if the term starts with the specified locale prefix
-            if (!Term.StartsWith(Locale.PREFIX))
+            if (Term == null || !Term.StartsWith(Locale.PREFIX))
                 return true;
 
             // Attempt to get the translation for the term

@@ -6,6 +6,7 @@ using DV;
 using DV.UIFramework;
 using HarmonyLib;
 using JetBrains.Annotations;
+using LiteNetLib;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;
 using Multiplayer.Editor;
@@ -59,7 +60,14 @@ public static class Multiplayer
 
             Locale.Load(ModEntry.Path);
 
-            Log($"Multiplayer JSON Version: {ModEntry.Info.Version}, Internal Version: {Ver}\r\nGame version: {BuildInfo.BUILD_VERSION_MAJOR.ToString()}\r\nBuilbot version: {BuildInfo.BUILDBOT_INFO.ToString()}");
+            var gameVer = BuildInfo.BUILD_VERSION_MAJOR.ToString() +
+                (string.IsNullOrEmpty(BuildInfo.BUILD_VERSION_SUFFIX) ? "" : "." + BuildInfo.BUILD_VERSION_SUFFIX);
+
+            Log($"\r\n\tMultiplayer JSON Version: {ModEntry.Info.Version}, Internal Version: {Ver}\r\n" +
+                $"\tGame version: {gameVer}\r\n" +
+                $"\tBuildbot version: {BuildInfo.BUILDBOT_INFO.ToString()}\r\n" +
+                $"\tLiteNetLib version: {LiteNetLibVer()}\r\n");
+
 
             Log("Patching...");
             harmony = new Harmony(ModEntry.Info.Id);
@@ -169,6 +177,14 @@ public static class Multiplayer
                 }
             }
         }
+    }
+
+    static string LiteNetLibVer()
+    {
+        Assembly liteNetLibAssembly = typeof(NetManager).Assembly;
+        AssemblyName assemblyName = liteNetLibAssembly.GetName();
+
+        return assemblyName.Version.ToString();
     }
 
     #region Logging

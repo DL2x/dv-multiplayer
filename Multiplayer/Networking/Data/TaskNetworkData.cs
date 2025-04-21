@@ -303,8 +303,8 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
 
         return new TransportTask(
             cars,
-            RailTrackRegistry.Instance.GetTrackWithName(DestinationTrack).logicTrack,
-            RailTrackRegistry.Instance.GetTrackWithName(StartingTrack).logicTrack,
+            RailTrackRegistry.Instance.GetTrackWithName(DestinationTrack).LogicTrack(),
+            RailTrackRegistry.Instance.GetTrackWithName(StartingTrack).LogicTrack(),
             TransportedCargoPerCar?.ToList()
         );
     }

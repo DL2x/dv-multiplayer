@@ -42,6 +42,28 @@ public readonly struct TrainCarHealthData
         if (dmgCtrl == null )
             return new TrainCarHealthData();
 
+        else
+        {
+            //freight cars don't have damage controller, so we need to check if they have a damage model
+            var dmgModel = trainCar.GetComponent<CarDamageModel>();
+            dmgModel?.SetHealth(BodyHP);
+        }
+    }
+
+    public static TrainCarHealthData From(TrainCar trainCar)
+    {
+        var dmgCtrl = trainCar.GetComponent<DamageController>();
+
+        if (dmgCtrl == null)
+        {
+            //freight cars don't have damage controller, so we need to check if they have a damage model
+            var dmgModel = trainCar.GetComponent<CarDamageModel>();
+            if (dmgModel != null)
+                return new TrainCarHealthData(dmgModel.currentHealth, 0,0,0,false);
+            else
+                return new TrainCarHealthData();
+        }
+        
         float bodyHP = dmgCtrl?.bodyDamage?.HealthPercentage ?? 0;
         float wheelsHP = dmgCtrl?.wheels?.HealthPercentage ?? 0;
         float mechanicalPT = dmgCtrl?.mechanicalPT?.HealthPercentage ?? 0;

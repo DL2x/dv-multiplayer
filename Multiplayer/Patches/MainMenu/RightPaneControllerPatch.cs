@@ -108,6 +108,6 @@ public static class RightPaneController_Patch
         SteamFriends.OnGameLobbyJoinRequested += SteamworksUtils.OnLobbyJoinRequest;
 
         if (Environment.GetCommandLineArgs().Contains("+connect_lobby"))
-            SteamworksUtils.JoinFromCommandLine();
+            __instance.StartCoroutine(SteamworksUtils.JoinFromCommandLine());
     }
 }

@@ -385,7 +385,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundWeatherPacket(ClientboundWeatherPacket packet)
     {
-        WeatherDriver.Instance.LoadSaveData(JObject.FromObject(packet));
+        WeatherDriver.Instance.LoadSaveData(JObject.FromObject(packet), Globals.G.GameParams.WeatherEditorAlwaysAllowed);
     }
 
     private void OnClientboundRemoveLoadingScreen(ClientboundRemoveLoadingScreenPacket packet)
@@ -867,18 +867,6 @@ public class NetworkClient : NetworkManager
             return;
 
         packet.Health.LoadTo(trainCar);
-        //todo test new code thoroughly
-        //check that career and comms radio repairs and damage work as expected
-
-        //CarDamageModel carDamage = trainCar.CarDamage;
-        //float difference = Mathf.Abs(packet.Health - carDamage.currentHealth);
-        //if (difference < 0.0001)
-        //    return;
-
-        //if (packet.Health < carDamage.currentHealth)
-        //    carDamage.DamageCar(difference);
-        //else
-        //    carDamage.RepairCar(difference);
     }
 
     private void OnClientboundRerailTrainPacket(ClientboundRerailTrainPacket packet)
@@ -889,8 +877,8 @@ public class NetworkClient : NetworkManager
         if (!NetworkedRailTrack.Get(packet.TrackId, out NetworkedRailTrack networkedRailTrack))
             return;
 
-        Log($"Rerailing [{trainCar?.ID}, {packet.NetId}] to track {networkedRailTrack?.RailTrack?.logicTrack?.ID}");
-        LogDebug(() => $"Rerailing [{trainCar?.ID}, {packet.NetId}] track: [{networkedRailTrack?.RailTrack?.logicTrack?.ID}, {packet.TrackId}], raw position: {packet.Position}, adjusted position: {packet.Position + WorldMover.currentMove}, forward: {packet.Forward}");
+        Log($"Rerailing [{trainCar?.ID}, {packet.NetId}] to track {networkedRailTrack?.RailTrack?.LogicTrack()?.ID}");
+        LogDebug(() => $"Rerailing [{trainCar?.ID}, {packet.NetId}] track: [{networkedRailTrack?.RailTrack?.LogicTrack()?.ID}, {packet.TrackId}], raw position: {packet.Position}, adjusted position: {packet.Position + WorldMover.currentMove}, forward: {packet.Forward}");
         trainCar.Rerail(networkedRailTrack.RailTrack, packet.Position + WorldMover.currentMove, packet.Forward);
     }
 

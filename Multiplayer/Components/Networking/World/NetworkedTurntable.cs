@@ -7,7 +7,7 @@ namespace Multiplayer.Components.Networking.World;
 public class NetworkedTurntable : IdMonoBehaviour<byte, NetworkedTurntable>
 {
     private static NetworkedTurntable[] _indexedTurntables;
-    public static NetworkedTurntable[] IndexedTurntables => _indexedTurntables ??= WorldData.Instance.TrackRootParent.GetComponentsInChildren<NetworkedTurntable>().OrderBy(nj => nj.NetId).ToArray();
+    public static NetworkedTurntable[] IndexedTurntables => _indexedTurntables ??= RailTrackRegistry.Instance.TrackRootParent.GetComponentsInChildren<NetworkedTurntable>().OrderBy(nj => nj.NetId).ToArray();
 
     protected override bool IsIdServerAuthoritative => false;
 
@@ -20,6 +20,8 @@ public class NetworkedTurntable : IdMonoBehaviour<byte, NetworkedTurntable>
         base.Awake();
         TurntableRailTrack = GetComponent<TurntableRailTrack>();
         NetworkLifecycle.Instance.OnTick += OnTick;
+
+        initialised = NetworkLifecycle.Instance.IsHost();
     }
 
     protected override void OnDestroy()
