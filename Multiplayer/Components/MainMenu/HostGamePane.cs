@@ -39,7 +39,6 @@ public class HostGamePane : MonoBehaviour
     TextMeshProUGUI serverDetails;
 
     SliderDV maxPlayers;
-    Toggle gamePublic;
     Selector gameVisibility;
     ButtonDV startButton;
 
@@ -385,7 +384,6 @@ public class HostGamePane : MonoBehaviour
     private void ValidateInputs(string text)
     {
         bool valid = true;
-        int portNum;
 
 
         if (!DVSteamworks.Success)
@@ -396,7 +394,7 @@ public class HostGamePane : MonoBehaviour
 
         if (port.text != "")
         {
-            if (!int.TryParse(port.text, out portNum) || portNum < MIN_PORT || portNum > MAX_PORT)
+            if (!int.TryParse(port.text, out int portNum) || portNum < MIN_PORT || portNum > MAX_PORT)
                 valid = false;
         }
 
