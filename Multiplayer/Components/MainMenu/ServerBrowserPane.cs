@@ -1,24 +1,25 @@
-using System;
-using System.Collections;
+using DV;
 using DV.Localization;
 using DV.UI;
 using DV.UIFramework;
-using DV.Util;
 using DV.Utils;
+using LiteNetLib;
+using Multiplayer.Components.MainMenu.ServerBrowser;
 using Multiplayer.Components.Networking;
+using Multiplayer.Components.UI.Controls;
+using Multiplayer.Networking.Data;
 using Multiplayer.Utils;
+using Steamworks;
+using Steamworks.Data;
+using System;
+using System.Collections.Generic;
+using System.Collections;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Linq;
-using Multiplayer.Networking.Data;
-using DV;
-using System.Net;
-using LiteNetLib;
-using System.Collections.Generic;
-using Steamworks;
-using Steamworks.Data;
-using System.Threading.Tasks;
 
 namespace Multiplayer.Components.MainMenu
 {
@@ -44,12 +45,8 @@ namespace Multiplayer.Components.MainMenu
         private const int MAX_PORT = 49151;
 
         //Gridview variables
-        private readonly ObservableCollectionExt<IServerBrowserGameDetails> gridViewModel = [];
-        private ServerBrowserGridView gridView;
-        private ScrollRect parentScroller;
-        private string serverIDOnRefresh;
+        private ServerBrowserGridView serverGridView;
         private IServerBrowserGameDetails selectedServer;
-
 
         //ping tracking
         private float pingTimer = 0f;
@@ -100,20 +97,11 @@ namespace Multiplayer.Components.MainMenu
             BuildUI();
 
             SetupServerBrowser();
-            RefreshGridView();
         }
 
         public void OnEnable()
         {
-            //Multiplayer.Log("MultiplayerPane OnEnable()");
-            if (!this.parentScroller)
-            {
-                //Multiplayer.Log("Find ScrollRect");
-                this.parentScroller = this.gridView.GetComponentInParent<ScrollRect>();
-                //Multiplayer.Log("Found ScrollRect");
-            }
             this.SetupListeners(true);
-            this.serverIDOnRefresh = "";
 
             buttonDirectIP.ToggleInteractable(true);
             buttonRefresh.ToggleInteractable(true);
@@ -148,7 +136,7 @@ namespace Multiplayer.Components.MainMenu
             else if (remoteRefreshComplete)
             {
                 RefreshGridView();
-                IndexChanged(gridView); //Revalidate any selected servers
+                OnSelectedIndexChanged(serverGridView); //Revalidate any selected servers
                 remoteRefreshComplete = false;
                 serverRefreshing = false;
                 timePassed = 0;
@@ -341,11 +329,11 @@ namespace Multiplayer.Components.MainMenu
 
             //load our custom controller
             SaveLoadGridView slgv = GridviewGO.GetComponent<SaveLoadGridView>();
-            gridView = GridviewGO.AddComponent<ServerBrowserGridView>();
+            serverGridView = GridviewGO.AddComponent<ServerBrowserGridView>();
 
             //grab the original prefab
             slgv.viewElementPrefab.SetActive(false);
-            gridView.viewElementPrefab = Instantiate(slgv.viewElementPrefab);
+            serverGridView.viewElementPrefab = Instantiate(slgv.viewElementPrefab);
             slgv.viewElementPrefab.SetActive(true);
 
             //Remove original controller
@@ -353,18 +341,16 @@ namespace Multiplayer.Components.MainMenu
 
             //Don't forget to re-enable!
             GridviewGO.SetActive(true);
-
-            gridView.showDummyElement = true;
         }
         private void SetupListeners(bool on)
         {
             if (on)
             {
-                this.gridView.SelectedIndexChanged += this.IndexChanged;
+                serverGridView.SelectedIndexChanged += this.OnSelectedIndexChanged;
             }
             else
             {
-                this.gridView.SelectedIndexChanged -= this.IndexChanged;
+                serverGridView.SelectedIndexChanged -= this.OnSelectedIndexChanged;
             }
         }
         #endregion
@@ -375,13 +361,10 @@ namespace Multiplayer.Components.MainMenu
             if (serverRefreshing)
                 return;
 
-            if (selectedServer != null)
-                serverIDOnRefresh = selectedServer.id;
-
             remoteServers.Clear();
 
             serverRefreshing = true;
-            buttonJoin.ToggleInteractable(false);
+            //buttonJoin.ToggleInteractable(false);
             buttonRefresh.ToggleInteractable(false);
 
             if (DVSteamworks.Success)
@@ -428,15 +411,14 @@ namespace Multiplayer.Components.MainMenu
             ShowIpPopup();
         }
 
-        private void IndexChanged(AGridView<IServerBrowserGameDetails> gridView)
+        private void OnSelectedIndexChanged(MPGridView<IServerBrowserGameDetails> gridView)
         {
             if (serverRefreshing)
                 return;
 
-            if (gridView.SelectedModelIndex >= 0)
+            selectedServer = gridView.SelectedItem;
+            if (selectedServer != null)
             {
-                selectedServer = gridViewModel[gridView.SelectedModelIndex];
-
                 UpdateDetailsPane();
 
                 //Check if we can connect to this server
@@ -457,12 +439,13 @@ namespace Multiplayer.Components.MainMenu
 
         private void UpdateElement(IServerBrowserGameDetails element)
         {
-            int index = gridViewModel.IndexOf(element);
+            int index = serverGridView.IndexOf(element);
 
             if (index >= 0)
             {
-                var viewElement = gridView.GetElementAt(index);
+                var viewElement = serverGridView.GetElementAt(index) as ServerBrowserElement;
                 viewElement?.UpdateView();
+
             }
         }
         #endregion
@@ -511,7 +494,7 @@ namespace Multiplayer.Components.MainMenu
                 if (result.closedBy == PopupClosedByAction.Abortion)
                 {
                     buttonDirectIP.ToggleInteractable(true);
-                    IndexChanged(gridView); //re-enable the join button if a valid gridview item is selected
+                    OnSelectedIndexChanged(serverGridView); //re-enable the join button if a valid gridview item is selected
                     return;
                 }
 
@@ -598,9 +581,7 @@ namespace Multiplayer.Components.MainMenu
                 {
                     ShowPasswordPopup();
                 }
-
             };
-
         }
 
         private void ShowPasswordPopup()
@@ -823,8 +804,8 @@ namespace Multiplayer.Components.MainMenu
 
             if (gameObject != null && gameObject.activeInHierarchy)
             {
-                if (gridView != null)
-                    IndexChanged(gridView);
+                if (serverGridView != null)
+                    OnSelectedIndexChanged(serverGridView);
 
                 if (buttonDirectIP != null && buttonDirectIP.gameObject != null)
                     buttonDirectIP.ToggleInteractable(true);
@@ -881,6 +862,8 @@ namespace Multiplayer.Components.MainMenu
         private async void ListActiveLobbies()
         {
             lobbies = await SteamMatchmaking.LobbyList.WithMaxResults(100)
+                                                      .FilterDistanceWorldwide()
+                                                      .WithSlotsAvailable(-1)
                                                       //.WithKeyValue(SteamworksUtils.MP_MOD_KEY, string.Empty)
                                                       .RequestAsync();
 
@@ -912,7 +895,7 @@ namespace Multiplayer.Components.MainMenu
 
         private void UpdatePingsSteam()
         {
-            foreach (var server in gridViewModel)
+            foreach (var server in serverGridView.Items)
             {
                 if (server is LobbyServerData lobbyServer)
                 {
@@ -944,28 +927,26 @@ namespace Multiplayer.Components.MainMenu
         #endregion
         private void RefreshGridView()
         {
-
-            var allServers = new List<IServerBrowserGameDetails>();
-            allServers.AddRange(remoteServers);
-
             // Get all active IDs
-            List<string> activeIDs = allServers.Select(s => s.id).Distinct().ToList();
+            List<string> activeIDs = remoteServers.Select(s => s.id).Distinct().ToList();
 
-            // Find servers to remove
-            List<IServerBrowserGameDetails> removeList = gridViewModel.Where(gv => !activeIDs.Contains(gv.id)).ToList();
-
-            // Remove expired servers
-            foreach (var remove in removeList)
+            // Remove servers that no longer exist
+            for (int i = serverGridView.Items.Count - 1; i >= 0; i--)
             {
-                gridViewModel.Remove(remove);
+                if (!activeIDs.Contains(serverGridView.Items[i].id))
+                {
+                    serverGridView.RemoveItemAt(i);
+                }
             }
 
+            Multiplayer.LogDebug(() => $"RefreshGridView() prepare to update/add, remoteServers count: {remoteServers.Count}");
             // Update existing servers and add new ones
-            foreach (var server in allServers)
+            foreach (var server in remoteServers)
             {
-                var existingServer = gridViewModel.FirstOrDefault(gv => gv.id == server.id);
+                var existingServer = serverGridView.Items.FirstOrDefault(gv => gv.id == server.id);
                 if (existingServer != null)
                 {
+                    Multiplayer.LogDebug(() => $"RefreshGridView() updating server");
                     // Update existing server
                     existingServer.TimePassed = server.TimePassed;
                     existingServer.CurrentPlayers = server.CurrentPlayers;
@@ -974,41 +955,13 @@ namespace Multiplayer.Components.MainMenu
                 }
                 else
                 {
+                    Multiplayer.LogDebug(() => $"RefreshGridView() adding server");
                     // Add new server
-                    gridViewModel.Add(server);
+                    serverGridView.AddItem(server);
                 }
-            }
-
-            if (gridViewModel.Count() == 0)
-            {
-                gridView.showDummyElement = true;
-                buttonJoin.ToggleInteractable(false);
-            }
-            else
-            {
-                gridView.showDummyElement = false;
-            }
-
-            //Update the gridview rendering
-            gridView.SetModel(gridViewModel);
-
-            //if we have a server selected, we need to re-select it after refresh
-            if (serverIDOnRefresh != null)
-            {
-                int selID = Array.FindIndex(gridViewModel.ToArray(), server => server.id == serverIDOnRefresh);
-                if (selID >= 0)
-                {
-                    gridView.SetSelected(selID);
-
-                    if (this.parentScroller)
-                    {
-                        this.parentScroller.verticalNormalizedPosition = 1f - (float)selID / (float)gridView.Model.Count;
-                    }
-                }
-                serverIDOnRefresh = null;
             }
         }
-
+         
         private string ExtractDomainName(string input)
         {
             if (input.StartsWith("http://"))
