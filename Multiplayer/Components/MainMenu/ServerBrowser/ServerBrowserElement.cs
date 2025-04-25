@@ -1,15 +1,17 @@
-using DV.UIFramework;
+
+using Multiplayer.Components.UI.Controls;
 using Multiplayer.Utils;
-using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace Multiplayer.Components.MainMenu.ServerBrowser
 {
-    public class ServerBrowserElement : AViewElement<IServerBrowserGameDetails>
+    public class ServerBrowserElement : MPViewElement<IServerBrowserGameDetails>
     {
-        private TextMeshProUGUI networkName;
+        public override bool IsPlaceholder => false;
+
+        private TextMeshProUGUI serverName;
         private TextMeshProUGUI playerCount;
         private TextMeshProUGUI ping;
         private GameObject goIconPassword;
@@ -19,7 +21,7 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
         private IServerBrowserGameDetails data;
 
         private const int PING_WIDTH = 124; // Adjusted width for the ping text
-        private const int PING_POS_X = 650; // X position for the ping text
+        private const int PING_PADDING_X = 10;
 
         private const string PING_COLOR_UNKNOWN = "#808080";
         private const string PING_COLOR_EXCELLENT = "#00ff00";
@@ -35,25 +37,35 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
         protected override void Awake()
         {
             // Find and assign TextMeshProUGUI components for displaying server details
-            networkName = this.FindChildByName("name [noloc]").GetComponent<TextMeshProUGUI>();
+            serverName = this.FindChildByName("name [noloc]").GetComponent<TextMeshProUGUI>();
             playerCount = this.FindChildByName("date [noloc]").GetComponent<TextMeshProUGUI>();
             ping = this.FindChildByName("time [noloc]").GetComponent<TextMeshProUGUI>();
             goIconPassword = this.FindChildByName("autosave icon");
             iconPassword = goIconPassword.GetComponent<Image>();
 
-            // Fix alignment of the player count text relative to the network name text
-            Vector3 namePos = networkName.transform.position;
-            Vector2 nameSize = networkName.rectTransform.sizeDelta;
-            playerCount.transform.position = new Vector3(namePos.x + nameSize.x, namePos.y, namePos.z);
+            RectTransform nameRT = serverName.rectTransform;
 
-            // Adjust the size and position of the ping text
-            Vector2 rowSize = transform.GetComponentInParent<RectTransform>().sizeDelta;
-            Vector3 pingPos = ping.transform.position;
-            Vector2 pingSize = ping.rectTransform.sizeDelta;
+            // Align player count
+            RectTransform playerCountRT = playerCount.rectTransform;
+            playerCountRT.anchorMin = new Vector2(0, 0.5f);
+            playerCountRT.anchorMax = new Vector2(0, 0.5f);
+            playerCountRT.pivot = new Vector2(0, 0.5f);
 
-            ping.rectTransform.sizeDelta = new Vector2(PING_WIDTH, pingSize.y);
-            ping.transform.position = new Vector3(PING_POS_X, pingPos.y, pingPos.z);
+            float nameWidth = nameRT.sizeDelta.x;
+            playerCountRT.anchoredPosition = new Vector2(nameRT.position.x + nameWidth, nameRT.anchoredPosition.y);
+
+            // Align ping
+            RectTransform pingRT = ping.rectTransform;
+            pingRT.anchorMin = new Vector2(0, 0.5f);
+            pingRT.anchorMax = new Vector2(0, 0.5f);
+            pingRT.pivot = new Vector2(0, 0.5f);
+
+            RectTransform parentRT = transform as RectTransform;
+            float pingX = parentRT.rect.width - PING_WIDTH - PING_PADDING_X;
+            pingRT.anchoredPosition = new Vector2(pingX, nameRT.anchoredPosition.y);
+            pingRT.sizeDelta = new Vector2(PING_WIDTH, pingRT.sizeDelta.y);
             ping.alignment = TextAlignmentOptions.Right;
+
 
             // Set password icon
             iconPassword.sprite = Multiplayer.AssetIndex.lockIcon;
@@ -69,7 +81,7 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
                 goIconLAN.name = "LAN Icon";
                 Vector3 LANpos = goIconLAN.transform.localPosition;
                 Vector3 LANSize = goIconLAN.GetComponent<RectTransform>().sizeDelta;
-                LANpos.x += (PING_POS_X - LANpos.x - LANSize.x) / 2;
+                LANpos.x += (pingRT.position.x - LANpos.x - LANSize.x) / 2;
                 goIconLAN.transform.localPosition = LANpos;
                 iconLAN = goIconLAN.GetComponent<Image>();
                 iconLAN.sprite = Multiplayer.AssetIndex.lanIcon;
@@ -77,7 +89,7 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
 
         }
 
-        public override void SetData(IServerBrowserGameDetails data, AGridView<IServerBrowserGameDetails> _)
+        public override void SetData(IServerBrowserGameDetails data)
         {
             // Clear existing data
             if (this.data != null)
@@ -95,15 +107,13 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
 
         public void UpdateView()
         {
+            //Multiplayer.LogDebug(() => $"UpdateView() serverName: {data.Name}, ping: {data.Ping}");
 
             // Update the text fields with the data from the server
-            networkName.text = data.Name;
+            serverName.text = data.Name;
             playerCount.text = $"{data.CurrentPlayers} / {data.MaxPlayers}";
 
-            //if (data.MultiplayerVersion == Multiplayer.Ver)
-                ping.text = $"<color={GetColourForPing(data.Ping)}>{(data.Ping < 0 ? "?" : data.Ping)} ms</color>";
-            //else
-            //    ping.text = $"<color={PING_COLOR_UNKNOWN}>N/A</color>";
+            ping.text = $"<color={GetColourForPing(data.Ping)}>{(data.Ping < 0 ? "?" : data.Ping)} ms</color>";
 
             // Hide the icon if the server does not have a password
             goIconPassword.SetActive(data.HasPassword);
@@ -114,19 +124,14 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
 
         private string GetColourForPing(int ping)
         {
-            switch (ping)
+            return ping switch
             {
-                case PING_THRESHOLD_NONE:
-                    return PING_COLOR_UNKNOWN;
-                case < PING_THRESHOLD_EXCELLENT:
-                    return PING_COLOR_EXCELLENT;
-                case < PING_THRESHOLD_GOOD:
-                    return PING_COLOR_GOOD;
-                case < PING_THRESHOLD_HIGH:
-                    return PING_COLOR_HIGH;
-                default:
-                    return PING_COLOR_POOR;
-            }
+                PING_THRESHOLD_NONE => PING_COLOR_UNKNOWN,
+                < PING_THRESHOLD_EXCELLENT => PING_COLOR_EXCELLENT,
+                < PING_THRESHOLD_GOOD => PING_COLOR_GOOD,
+                < PING_THRESHOLD_HIGH => PING_COLOR_HIGH,
+                _ => PING_COLOR_POOR,
+            };
         }
     }
 }
