@@ -1,44 +1,36 @@
-using System;
 using DV.UI;
-using DV.UIFramework;
-using Multiplayer.Components.MainMenu.ServerBrowser;
+using Multiplayer.Components.UI.Controls;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Multiplayer.Components.MainMenu
+namespace Multiplayer.Components.MainMenu.ServerBrowser;
+
+[RequireComponent(typeof(ContentSizeFitter))]
+[RequireComponent(typeof(VerticalLayoutGroup))]
+public class ServerBrowserGridView : MPGridView<IServerBrowserGameDetails>
 {
-    [RequireComponent(typeof(ContentSizeFitter))]
-    [RequireComponent(typeof(VerticalLayoutGroup))]
-    // 
-    public class ServerBrowserGridView : AGridView<IServerBrowserGameDetails>
+
+    protected override void Awake()
     {
+        showPlaceholderWhenEmpty = true;
+
+        //copy the copy
+        viewElementPrefab.SetActive(false);
+        placeholderElementPrefab = Instantiate(viewElementPrefab);
+
+        //swap controllers
+        Destroy(viewElementPrefab.GetComponent<SaveLoadViewElement>());
+        GameObject.Destroy(placeholderElementPrefab.GetComponent<SaveLoadViewElement>());
+
+        viewElementPrefab.AddComponent<ServerBrowserElement>();
+        placeholderElementPrefab.AddComponent<ServerBrowserPlaceholderElement>();
+
+        viewElementPrefab.name = "prefabSBElement";
+        placeholderElementPrefab.name = "prefabSBPlaceholderElement";
+
+        viewElementPrefab.SetActive(true);
+        placeholderElementPrefab.SetActive(true);
          
-        protected override void Awake()
-        {
-            //Multiplayer.Log("serverBrowserGridview Awake()");
-
-            //copy the copy
-            this.viewElementPrefab.SetActive(false);
-            this.dummyElementPrefab = Instantiate(this.viewElementPrefab);
-
-            //swap controllers
-            GameObject.Destroy(this.viewElementPrefab.GetComponent<SaveLoadViewElement>());
-            GameObject.Destroy(this.dummyElementPrefab.GetComponent<SaveLoadViewElement>());
-
-            this.viewElementPrefab.AddComponent<ServerBrowserElement>();
-            this.dummyElementPrefab.AddComponent<ServerBrowserDummyElement>();
-
-            this.viewElementPrefab.name = "prefabServerBrowserElement";
-            this.dummyElementPrefab.name = "prefabServerBrowserDummyElement";
-
-            this.viewElementPrefab.SetActive(true);
-            this.dummyElementPrefab.SetActive(true);
-
-        }
-
-        public ServerBrowserElement GetElementAt(int index)
-        {
-            return transform.GetChild(index + indexOffset).GetComponent<ServerBrowserElement>();
-        }
+        base.Awake();
     }
 }

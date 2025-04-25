@@ -2,21 +2,20 @@ using DV.UI;
 using DV.UIFramework;
 using DV.Localization;
 using Multiplayer.Utils;
-using System.ComponentModel;
-using TMPro;
 using UnityEngine;
+using Multiplayer.Components.UI.Controls;
 
 namespace Multiplayer.Components.MainMenu.ServerBrowser
 {
-    public class ServerBrowserDummyElement : AViewElement<IServerBrowserGameDetails>
+    public class ServerBrowserPlaceholderElement : MPViewElement<IServerBrowserGameDetails>
     {
-        private TextMeshProUGUI networkName;
+        public override bool IsPlaceholder => true;
 
         protected override void Awake()
         {
             // Find and assign TextMeshProUGUI components for displaying server details
             GameObject networkNameGO = this.FindChildByName("name [noloc]");
-            networkName = networkNameGO.GetComponent<TextMeshProUGUI>();
+
             this.FindChildByName("date [noloc]").SetActive(false);
             this.FindChildByName("time [noloc]").SetActive(false);
             this.FindChildByName("autosave icon").SetActive(false);
@@ -41,12 +40,7 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
 
         }
 
-        public override void SetData(IServerBrowserGameDetails data, AGridView<IServerBrowserGameDetails> _)
-        {
-            //do nothing
-        }
-
-        private void UpdateView(object sender = null, PropertyChangedEventArgs e = null)
+        public override void SetData(IServerBrowserGameDetails data)
         {
             //do nothing
         }
