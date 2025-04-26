@@ -30,6 +30,7 @@
         <Reference Include="CommandTerminal" />
         <Reference Include="DV.BrakeSystem" />
         <Reference Include="DV.BuildInfo" />
+        <Reference Include="DV.CabControls.Spec" />
         <Reference Include="DV.CharacterController" />
         <Reference Include="DV.Common" />
         <Reference Include="DV.ControllerAnchors" />

@@ -1,6 +1,7 @@
 using LiteNetLib.Utils;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Serialization;
+using Multiplayer.Utils;
 using UnityEngine;
 
 namespace Multiplayer.Networking.Data;
@@ -24,7 +25,7 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
                 plugData.HeldBy?.Id ?? 0,
                 plugData.TrainCarNetId,
                 plugData.IsConnectedLeft,
-                plugData.transform.AbsolutePosition(),
+                plugData.transform.GetWorldAbsolutePosition(),
                 plugData.transform.rotation
             );
     }
