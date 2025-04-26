@@ -893,32 +893,32 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonTrainUncouplePacket(CommonTrainUncouplePacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonHoseConnectedPacket(CommonHoseConnectedPacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonHoseDisconnectedPacket(CommonHoseDisconnectedPacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonMuConnectedPacket(CommonMuConnectedPacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonMuDisconnectedPacket(CommonMuDisconnectedPacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonCockFiddlePacket(CommonCockFiddlePacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnCommonBrakeCylinderReleasePacket(CommonBrakeCylinderReleasePacket packet, ITransportPeer peer)

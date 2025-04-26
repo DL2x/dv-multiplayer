@@ -240,18 +240,16 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (UnloadWatcher.isQuitting)
             return;
 
-        NetworkLifecycle.Instance.OnTick -= Common_OnTick;
-        NetworkLifecycle.Instance.OnTick -= Server_OnTick;
-
-        NetworkLifecycle.Instance.Server.PlayerDisconnect -= Server_OnPlayerDisconnect;
-
+        //Clean dictionaries
         trainCarsToNetworkedTrainCars.Remove(TrainCar);
-
         trainCarIdToNetworkedTrainCars.Remove(CurrentID);
         trainCarIdToTrainCars.Remove(CurrentID);
 
         foreach (Coupler coupler in TrainCar.couplers)
             hoseToCoupler.Remove(coupler.hoseAndCock);
+
+        //stop tracking client events
+        NetworkLifecycle.Instance.OnTick -= Common_OnTick;
 
         if (firebox != null)
         {
@@ -270,8 +268,12 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (TrainCar.PaintInterior != null)
             TrainCar.PaintInterior.OnThemeChanged -= Common_OnPaintThemeChange;
 
+        //stop tracking server events
         if (NetworkLifecycle.Instance.IsHost())
         {
+            NetworkLifecycle.Instance.OnTick -= Server_OnTick;
+            NetworkLifecycle.Instance.Server.PlayerDisconnect -= Server_OnPlayerDisconnect;
+
             bogie1.TrackChanged -= Server_BogieTrackChanged;
             bogie2.TrackChanged -= Server_BogieTrackChanged;
 
