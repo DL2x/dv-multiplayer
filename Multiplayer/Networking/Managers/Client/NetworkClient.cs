@@ -1,6 +1,4 @@
 using System;
-using System.Net;
-using System.Text;
 using System.Collections.Generic;
 using DV;
 using DV.Damage;
@@ -61,13 +59,14 @@ public class NetworkClient : NetworkManager
     private ITransportPeer serverPeer;
 
     private ChatGUI chatGUI;
-    public bool isSinglePlayer;
+    private readonly bool isSinglePlayer;
 
     private bool isAlsoHost;
     IGameSession originalSession;
 
-    public NetworkClient(Settings settings) : base(settings)
+    public NetworkClient(Settings settings, bool singlePlayer) : base(settings)
     {
+        isSinglePlayer = singlePlayer;
         ClientPlayerManager = new ClientPlayerManager();
     }
 
