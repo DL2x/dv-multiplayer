@@ -47,8 +47,8 @@ public class NetworkServer : NetworkManager
     private readonly Dictionary<byte, ITransportPeer> Peers = [];
 
     private LobbyServerManager lobbyServerManager;
-    public bool isSinglePlayer;
-    public LobbyServerData serverData;
+    public readonly bool IsSinglePlayer;
+    public LobbyServerData ServerData;
     public RerailController rerailController;
 
     public IReadOnlyCollection<ServerPlayer> ServerPlayers => serverPlayers.Values;
@@ -64,18 +64,16 @@ public class NetworkServer : NetworkManager
     //we don't care if the client doesn't have these mods
     public static string[] modWhiteList = ["RuntimeUnityEditor", "BookletOrganizer", "RemoteDispatch"];
 
-    public NetworkServer(IDifficulty difficulty, Settings settings, bool isSinglePlayer, LobbyServerData serverData) : base(settings)
+    public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData) : base(settings)
     {
-        LogDebug(()=>$"NetworkServer Constructor");
-        this.isSinglePlayer = isSinglePlayer;
-        this.serverData = serverData;
+        Log(()=>$"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
 
+        IsSinglePlayer = singlePlayer;
+        ServerData = serverData;
         Difficulty = difficulty;
 
         serverMods = ModInfo.FromModEntries(UnityModManager.modEntries)
                             .Where(mod => !modWhiteList.Contains(mod.Id)).ToArray();
-
-
     }
 
     public override bool Start(int port)
@@ -100,13 +98,15 @@ public class NetworkServer : NetworkManager
 
     public override void Stop()
     {
+        WorldStreamingInit.LoadingFinished -= OnLoaded;
+
         if (lobbyServerManager != null)
         {
             lobbyServerManager.RemoveFromLobbyServer();
             UnityEngine.Object.Destroy(lobbyServerManager);
         }
 
-        //Alert all clients (except h
+        //Alert all clients (except host)
         var packet =  WritePacket(new ClientboundDisconnectPacket());
         foreach (var peer in Peers.Values)
         {
@@ -158,8 +158,7 @@ public class NetworkServer : NetworkManager
 
     private void OnLoaded()
     {
-        //Debug.Log($"Server loaded, isSinglePlayer: {isSinglePlayer} isPublic: {isPublic}");
-        if (!isSinglePlayer)
+        if (!IsSinglePlayer)
         {
             lobbyServerManager = NetworkLifecycle.Instance.GetOrAddComponent<LobbyServerManager>();
         }
@@ -636,7 +635,7 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        if (PlayerCount >= Multiplayer.Settings.MaxPlayers || isSinglePlayer && PlayerCount >= 1)
+        if (PlayerCount >= Multiplayer.Settings.MaxPlayers || IsSinglePlayer && PlayerCount >= 1)
         {
             LogWarning("Denied login due to server being full!");
             ClientboundLoginResponsePacket denyPacket = new()
