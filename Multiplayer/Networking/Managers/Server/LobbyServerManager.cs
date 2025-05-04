@@ -17,7 +17,6 @@ using System.Linq;
 using Steamworks;
 using Steamworks.Data;
 using Multiplayer.Utils;
-using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Components.MainMenu;
 
 namespace Multiplayer.Networking.Managers.Server;
@@ -59,13 +58,33 @@ public class LobbyServerManager : MonoBehaviour
     #region Unity
     public void Awake()
     {
+        bool destroy = false;
+
         server = NetworkLifecycle.Instance.Server;
 
-        Multiplayer.Log($"LobbyServerManager New({server != null})");
+        if (server == null)
+        {
+            server.LogError($"LobbyServerManager Server is null");
+            destroy = true;
+        }
+        else if (server?.ServerData == null)
+        {
+            Multiplayer.LogError($"LobbyServerManager Server Data is null");
+            destroy = true;
+        }
+
+        if (destroy)
+        {
+            Multiplayer.LogError($"Failed to load LobbyServerManager");
+            Destroy(this);
+        }
     }
 
     public IEnumerator Start()
     {
+        if (server == null || server.ServerData == null)
+            yield break;
+
         //Create a steam lobby
         if (DVSteamworks.Success)
         {
@@ -73,19 +92,30 @@ public class LobbyServerManager : MonoBehaviour
         }
 
         //Register with old php lobby server (provides stats and makes the lobby visible, but not joinable to users on old versions)
-        server.serverData.ipv6 = GetStaticIPv6Address();
-        server.serverData.LocalIPv4 = GetLocalIPv4Address();
+        server.ServerData.ipv6 = GetStaticIPv6Address();
+        server.ServerData.LocalIPv4 = GetLocalIPv4Address();
 
-        StartCoroutine(GetIPv4(Multiplayer.Settings.Ipv4AddressCheck));
+        if (!string.IsNullOrEmpty(Multiplayer.Settings.Ipv4AddressCheck))
+        {
+            StartCoroutine(GetIPv4(Multiplayer.Settings.Ipv4AddressCheck));
+        }
+        else
+        {
+            server.LogWarning("Ipv4AddressCheck URL is null or empty, skipping IPv4 detection");
+            initialised = true;
+        }
 
-        while(!initialised)
+        while (!initialised)
             yield return null;
 
-        server.Log("Public IPv4: " + server.serverData.ipv4);
-        server.Log("Public IPv6: " + server.serverData.ipv6);
-        server.Log("Private IPv4: " + server.serverData.LocalIPv4);
+        server.Log
+            (
+                $"\r\nPublic IPv4: {server.ServerData.ipv4}\r\n" +
+                $"Public IPv6: {server.ServerData.ipv6}\r\n" +
+                $"Private IPv4: {server.ServerData.LocalIPv4}"
+            );
 
-        if (server.serverData.Visibility >= ServerVisibility.Private)
+        if (server.ServerData.Visibility >= ServerVisibility.Private)
         {
             Multiplayer.Log($"Registering server at: {Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}");
             StartCoroutine(RegisterWithLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}"));
@@ -103,7 +133,7 @@ public class LobbyServerManager : MonoBehaviour
             server_id = Guid.NewGuid().ToString();
         }
 
-        server.serverData.id = server_id;
+        server.ServerData.id = server_id;
 
         StartDiscoveryServer();
     }
@@ -128,20 +158,20 @@ public class LobbyServerManager : MonoBehaviour
         {
             timePassed += Time.deltaTime;
 
-            if (timePassed > UPDATE_TIME || (server.serverData.CurrentPlayers != server.PlayerCount && timePassed > PLAYER_CHANGE_TIME))
+            if (timePassed > UPDATE_TIME || (server.ServerData.CurrentPlayers != server.PlayerCount && timePassed > PLAYER_CHANGE_TIME))
             {
                 timePassed = 0f;
-                server.serverData.CurrentPlayers = server.PlayerCount;
+                server.ServerData.CurrentPlayers = server.PlayerCount;
                 StartCoroutine(UpdateLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_UPDATE_SERVER}"));
 
                 if(lobby != null)
                 {
-                    SteamworksUtils.SetLobbyData((Lobby)lobby, server.serverData, EXCLUDE_PARAMS);
+                    SteamworksUtils.SetLobbyData((Lobby)lobby, server.ServerData, EXCLUDE_PARAMS);
                 }
             }
-        }else if (server.serverData.Visibility == ServerVisibility.Private || !sendUpdates)
+        }else if (server?.ServerData?.Visibility == ServerVisibility.Private || !sendUpdates)
         {
-            server.serverData.CurrentPlayers = server.PlayerCount;
+            server.ServerData.CurrentPlayers = server.PlayerCount;
         }
 
         //Keep LAN discovery running
@@ -153,9 +183,11 @@ public class LobbyServerManager : MonoBehaviour
     #region Steam Lobby
     public async void CreateSteamLobby()
     {
+        if (server == null || server.ServerData == null)
+            return;
 
         // Specify the lobby type (public, private, etc.)
-        var result = await SteamMatchmaking.CreateLobbyAsync(server.serverData.MaxPlayers);
+        var result = await SteamMatchmaking.CreateLobbyAsync(server.ServerData.MaxPlayers);
 
         if (result.HasValue)
         {
@@ -168,14 +200,14 @@ public class LobbyServerManager : MonoBehaviour
             lobby?.SetData(SteamworksUtils.LOBBY_MP_MOD_KEY, SteamworksUtils.LOBBY_MP_MOD_KEY); //We'll add this in for filtering
             lobby?.SetData(SteamworksUtils.LOBBY_NET_LOCATION_KEY, SteamNetworkingUtils.LocalPingLocation.ToString()); //for ping estimation
 
-            SteamworksUtils.SetLobbyData((Lobby)lobby, server.serverData, EXCLUDE_PARAMS);
+            SteamworksUtils.SetLobbyData((Lobby)lobby, server.ServerData, EXCLUDE_PARAMS);
 
             //Set correct visibility
-            if (server.serverData.Visibility == ServerVisibility.Private)
+            if (server.ServerData.Visibility == ServerVisibility.Private)
                 lobby?.SetPrivate();
-            else if (server.serverData.Visibility == ServerVisibility.Friends)
+            else if (server.ServerData.Visibility == ServerVisibility.Friends)
                 lobby?.SetFriendsOnly();
-            else if (server.serverData.Visibility == ServerVisibility.Public)
+            else if (server.ServerData.Visibility == ServerVisibility.Public)
                 lobby?.SetPublic();
 
             lobby?.SetJoinable(true);
@@ -200,7 +232,7 @@ public class LobbyServerManager : MonoBehaviour
     private IEnumerator RegisterWithLobbyServer(string uri)
     {
         JsonSerializerSettings jsonSettings = new() { NullValueHandling = NullValueHandling.Ignore };
-        string json = JsonConvert.SerializeObject(server.serverData, jsonSettings);
+        string json = JsonConvert.SerializeObject(server.ServerData, jsonSettings);
         Multiplayer.LogDebug(()=>$"JsonRequest: {json}");
 
         yield return SendWebRequest(
@@ -247,7 +279,7 @@ public class LobbyServerManager : MonoBehaviour
                                                 server_id,
                                                 private_key,
                                                 inGame.ToString("d\\d\\ hh\\h\\ mm\\m\\ ss\\s"),
-                                                server.serverData.CurrentPlayers
+                                                server.ServerData.CurrentPlayers
                                             );
 
         string json = JsonConvert.SerializeObject(reqData, jsonSettings);
@@ -285,7 +317,7 @@ public class LobbyServerManager : MonoBehaviour
                 if (match != null)
                 {
                     Multiplayer.Log($"IPv4 address extracted: {match.Value}");
-                    server.serverData.ipv4 = match.Value;     
+                    server.ServerData.ipv4 = match.Value;     
                 }
                 else
                 {
@@ -494,7 +526,7 @@ public class LobbyServerManager : MonoBehaviour
         if (!packet.IsResponse)
         {
             packet.IsResponse = true;
-            packet.Data = server.serverData;
+            packet.Data = server.ServerData;
         }
 
         SendUnconnectedPacket(packet, endPoint.Address.ToString(), endPoint.Port);
