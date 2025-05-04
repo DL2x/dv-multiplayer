@@ -38,12 +38,18 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
 
     private void Server_OnTick(uint tick)
     {
-        if (UnloadWatcher.isUnloading)
-            return;
 
         cachedSendPacket.Tick = tick;
         foreach (Trainset set in Trainset.allSets)
-            Server_TickSet(set, tick);
+        {
+            if (UnloadWatcher.isUnloading || UnloadWatcher.isQuitting)
+                return;
+
+            if (set != null)
+                Server_TickSet(set, tick);
+            else
+                Multiplayer.LogError($"Server_OnTick(): Trainset is null!");
+        }
     }
     private void Server_TickSet(Trainset set, uint tick)
     {
@@ -51,11 +57,8 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
         bool maxTicksReached = false;
         bool anyTracksDirty = false;
 
-        if (set == null)
-        {
-            Multiplayer.LogError($"Server_TickSet(): Received null set!");
+        if (UnloadWatcher.isUnloading || UnloadWatcher.isQuitting)
             return;
-        }
 
         cachedSendPacket.FirstNetId = set.firstCar.GetNetId();
         cachedSendPacket.LastNetId = set.lastCar.GetNetId();
@@ -66,21 +69,32 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
 
         foreach (TrainCar trainCar in set.cars)
         {
-            if (trainCar == null || !trainCar.gameObject.activeSelf)
+            if (trainCar == null || trainCar.gameObject == null || !trainCar.gameObject.activeSelf)
             {
-                Multiplayer.LogError($"Trainset {set.id} ({set.firstCar?.GetNetId()} has a null or inactive ({trainCar?.gameObject.activeSelf}) car!");
+                Multiplayer.LogError($"Trainset {set?.id} ({set.firstCar?.GetNetId()}) has a null or inactive car! trainCar: {trainCar != null}, gameObject: {trainCar?.gameObject != null}, active: {trainCar?.gameObject?.activeSelf}");
                 return;
             }
 
             //If we can locate the networked car, we'll add to the ticks counter and check if any tracks are dirty
-            if (NetworkedTrainCar.TryGetFromTrainCar(trainCar, out NetworkedTrainCar netTC))
+            if (NetworkedTrainCar.TryGetFromTrainCar(trainCar, out NetworkedTrainCar netTC) && netTC != null)
             {
                 maxTicksReached |= netTC.TicksSinceSync >= MAX_UNSYNC_TICKS; //Even if the car is stationary, if the max ticks has been exceeded we will still sync
                 anyTracksDirty |= netTC.BogieTracksDirty;
             }
+            else
+            {
+                Multiplayer.LogError($"NetworkedTrainCar not found for TrainCar {trainCar?.ID} in set {set?.id} ({set.firstCar?.GetNetId()})");
+                return;
+            }
             
             if (trainCar.derailed)
             {
+                if (trainCar?.rb == null)
+                {
+                    Multiplayer.LogError($"Rigid body not found for TrainCar {trainCar?.ID} in set {set?.id} ({set.firstCar?.GetNetId()})");
+                    return;
+                }
+
                 // Check if derailed car is actually moving
                 float velocityMagnitude = trainCar.rb.velocity.magnitude;
                 if (velocityMagnitude > VELOCITY_THRESHOLD)
@@ -110,7 +124,7 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
             TrainCar trainCar = set.cars[i];
             if (!trainCar.TryNetworked(out NetworkedTrainCar networkedTrainCar))
             {
-                Multiplayer.LogDebug(() => $"TrainCar {trainCar.ID} is not networked! Is active? {trainCar.gameObject.activeInHierarchy}");
+                Multiplayer.LogDebug(() => $"TrainCar {trainCar?.ID} is not networked! Is active? {trainCar?.gameObject?.activeInHierarchy}");
                 continue;
             }
 
@@ -145,7 +159,6 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
             }
 
             //reset this car's states
-            //networkedTrainCar.TicksSinceSync = 0;
             networkedTrainCar.BogieTracksDirty = false;
         }
 
