@@ -29,6 +29,11 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public string Guid = System.Guid.NewGuid().ToString();
 
     [Space(10)]
+    [Header("Misc.")]
+    [Draw("Chat Key Bind", Tooltip ="Key to show chat window.")]
+    public KeyCode ChatKey = KeyCode.Return;
+
+    [Space(10)]
     [Header("Server")]
     [Draw("Server Name", Tooltip = "Name of your server in the lobby browser.")]
     public string ServerName = "";
@@ -108,9 +113,13 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     {
         LastSteamName = LastSteamName.Trim().Truncate(MAX_USERNAME_LENGTH);
         Username = Username.Trim().Truncate(MAX_USERNAME_LENGTH);
+
         Port = Mathf.Clamp(Port, 1024, 49151);
         MaxPlayers = Mathf.Clamp(MaxPlayers, 1, byte.MaxValue);
         Password = Password?.Trim();
+
+        ChatKey = ChatKey == KeyCode.None ? KeyCode.Return : ChatKey;
+
         if (!UnloadWatcher.isQuitting)
             OnSettingsUpdated?.Invoke(this);
         Save(this, modEntry);

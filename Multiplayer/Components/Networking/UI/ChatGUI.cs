@@ -109,7 +109,7 @@ public class ChatGUI : MonoBehaviour
     protected void Update()
     {
         //Handle keypresses to open/close the chat window
-        if (!isOpen && Input.GetKeyDown(KeyCode.Return) && !AppUtil.Instance.IsPauseMenuOpen)
+        if (!isOpen && Input.GetKeyDown(Multiplayer.Settings.ChatKey) && !AppUtil.Instance.IsPauseMenuOpen)
         {
             isOpen = true;              //whole panel is open
             showingMessage = false;     //We don't want to time out
