@@ -66,19 +66,22 @@ public abstract class TickedQueue<T> : MonoBehaviour
 
     private string GetID()
     {
-        if (identifier != string.Empty)
+        if (!string .IsNullOrEmpty(identifier))
             return identifier;
 
-        TrainCar car;
+        if (this.gameObject == null)
+            return "Bad GO";
+
+        TrainCar car = TrainCar.Resolve(this.gameObject);
         int bogie = 0;
 
-        if (car = TrainCar.Resolve(this.gameObject))
+        if (car != null)
             if (this is NetworkedBogie netBogie)
                 bogie = (car.Bogies[0] == netBogie.Bogie) ? 1 : 2;
 
-        if (car.logicCar != null)
+        if (car?.logicCar != null)
             identifier = $"{car?.ID ?? gameObject.GetPath()}{(bogie > 0 ? $" Bogie {bogie}" : "")}";
 
-        return identifier;
+        return identifier ?? "Unknown";
     }
 }

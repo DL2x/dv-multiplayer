@@ -3,7 +3,7 @@
         <TargetFramework>net48</TargetFramework>
         <LangVersion>latest</LangVersion>
         <RootNamespace>Multiplayer</RootNamespace>
-        <InformationalVersion>0.1.11.0</InformationalVersion>
+        <InformationalVersion>0.1.11.6</InformationalVersion>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
@@ -16,7 +16,7 @@
         <Publicize Include="DV.Interaction" IncludeCompilerGeneratedMembers="false" />
         <Publicize Include="DV.RailTrack" IncludeCompilerGeneratedMembers="false" />
         <Publicize Include="DV.Simulation" IncludeCompilerGeneratedMembers="false" />
-        <Publicize Include="DV.Steam" IncludeCompilerGeneratedMembers="false" />
+        <Publicize Include="DV.Platform.Steam" IncludeCompilerGeneratedMembers="false" />
         <Publicize Include="DV.Utils:DV.Utils.SingletonBehaviour`1._instance" />
         <Publicize Include="DV.Utils:HingeJointAngleFix.angleOffset" />
         <Publicize Include="DV.Utils:HingeJointAngleFix.angleRange" />
@@ -45,7 +45,7 @@
         <Reference Include="DV.RailTrack" />
         <Reference Include="DV.Scenarios.CRUD" />
         <Reference Include="DV.Simulation" />
-        <Reference Include="DV.Steam" />
+        <Reference Include="DV.Platform.Steam" />
         <Reference Include="DV.Telemetry" />
         <Reference Include="DV.TerrainSystem" />
         <Reference Include="DV.TerrainTools" />

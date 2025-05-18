@@ -132,15 +132,16 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         Multiplayer.Log($"Starting server on port {port}");
         NetworkServer server = new(difficulty, Multiplayer.Settings, IsSinglePlayer, serverData);
 
-        //reset for next game
-        IsSinglePlayer = true;
-        serverData = null;
-
         if (!server.Start(port))
             return false;
 
         Server = server;
-        StartClient(IPAddress.Loopback.ToString(), port, Multiplayer.Settings.Password, IsSinglePlayer, null/* (DisconnectReason dr,string msg) =>{ }*/);
+        StartClient(IPAddress.Loopback.ToString(), port, Multiplayer.Settings.Password, IsSinglePlayer, null);
+
+        //reset for next game
+        IsSinglePlayer = true;
+        serverData = null;
+
         return true;
     }
 
@@ -148,7 +149,7 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
     {
         if (Client != null)
             throw new InvalidOperationException("NetworkManager already exists!");
-        NetworkClient client = new(Multiplayer.Settings);
+        NetworkClient client = new(Multiplayer.Settings, isSinglePlayer);
         client.Start(address, port, password, isSinglePlayer, onDisconnect);
         Client = client;
         OnSettingsUpdated(Multiplayer.Settings); // Show stats if enabled
@@ -192,7 +193,9 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
     {
         if (manager == null)
             return;
+
         tickWatchdog.Start();
+
         try
         {
             manager.PollEvents();
