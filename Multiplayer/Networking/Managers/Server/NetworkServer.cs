@@ -170,7 +170,8 @@ public class NetworkServer : NetworkManager
         IsLoaded = true;
 
         //We should initialise object here for dedicated servers, rather than relying on the existance of a client
-        NetworkedPitStopStation.InitialisePitStops(); //trigger cache build
+        NetworkedPitStopStation.InitialisePitStops();
+        NetworkedCashRegisterWithModules.InitialiseCashRegisters();
 
         while (joinQueue.Count > 0)
         {

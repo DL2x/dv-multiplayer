@@ -187,6 +187,8 @@ public class NetworkClient : NetworkManager
         NetworkedItemManager.Instance.CacheWorldItems();
         Log($"WorldStreamingInit.LoadingFinished() InitialisePitStops()");
         NetworkedPitStopStation.InitialisePitStops();
+        Log($"WorldStreamingInit.LoadingFinished() InitialiseCashRegisters()");
+        NetworkedCashRegisterWithModules.InitialiseCashRegisters();
         Log($"WorldStreamingInit.LoadingFinished() SendReadyPacket()");
         SendReadyPacket();
 
