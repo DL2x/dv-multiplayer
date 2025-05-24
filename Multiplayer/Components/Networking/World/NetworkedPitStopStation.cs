@@ -21,6 +21,7 @@ namespace Multiplayer.Components.Networking.World;
 public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopStation>
 {
     #region Lookup Cache
+    private static readonly Dictionary<PitStopStation, NetworkedPitStopStation> pitStopStationToNetworkedPitStopStation = [];
 
     public static bool Get(ushort netId, out NetworkedPitStopStation obj)
     {
@@ -33,7 +34,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     {
 
         //Find all pitstop stations that are placed on the map
-        //sort them by their hierachy path for consistent ordering
+        //sort them by their hierarchy path for consistent ordering
         var stations = Resources.FindObjectsOfTypeAll<PitStopStation>()
             .Where(p => p.transform.parent != null)
             .OrderBy(p => p.GetObjectPath(), StringComparer.InvariantCulture)
@@ -45,6 +46,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         {
             var netStation = station.GetOrAddComponent<NetworkedPitStopStation>();
             netStation.Station = station;
+
+            pitStopStationToNetworkedPitStopStation[station] = netStation;
 
             Multiplayer.LogDebug(() => $"InitialisePitStops() Station: {station?.GetObjectPath()}, netId: {netStation.NetId}");
 
@@ -134,7 +137,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     protected override void OnDestroy()
     {
-        if (UnloadWatcher.isUnloading)
+        pitStopStationToNetworkedPitStopStation.Remove(Station);
 
         if (carSelectorGrab != null)
         {
