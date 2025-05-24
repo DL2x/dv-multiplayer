@@ -21,7 +21,6 @@ namespace Multiplayer.Components.Networking.World;
 public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopStation>
 {
     #region Lookup Cache
-    private static readonly Dictionary<Vector3, NetworkedPitStopStation> netPitStopStationToLocation = [];
 
     public static bool Get(ushort netId, out NetworkedPitStopStation obj)
     {
@@ -30,57 +29,32 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         return b;
     }
 
-    public static bool GetFromVector(Vector3 position, out NetworkedPitStopStation networkedPitStopStation)
-    {
-        return netPitStopStationToLocation.TryGetValue(position, out networkedPitStopStation);
-    }
-
-    public static NetworkedPitStopStation[] GetAll()
-    {
-        return netPitStopStationToLocation.Values.ToArray();
-    }
-
-    public static Tuple<ushort, Vector3, int>[] GetAllPitStopStations()
-    {
-        if (netPitStopStationToLocation.Count == 0)
-            InitialisePitStops();
-
-        List<Tuple<ushort, Vector3, int>> result = [];
-
-        foreach (var kvp in netPitStopStationToLocation)
-        {
-            var selection = kvp.Value?.Station?.pitstop?.SelectedIndex ?? 0;
-            result.Add(new(kvp.Value.NetId, kvp.Key, selection));
-        }
-
-        return result.ToArray();
-    }
-
     public static void InitialisePitStops()
     {
-        if (netPitStopStationToLocation.Count != 0)
-            return;
 
-        var stations = Resources.FindObjectsOfTypeAll<PitStopStation>().Where(p => p.transform.parent != null).ToArray();
+        //Find all pitstop stations that are placed on the map
+        //sort them by their hierachy path for consistent ordering
+        var stations = Resources.FindObjectsOfTypeAll<PitStopStation>()
+            .Where(p => p.transform.parent != null)
+            .OrderBy(p => p.GetObjectPath(), StringComparer.InvariantCulture)
+            .ToArray();
 
         Multiplayer.LogDebug(() => $"InitialisePitStops() Found: {stations?.Length}");
 
         foreach (var station in stations)
         {
-            Multiplayer.LogDebug(() => $"InitialisePitStops() Station: {station?.transform?.parent?.parent?.name}");
-
             var netStation = station.GetOrAddComponent<NetworkedPitStopStation>();
             netStation.Station = station;
-            CoroutineManager.Instance.StartCoroutine(netStation.Init());
 
-            Multiplayer.LogDebug(() => $"InitialisePitStops() Parent: {station?.transform?.parent?.name}, parent-parent: {station?.transform?.parent?.parent?.name}, position global: {station?.transform?.position - WorldMover.currentMove}");
-            netPitStopStationToLocation[station.transform.position - WorldMover.currentMove] = netStation;
+            Multiplayer.LogDebug(() => $"InitialisePitStops() Station: {station?.GetObjectPath()}, netId: {netStation.NetId}");
+
+            CoroutineManager.Instance.StartCoroutine(netStation.Init());
 
         }
     }
     #endregion
 
-    protected override bool IsIdServerAuthoritative => true;
+    protected override bool IsIdServerAuthoritative => false;
 
     const float MAX_DELTA = 0.2f;
     const float MIN_UPDATE_TIME = 0.1f;
@@ -161,9 +135,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     protected override void OnDestroy()
     {
         if (UnloadWatcher.isUnloading)
-            netPitStopStationToLocation.Clear();
-        else
-            netPitStopStationToLocation.Remove(transform.position);
 
         if (carSelectorGrab != null)
         {

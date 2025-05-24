@@ -128,7 +128,6 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundWeatherPacket>(OnClientboundWeatherPacket);
         netPacketProcessor.SubscribeReusable<ClientboundRailwayStatePacket>(OnClientboundRailwayStatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundStationControllerLookupPacket>(OnClientboundStationControllerLookupPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundPitStopStationLookupPacket>(OnClientboundPitStopStationLookupPacket);
 
 
         netPacketProcessor.SubscribeReusable<ClientboundPlayerJoinedPacket>(OnClientboundPlayerJoinedPacket);
@@ -449,45 +448,6 @@ public class NetworkClient : NetworkManager
             {
                 LogError($"OnClientBoundStationControllerLookupPacket() station: {packet.StationID[i]} mapped to NetID 0");
             }
-        }
-    }
-
-    //Force pitstops to be mapped to same netId across all clients and server - probably should implement for junctions, etc.
-    private void OnClientboundPitStopStationLookupPacket(ClientboundPitStopStationLookupPacket packet)
-    {
-        LogDebug(() => $"OnClientboundPitStopStationLookupPacket({packet.PitStops?.Length})");
-
-        if (packet.PitStops == null)
-        {
-            LogError($"OnClientboundPitStopStationLookupPacket received packet with null arrays: NetIDs is null: {packet.PitStops == null}");
-            return;
-        }
-
-        for (int i = 0; i < packet.PitStops.Length; i++)
-        {
-            LogDebug(() => $"OnClientboundPitStopStationLookupPacket({i}) vector: {packet.PitStops[i].Location}, netId: {packet.PitStops[i].NetId}");
-            if (NetworkedPitStopStation.GetFromVector(packet.PitStops[i].Location, out  NetworkedPitStopStation netStation))
-            {
-                netStation.NetId = packet.PitStops[i].NetId;
-                if (netStation.Station.pitstop != null)
-                {
-                    netStation.Station.pitstop.currentCarIndex = packet.PitStops[i].SelectedCar;
-                    foreach (var mapping in packet.PitStops[i].PlugMapping)
-                    {
-                        if (netStation.TryGetPluggable(mapping.Key, out var netPluggable))
-                        {
-                            LogDebug(() => $"OnClientboundPitStopStationLookupPacket({i}) {mapping.Key}, {mapping.Value} Found");
-                            netPluggable.NetId = mapping.Value;
-                        }
-                        else
-                        {
-                            LogDebug(() => $"OnClientboundPitStopStationLookupPacket({i}) {mapping.Key}, {mapping.Value} Not Found");
-                        }
-                    }
-                }
-            }
-            else
-                LogError($"Syncing PitStopStations station with coords: {packet.PitStops[i].Location} not found");
         }
     }
 
