@@ -259,12 +259,12 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         EnableInteraction();
     }
 
-    public void SetCash()
+    public void SetCash(double amount)
     {
-        if (isBuying || isCancelling)
+        if (isBuying || isCancelling || NetworkLifecycle.Instance.IsProcessingPacket)
             return;
 
-        NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.SetFunds, CashRegister.DepositedCash);
+        NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.SetFunds, amount);
     }
 
     private void DisableInteraction()

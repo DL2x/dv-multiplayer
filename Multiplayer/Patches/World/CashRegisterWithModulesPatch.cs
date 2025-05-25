@@ -44,16 +44,23 @@ public class CashRegisterWithModulesPatch
 
         return false;
     }
+}
 
+[HarmonyPatch(typeof(CashRegisterBase))]
+public class CashRegisterBasePatch
+{
     [HarmonyPostfix]
-    [HarmonyPatch(nameof(CashRegisterWithModules.SetCash))]
-    private static void SetCash(CashRegisterWithModules __instance)
+    [HarmonyPatch(nameof(CashRegisterBase.SetCash))]
+    private static void SetCash(CashRegisterBase __instance, double amount)
     {
-        Multiplayer.LogDebug(() => $"SetCash() {__instance.GetObjectPath()}, Deposited: {__instance.DepositedCash}");
+        if (__instance is not CashRegisterWithModules cashRegisterWithModules)
+            return;
 
-        if (!NetworkedCashRegisterWithModules.TryGet(__instance, out var netCashRegister))
-            Multiplayer.LogWarning($"CashRegisterWithModules.SetCash({__instance.GetObjectPath()}) NetworkedCashRegisterWithModules not found!");
+        Multiplayer.LogDebug(() => $"SetCash() {__instance.GetObjectPath()}, Deposited: {amount}");
+
+        if (!NetworkedCashRegisterWithModules.TryGet(cashRegisterWithModules, out var netCashRegister))
+            Multiplayer.LogWarning($"CashRegisterWithModules.SetCash({cashRegisterWithModules.GetObjectPath()}) NetworkedCashRegisterWithModules not found!");
         else
-            netCashRegister.SetCash();
+            netCashRegister.SetCash(amount);
     }
 }
