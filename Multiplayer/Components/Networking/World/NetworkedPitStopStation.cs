@@ -37,7 +37,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         //sort them by their hierarchy path for consistent ordering
         var stations = Resources.FindObjectsOfTypeAll<PitStopStation>()
             .Where(p => p.transform.parent != null)
-            .OrderBy(p => p.GetObjectPath(), StringComparer.InvariantCulture)
+            .OrderBy(p => p.transform.position.x)
+            .ThenBy(p => p.transform.position.y)
+            .ThenBy(p => p.transform.position.z)
             .ToArray();
 
         Multiplayer.LogDebug(() => $"InitialisePitStops() Found: {stations?.Length}");
@@ -46,6 +48,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         {
             var netStation = station.GetOrAddComponent<NetworkedPitStopStation>();
             netStation.Station = station;
+
+            if (netStation.NetId == 0)
+                netStation.Awake();
 
             pitStopStationToNetworkedPitStopStation[station] = netStation;
 
@@ -110,7 +115,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     #region Unity
     protected override void Awake()
     {
-        base.Awake();
+        if (NetId == 0)
+            base.Awake();
 
         StationName = $"{transform.parent.parent.name} - {transform.parent.name}";
 

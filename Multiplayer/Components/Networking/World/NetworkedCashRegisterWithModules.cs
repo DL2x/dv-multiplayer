@@ -36,7 +36,9 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         //sort them by their hierarchy path for consistent ordering
         var registers = CashRegisterBase.allCashRegisters
             .OfType<CashRegisterWithModules>()
-            .OrderBy(r => r.GetObjectPath(), StringComparer.InvariantCulture)
+            .OrderBy(r => r.transform.position.x)
+            .ThenBy(r => r.transform.position.y)
+            .ThenBy(r => r.transform.position.z)
             .ToArray();
 
         Multiplayer.LogDebug(() => $"InitialiseCashRegisters() Found: {registers?.Length}");
@@ -45,6 +47,9 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         {
             var netRegister = register.GetOrAddComponent<NetworkedCashRegisterWithModules>();
             netRegister.CashRegister = register;
+
+            if (netRegister.NetId == 0)
+                netRegister.Awake();
 
             cashRegisterToNetworkedCashRegister[register] = netRegister;
 
@@ -70,10 +75,19 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
     #endregion
 
     #region Common Variables
-    CashRegisterWithModules CashRegister;
+    CashRegisterWithModules CashRegister; 
     #endregion
 
     #region Unity
+
+    protected override void Awake()
+    {
+        Multiplayer.LogDebug(()=>$"CashRegisterWithModules.Awake() {transform.GetObjectPath()}, {transform.position}, netId: {NetId}");
+
+        if (NetId == 0)
+            base.Awake();
+    }
+
     protected override void OnDestroy()
     {
         cashRegisterToNetworkedCashRegister.Remove(CashRegister);
