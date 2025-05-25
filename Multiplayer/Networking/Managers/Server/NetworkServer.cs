@@ -719,13 +719,13 @@ public class NetworkServer : NetworkManager
 
         ITransportPeer peer = request.Accept();
 
-        ServerPlayer serverPlayer = new()
-        {
-            Id = (byte)peer.Id,
-            Username = overrideUsername,
-            OriginalUsername = packet.Username,
-            Guid = guid
-        };
+        ServerPlayer serverPlayer = new(
+            peer,
+            (byte)peer.Id,
+            overrideUsername,
+            packet.Username,
+            guid
+        );
 
         serverPlayers.Add(serverPlayer.Id, serverPlayer);
 
