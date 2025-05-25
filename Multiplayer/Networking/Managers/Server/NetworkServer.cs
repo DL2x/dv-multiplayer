@@ -592,7 +592,7 @@ public class NetworkServer : NetworkManager
         };
 
         if (peer == null)
-            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered);
+            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
         else
             SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
     }
