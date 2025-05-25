@@ -1423,5 +1423,18 @@ public class NetworkClient : NetworkManager
         SendPacketToServer(new CommonPaintThemePacket { NetId = netId, TargetArea = targetArea, PaintThemeId = themeIndex }, DeliveryMethod.ReliableUnordered);
     }
 
+    public void SendCashRegisterAction(ushort netId, CashRegisterAction action, double amount = 0.0f)
+    {
+        SendPacketToServer(
+            new CommonCashRegisterWithModulesActionPacket
+            {
+                NetId = netId,
+                Action = action,
+                Amount = amount
+            },
+            DeliveryMethod.ReliableOrdered
+        );
+    }
+
     #endregion
 }

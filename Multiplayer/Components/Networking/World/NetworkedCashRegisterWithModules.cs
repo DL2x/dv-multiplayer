@@ -1,4 +1,8 @@
 using DV.CashRegister;
+using DV.Interaction;
+using DV.InventorySystem;
+using Multiplayer.Networking.Data;
+using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Utils;
 using System;
 using System.Collections.Generic;
@@ -51,10 +55,88 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
     #endregion
 
     #region Client Variables
+    bool isBuying;
+    bool buyAccepted;
+
+    bool isCancelling;
+    bool cancelAccepted;
 
     #endregion
 
     #region Common Variables
-    CashRegisterWithModules Register;
+    CashRegisterWithModules CashRegister;
+    #endregion
+
+    public IEnumerator Buy()
+    {
+        if (isBuying || isCancelling)
+            yield break;
+
+        DisableInteraction();
+
+        NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.Buy);
+
+        isBuying = true;
+        buyAccepted = false;
+        float timeOut = Time.time + NetworkLifecycle.Instance.Client.RPC_Timeout;
+
+        yield return new WaitUntil(() => Time.time >= timeOut || isBuying == false);
+
+        if (!buyAccepted)
+            CashRegister?.cancelAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
+
+        isBuying = false;
+        buyAccepted = false;
+
+        EnableInteraction();
+    }
+
+    public IEnumerator Cancel()
+    {
+        if (isBuying || isCancelling)
+            yield break;
+
+        DisableInteraction();
+
+        NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.Cancel);
+        isCancelling = true;
+        cancelAccepted = false;
+        float timeOut = Time.time + NetworkLifecycle.Instance.Client.RPC_Timeout;
+
+        yield return new WaitUntil(() => Time.time >= timeOut || isCancelling == false);
+
+        if (cancelAccepted)
+            CashRegister?.cancelAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
+
+        isCancelling = false;
+        cancelAccepted = false;
+
+        EnableInteraction();
+    }
+
+    public void SetCash()
+    {
+        if (isBuying || isCancelling)
+            return;
+
+        NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.SetFunds, CashRegister.DepositedCash);
+    }
+
+    private void DisableInteraction()
+    {
+        CashRegister.buyButton.InteractionAllowed = false;
+        CashRegister.cancelButton.InteractionAllowed = false;
+    }
+
+    private void EnableInteraction()
+    {
+        CashRegister.buyButton.InteractionAllowed = true;
+        CashRegister.cancelButton.InteractionAllowed = true;
+    }
+
+    #endregion
+
+    #region Common
+
     #endregion
 }
