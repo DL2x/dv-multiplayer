@@ -157,6 +157,8 @@ public class NetworkServer : NetworkManager
 
         netPacketProcessor.SubscribeReusable<CommonPitStopInteractionPacket, ITransportPeer>(OnCommonPitStopInteractionPacket);
         netPacketProcessor.SubscribeReusable<CommonPitStopPlugInteractionPacket, ITransportPeer>(OnCommonPitStopPlugInteractionPacket);
+
+        netPacketProcessor.SubscribeReusable<CommonCashRegisterWithModulesActionPacket, ITransportPeer>(OnCommonCashRegisterWithModulesActionPacket);
     }
 
     private void OnLoaded()
@@ -600,6 +602,14 @@ public class NetworkServer : NetworkManager
         LogDebug(() => $"SendPitStopInteractionPacket({peer.Id}, {packet.NetId})");
 
         SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
+    }
+
+    public void SendCashRegisterAction(CommonCashRegisterWithModulesActionPacket packet, ITransportPeer peer = null)
+    {
+        if (peer == null)
+            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
+        else
+            SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
     public void SendChat(string message, ITransportPeer exclude = null)
@@ -1287,6 +1297,26 @@ public class NetworkServer : NetworkManager
         //);
 
         //NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items, player);
+    }
+
+    private void OnCommonCashRegisterWithModulesActionPacket(CommonCashRegisterWithModulesActionPacket packet, ITransportPeer peer)
+    {
+        if (TryGetServerPlayer(peer, out var player))
+        {
+            LogWarning($"Cash Register With Modules Action received, but player was not found");
+            return;
+        }
+
+        if (!NetworkedCashRegisterWithModules.Get(packet.NetId, out NetworkedCashRegisterWithModules netCashRegister))
+        {
+            LogWarning($"Cash Register With Modules Action received for netId: {packet.NetId}, but cash register does not exist!");
+            return;
+        }
+
+        Log($"Cash Register With Modules Action received for {netCashRegister.GetObjectPath()}, Action: {packet.Action}, Amount: {packet.Amount}");
+        netCashRegister.Server_ProcessCashRegisterAction(player, packet);
+
+
     }
     #endregion
 }

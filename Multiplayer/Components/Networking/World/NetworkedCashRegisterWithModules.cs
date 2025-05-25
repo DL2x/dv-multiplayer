@@ -5,6 +5,7 @@ using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Utils;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -23,14 +24,19 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         return b;
     }
 
+    public static bool TryGet(CashRegisterWithModules cashRegister, out NetworkedCashRegisterWithModules networkedCashRegisterWithModules)
+    {
+        return cashRegisterToNetworkedCashRegister.TryGetValue(cashRegister, out networkedCashRegisterWithModules);
+    }
+
     public static void InitialiseCashRegisters()
     {
 
         //Find all CashRegistersWithModules that are placed on the map
         //sort them by their hierarchy path for consistent ordering
-        var registers = Resources.FindObjectsOfTypeAll<CashRegisterWithModules>()
-            .Where(p => p.transform.parent != null)
-            .OrderBy(p => p.GetObjectPath(), StringComparer.InvariantCulture)
+        var registers = CashRegisterBase.allCashRegisters
+            .OfType<CashRegisterWithModules>()
+            .OrderBy(r => r.GetObjectPath(), StringComparer.InvariantCulture)
             .ToArray();
 
         Multiplayer.LogDebug(() => $"InitialiseCashRegisters() Found: {registers?.Length}");
@@ -38,7 +44,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         foreach (var register in registers)
         {
             var netRegister = register.GetOrAddComponent<NetworkedCashRegisterWithModules>();
-            netRegister.Register = register;
+            netRegister.CashRegister = register;
 
             cashRegisterToNetworkedCashRegister[register] = netRegister;
 
@@ -66,6 +72,131 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
     #region Common Variables
     CashRegisterWithModules CashRegister;
     #endregion
+
+    #region Unity
+    protected override void OnDestroy()
+    {
+        cashRegisterToNetworkedCashRegister.Remove(CashRegister);
+        base.OnDestroy();
+    }
+    #endregion
+
+    #region Server
+    public void Server_ProcessCashRegisterAction(ServerPlayer player, CommonCashRegisterWithModulesActionPacket packet)
+    {
+        float sqrDistance = (player.WorldPosition - transform.position).sqrMagnitude;
+        bool success = false;
+
+        NetworkLifecycle.Instance.Server?.LogDebug(() => $"Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount})");
+
+        if (sqrDistance > GrabberRaycasterDV.FPS_INTERACTION_RANGE_SQR)
+        {
+            NetworkLifecycle.Instance.Server?.LogDebug(() => $"Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount}) {CashRegister.GetObjectPath()}. Player too far! Player pos: {player.WorldPosition}, register pos: {transform.position}, sqrMag: {sqrDistance}");
+            return;
+        }
+
+        switch (packet.Action)
+        {
+            case CashRegisterAction.Cancel:
+                if (CashRegister.cancelButton.InteractionAllowed)
+                {
+                    CashRegister?.Cancel();
+                    success = true;
+                }
+
+                break;
+
+            case CashRegisterAction.Buy:
+                if (CashRegister.buyButton.InteractionAllowed)
+                    success = CashRegister?.Buy() ?? false;
+
+                break;
+
+            case CashRegisterAction.SetFunds:
+                double spend = 0;
+
+                NetworkLifecycle.Instance.Server?.LogDebug(() => $"Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount}) Wallet: {Inventory.Instance.PlayerMoney}");
+                if (packet.Amount > 0)
+                {
+                    if (Inventory.Instance.PlayerMoney >= packet.Amount)
+                        spend = packet.Amount;
+                    else
+                        spend = Inventory.Instance.PlayerMoney;
+
+                    success = Inventory.Instance.RemoveMoney(spend);
+
+                    if(success)
+                        CashRegister?.AddCash(spend);
+                }
+                else
+                {
+                    NetworkLifecycle.Instance.Server?.LogDebug(() => $"Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount}) amount negative!");
+                }
+                break;
+        }
+
+        if (success)
+            NetworkLifecycle.Instance.Server.SendCashRegisterAction(packet);
+        else
+            NetworkLifecycle.Instance.Server.SendCashRegisterAction
+                (
+                    new CommonCashRegisterWithModulesActionPacket
+                    {
+                        NetId = NetId,
+                        Action = CashRegisterAction.Reject,
+                        Amount = CashRegister.DepositedCash
+                    },
+                    player.Peer
+                );
+    }
+
+    #endregion
+
+    #region Client
+
+    public void Client_ProcessCashRegisterAction(CashRegisterAction action, double amount)
+    {
+        switch (action)
+        {
+            case CashRegisterAction.Cancel:
+
+                if (isCancelling)
+                    cancelAccepted = true;
+
+                isCancelling = false;
+                isBuying = false;
+
+                CashRegister?.cancelAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
+
+                break;
+
+            case CashRegisterAction.Buy:
+
+                if (isBuying)
+                    buyAccepted = true;
+
+                isCancelling = false;
+                isBuying = false;
+
+                CashRegister?.buyAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
+
+                break;
+
+            case CashRegisterAction.SetFunds:
+
+                if (CashRegister.DepositedCash == 0 && amount > 0)
+                {
+
+                }
+                break;
+
+            case CashRegisterAction.Reject:
+                isBuying = false;
+                isCancelling = false;
+               
+                break;
+        }
+    }
 
     public IEnumerator Buy()
     {
