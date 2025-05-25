@@ -58,6 +58,7 @@ public class NetworkClient : NetworkManager
     // One way ping in milliseconds
     public int Ping { get; private set; }
     private ITransportPeer serverPeer;
+    public float RPC_Timeout => (Ping * 4f) / 1000;
 
     private ChatGUI chatGUI;
     private readonly bool isSinglePlayer;
