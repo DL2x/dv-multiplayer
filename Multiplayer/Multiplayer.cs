@@ -1,17 +1,19 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Reflection;
 using DV;
 using DV.UIFramework;
 using HarmonyLib;
 using JetBrains.Annotations;
 using LiteNetLib;
+using MPAPI;
+using Multiplayer.API;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;
 using Multiplayer.Editor;
 using Multiplayer.Patches.Mods;
 using Multiplayer.Patches.World;
+using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using UnityChan;
 using UnityEngine;
 using UnityModManagerNet;
@@ -24,6 +26,7 @@ public static class Multiplayer
 
     public static UnityModManager.ModEntry ModEntry;
     public static Settings Settings;
+    private static APIProvider _apiProvider;
 
     private static AssetBundle assetBundle;
     public static AssetIndex AssetIndex { get; private set; }
@@ -44,7 +47,7 @@ public static class Multiplayer
     public static bool specLog = false;
 
     [UsedImplicitly]
-    private static bool Load(UnityModManager.ModEntry modEntry)
+    public static bool Load(UnityModManager.ModEntry modEntry)
     {
         ModEntry = modEntry;
         Settings = Settings.Load(modEntry);//Settings.Load<Settings>(modEntry);
@@ -98,6 +101,10 @@ public static class Multiplayer
 
             Log("Creating NetworkManager...");
             NetworkLifecycle.CreateLifecycle();
+
+            Log("Loading API Provider...");
+            _apiProvider = new APIProvider();
+            MPAPI.MultiplayerAPI.RegisterAPI(_apiProvider);
         }
         catch (Exception ex)
         {
