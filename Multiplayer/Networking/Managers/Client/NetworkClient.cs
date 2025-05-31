@@ -12,6 +12,8 @@ using DV.UserManagement;
 using DV.WeatherSystem;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using MPAPI.Interfaces.Packets;
+using Multiplayer.API;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
@@ -165,6 +167,25 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundJobValidateResponsePacket>(OnClientboundJobValidateResponsePacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket>(OnCommonItemChangePacket);
+    }
+
+    //allow mods to register their own packets
+    public void RegisterExternalPacket<T>(ClientPacketHandler<T> handler) where T : class, IPacket, new()
+    {
+        netPacketProcessor.SubscribeReusable<T>((packet) =>
+        {
+            handler(packet);
+        });
+    }
+
+    public void RegisterExternalSerializablePacket<T>(ClientPacketHandler<T> handler) where T : class, ISerializablePacket, new()
+    {
+        netPacketProcessor.SubscribeNetSerializable<ExternalSerializablePacketWrapper<T>>((wrapper) =>
+        {
+            handler(wrapper.Packet);
+        },
+        () => new ExternalSerializablePacketWrapper<T>()
+        );
     }
 
     private void OnLoaded()
@@ -1018,6 +1039,21 @@ public class NetworkClient : NetworkManager
         SendNetSerializablePacket(serverPeer, packet, deliveryMethod);
     }
 
+
+    #region Mod Packets
+    public void SendExternalPacketToServer<T>(T packet, bool reliable) where T : class, IPacket, new()
+    {
+        var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
+        SendPacketToServer(packet, deliveryMethod);
+    }
+
+    public void SendExternalSerializablePacketToServer<T>(T packet, bool reliable) where T : class, ISerializablePacket, new()
+    {
+        var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
+        var wrapper = new ExternalSerializablePacketWrapper<T> { Packet = packet };
+        SendNetSerializablePacketToServer(wrapper, deliveryMethod);
+    }
+    #endregion
     public void SendSaveGameDataRequest()
     {
         SendPacketToServer(new ServerboundSaveGameDataRequestPacket(), DeliveryMethod.ReliableOrdered);
