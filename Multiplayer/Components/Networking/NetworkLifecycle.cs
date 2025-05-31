@@ -158,7 +158,13 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
             throw new InvalidOperationException("NetworkManager already exists!");
         NetworkClient client = new(Multiplayer.Settings, isSinglePlayer);
         client.Start(address, port, password, isSinglePlayer, onDisconnect);
+
         Client = client;
+
+        // Register server API
+        var clientAPI = new ClientAPIProvider(client);
+        MultiplayerAPI.RegisterClient(clientAPI);
+
         OnSettingsUpdated(Multiplayer.Settings); // Show stats if enabled
     }
 
@@ -225,6 +231,7 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
 
         // Clear API registrations
         MultiplayerAPI.ClearServer();
+        MultiplayerAPI.ClearClient();
 
         Server = null;
         Client = null;
