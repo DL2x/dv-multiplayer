@@ -1,4 +1,5 @@
 using MPAPI.Interfaces;
+using MPAPI.Interfaces.Packets;
 using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Utils;
 using System;
@@ -25,6 +26,38 @@ namespace Multiplayer.API
                 .Cast<IPlayer>()
                 .ToList();
 
+        #endregion
+
+        #region Packet API
+        public void RegisterPacket<T>(PacketHandler<T> handler) where T : class, IPacket, new()
+        {
+            server.RegisterExternalPacket<T>(handler);
+        }
+        public void RegisterSerializablePacket<T>(PacketHandler<T> handler) where T : class, ISerializablePacket, new()
+        {
+            server.RegisterExternalSerializablePacket<T>(handler);
+        }
+
+
+        public void SendPacketToAll<T>(T packet, bool reliable = true, IPlayer excludePlayer = null) where T : class, IPacket, new()
+        {
+            server.SendExternalPacketToAll(packet, reliable, excludePlayer.Id);
+        }
+
+        public void SendSerializablePacketToAll<T>(T packet, bool reliable = true, IPlayer excludePlayer = null) where T : class, ISerializablePacket, new()
+        {
+            server.SendExternalSerializablePacketToAll(packet, reliable, excludePlayer.Id);
+        }
+
+        public void SendPacketToPlayer<T>(T packet, IPlayer player, bool reliable = true) where T : class, IPacket, new()
+        {
+            server.SendExternalPacketToPlayer(packet, player.Id, reliable);
+        }
+
+        public void SendSerializablePacketToPlayer<T>(T packet, IPlayer player, bool reliable = true) where T : class, ISerializablePacket, new()
+        {
+            server.SendExternalSerializablePacketToPlayer(packet, player.Id, reliable);
+        }
         #endregion
 
         #region Server Util

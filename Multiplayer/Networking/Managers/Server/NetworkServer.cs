@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using DV;
 using DV.InventorySystem;
 using DV.Logic.Job;
@@ -11,11 +8,14 @@ using DV.WeatherSystem;
 using Humanizer;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using MPAPI.Interfaces.Packets;
+using Multiplayer.API;
 using Multiplayer.Components.Networking;
+using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
-using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
@@ -24,16 +24,18 @@ using Multiplayer.Networking.Packets.Clientbound.World;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Networking.Packets.Common.Train;
 using Multiplayer.Networking.Packets.Serverbound;
-using Multiplayer.Utils;
-using UnityEngine;
-using UnityModManagerNet;
-using System.Net;
 using Multiplayer.Networking.Packets.Serverbound.Train;
 using Multiplayer.Networking.Packets.Unconnected;
-using System.Text;
-using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.TransportLayers;
-using MPAPI.Interfaces;
+using Multiplayer.Utils;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text;
+using UnityEngine;
+using UnityModManagerNet;
+using static DV.Interaction.Inputs.InputManager;
 
 
 namespace Multiplayer.Networking.Managers.Server;
@@ -163,6 +165,27 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonChatPacket, ITransportPeer>(OnCommonChatPacket);
         netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, ITransportPeer>(OnCommonItemChangePacket);
+    }
+
+    //allow mods to register their own packets
+    public void RegisterExternalPacket<T>(PacketHandler<T> handler) where T : class, IPacket, new()
+    {
+        netPacketProcessor.SubscribeReusable<T, ITransportPeer>((packet, peer) =>
+        {
+            var serverPlayer = TryGetServerPlayer(peer, out var player) ? new ServerPlayerWrapper(player) : null;
+            handler(packet, serverPlayer);
+        });
+    }
+
+    public void RegisterExternalSerializablePacket<T>(PacketHandler<T> handler) where T : class, ISerializablePacket, new()
+    {
+        netPacketProcessor.SubscribeNetSerializable<ExternalSerializablePacketWrapper<T>, ITransportPeer>((wrapper, peer) =>
+        {
+            var serverPlayer = TryGetServerPlayer(peer, out var player) ? new ServerPlayerWrapper(player) : null;
+            handler(wrapper.Packet, serverPlayer);
+        },
+        () => new ExternalSerializablePacketWrapper<T>()
+        );
     }
 
     private void OnLoaded()
@@ -296,6 +319,7 @@ public class NetworkServer : NetworkManager
             kvp.Value.Send(writer, deliveryMethod);
         }
     }
+
     private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod) where T : INetSerializable, new()
     {
         NetDataWriter writer = WriteNetSerializablePacket(packet);
@@ -313,6 +337,60 @@ public class NetworkServer : NetworkManager
             kvp.Value.Send(writer, deliveryMethod);
         }
     }
+
+    #region Mod Packets
+    public void SendExternalPacketToAll<T>(T packet, bool reliable) where T : class, IPacket, new()
+    {
+        var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
+        SendPacketToAll(packet, deliveryMethod);
+    }
+
+    public void SendExternalPacketToAll<T>(T packet, bool reliable, byte excludePlayerId) where T : class, IPacket, new()
+    {
+        if (!TryGetPeer(excludePlayerId, out var peer))
+            return;
+
+        var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
+        SendPacketToAll(packet, deliveryMethod, peer);
+    }
+
+    public void SendExternalSerializablePacketToAll<T>(T packet, bool reliable) where T : class, ISerializablePacket, new()
+    {
+        var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
+        var wrapper = new ExternalSerializablePacketWrapper<T> { Packet = packet };
+        SendNetSerializablePacketToAll(wrapper, deliveryMethod);
+    }
+
+    public void SendExternalSerializablePacketToAll<T>(T packet, bool reliable, byte excludePlayerId) where T : class, ISerializablePacket, new()
+    {
+        if (!TryGetPeer(excludePlayerId, out var peer))
+            return;
+
+        var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
+        var wrapper = new ExternalSerializablePacketWrapper<T> { Packet = packet };
+        SendNetSerializablePacketToAll(wrapper, deliveryMethod, peer);
+    }
+
+    public void SendExternalPacketToPlayer<T>(T packet, byte playerId, bool reliable) where T : class, IPacket, new()
+    {
+        if (!TryGetPeer(playerId, out var peer))
+            return;
+
+        var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
+        SendPacket(peer, packet, deliveryMethod);
+    }
+
+    public void SendExternalSerializablePacketToPlayer<T>(T packet, byte playerId, bool reliable) where T : class, ISerializablePacket, new()
+    {
+        if (!TryGetPeer(playerId, out var peer))
+            return;
+
+        var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
+        var wrapper = new ExternalSerializablePacketWrapper<T> { Packet = packet };
+        SendNetSerializablePacket(peer, wrapper, deliveryMethod);
+    }
+
+    #endregion
 
     public void KickPlayer(ITransportPeer peer)
     {
