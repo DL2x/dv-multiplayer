@@ -1,12 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MultiplayerAPI.Interfaces
+namespace MPAPI.Interfaces
 {
-    internal interface IPlayer
+    public interface IPlayer
     {
     }
 }

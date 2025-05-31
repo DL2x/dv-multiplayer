@@ -1,12 +1,8 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Net;
-using System.Text;
 using DV.Scenarios.Common;
 using DV.Utils;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Multiplayer.API;
 using Multiplayer.Components.Networking.UI;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Managers;
@@ -16,6 +12,11 @@ using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
 using Newtonsoft.Json;
 using Steamworks;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Net;
+using System.Text;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -136,6 +137,11 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
             return false;
 
         Server = server;
+
+        // Register server API
+        var serverAPI = new ServerAPIProvider(server);
+        MPAPI.MultiplayerAPI.RegisterServer(serverAPI);
+
         StartClient(IPAddress.Loopback.ToString(), port, Multiplayer.Settings.Password, IsSinglePlayer, null);
 
         //reset for next game

@@ -1,10 +1,6 @@
 using MPAPI.Interfaces;
 using Multiplayer.Components.Networking;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace Multiplayer.API
 {
@@ -16,7 +12,7 @@ namespace Multiplayer.API
 
         public bool IsHost => NetworkLifecycle.Instance.IsHost();
 
-        public bool IsDedicatedServer => throw new NotImplementedException();
+        public bool IsDedicatedServer => false; //feature not implemented
 
         public bool IsSinglePlayer => NetworkLifecycle.Instance.IsServerRunning && (NetworkLifecycle.Instance?.Server.IsSinglePlayer ?? false);
     }

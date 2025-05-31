@@ -211,7 +211,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (NetworkLifecycle.Instance.IsHost())
         {
             NetworkLifecycle.Instance.OnTick += Server_OnTick;
-            NetworkLifecycle.Instance.Server.PlayerDisconnect += Server_OnPlayerDisconnect;
+            NetworkLifecycle.Instance.Server.PlayerDisconnected += Server_OnPlayerDisconnect;
 
             bogie1.TrackChanged += Server_BogieTrackChanged;
             bogie2.TrackChanged += Server_BogieTrackChanged;
@@ -272,7 +272,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (NetworkLifecycle.Instance.IsHost())
         {
             NetworkLifecycle.Instance.OnTick -= Server_OnTick;
-            NetworkLifecycle.Instance.Server.PlayerDisconnect -= Server_OnPlayerDisconnect;
+            NetworkLifecycle.Instance.Server.PlayerDisconnected -= Server_OnPlayerDisconnect;
 
             bogie1.TrackChanged -= Server_BogieTrackChanged;
             bogie2.TrackChanged -= Server_BogieTrackChanged;

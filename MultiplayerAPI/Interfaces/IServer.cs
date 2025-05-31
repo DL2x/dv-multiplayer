@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -6,10 +7,14 @@ namespace MPAPI.Interfaces;
 
 public interface IServer
 {
-    public event Action<bool> OnPlayerConnected;
-    public event Action<bool> OnPlayerDisconnected;
+    event Action<IPlayer> OnPlayerConnected;
+    event Action<IPlayer> OnPlayerDisconnected;
 
-    public abstract float AnyPlayerSqrMag(GameObject item);
+    int PlayerCount { get; }
 
-    public abstract float AnyPlayerSqrMag(Vector3 anchor);
+    //public IReadOnlyCollection<IPlayer> Players { get; }
+
+    float AnyPlayerSqrMag(GameObject item);
+
+    float AnyPlayerSqrMag(Vector3 anchor);
 }

@@ -17,7 +17,15 @@ public static class MultiplayerAPI
     /// Gets the current API instance (null if Multiplayer mod is not loaded)
     /// </summary>
     public static IMultiplayerAPI Instance => _instance;
+
+    /// <summary>
+    /// Gets the current Server API instance (null if Multiplayer mod is not loaded or server not running)
+    /// </summary>
     public static IServer Server => _server;
+
+    /// <summary>
+    /// Gets the current Client API instance (null if Multiplayer mod is not loaded or client not running)
+    /// </summary>
     public static IClient Client => _client;
 
     /// <summary>

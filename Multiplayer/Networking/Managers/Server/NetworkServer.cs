@@ -39,7 +39,8 @@ namespace Multiplayer.Networking.Managers.Server;
 
 public class NetworkServer : NetworkManager
 {
-    public Action<uint> PlayerDisconnect;
+    public Action<uint> PlayerConnected;
+    public Action<uint> PlayerDisconnected;
     protected override string LogPrefix => "[Server]";
 
     private readonly Queue<ITransportPeer> joinQueue = new();
@@ -219,7 +220,7 @@ public class NetworkServer : NetworkManager
             Id = id
         }, DeliveryMethod.ReliableUnordered);
 
-        PlayerDisconnect?.Invoke(id);
+        PlayerDisconnected?.Invoke(id);
     }
 
     public override void OnNetworkLatencyUpdate(ITransportPeer peer, int latency)
