@@ -29,11 +29,11 @@ namespace Multiplayer.API
         #endregion
 
         #region Packet API
-        public void RegisterPacket<T>(PacketHandler<T> handler) where T : class, IPacket, new()
+        public void RegisterPacket<T>(ServerPacketHandler<T> handler) where T : class, IPacket, new()
         {
             server.RegisterExternalPacket<T>(handler);
         }
-        public void RegisterSerializablePacket<T>(PacketHandler<T> handler) where T : class, ISerializablePacket, new()
+        public void RegisterSerializablePacket<T>(ServerPacketHandler<T> handler) where T : class, ISerializablePacket, new()
         {
             server.RegisterExternalSerializablePacket<T>(handler);
         }

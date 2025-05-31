@@ -168,7 +168,7 @@ public class NetworkServer : NetworkManager
     }
 
     //allow mods to register their own packets
-    public void RegisterExternalPacket<T>(PacketHandler<T> handler) where T : class, IPacket, new()
+    public void RegisterExternalPacket<T>(ServerPacketHandler<T> handler) where T : class, IPacket, new()
     {
         netPacketProcessor.SubscribeReusable<T, ITransportPeer>((packet, peer) =>
         {
@@ -177,7 +177,7 @@ public class NetworkServer : NetworkManager
         });
     }
 
-    public void RegisterExternalSerializablePacket<T>(PacketHandler<T> handler) where T : class, ISerializablePacket, new()
+    public void RegisterExternalSerializablePacket<T>(ServerPacketHandler<T> handler) where T : class, ISerializablePacket, new()
     {
         netPacketProcessor.SubscribeNetSerializable<ExternalSerializablePacketWrapper<T>, ITransportPeer>((wrapper, peer) =>
         {

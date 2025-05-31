@@ -24,14 +24,14 @@ public interface IServer
     /// </summary>
     /// <typeparam name="T">Packet type implementing IPacket</typeparam>
     /// <param name="handler">Handler to call when packet is received</param>
-    void RegisterPacket<T>(PacketHandler<T> handler) where T : class, IPacket, new();
+    void RegisterPacket<T>(ServerPacketHandler<T> handler) where T : class, IPacket, new();
 
     /// <summary>
     /// Register a packet type that uses manual serialization
     /// </summary>
     /// <typeparam name="T">Packet type implementing ISerializablePacket</typeparam>
     /// <param name="handler">Handler to call when packet is received</param>
-    void RegisterSerializablePacket<T>(PacketHandler<T> handler) where T : class, ISerializablePacket, new();
+    void RegisterSerializablePacket<T>(ServerPacketHandler<T> handler) where T : class, ISerializablePacket, new();
 
 
     /// <summary>
