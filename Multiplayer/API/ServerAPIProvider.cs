@@ -3,6 +3,7 @@ using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace Multiplayer.API
@@ -18,7 +19,11 @@ namespace Multiplayer.API
 
         public int PlayerCount => server.PlayerCount;
 
-        //public IReadOnlyCollection<IPlayer> Players => server.ServerPlayers;
+        public IReadOnlyCollection<IPlayer> Players =>
+            server.ServerPlayers
+                .Select(p => new ServerPlayerWrapper(p))
+                .Cast<IPlayer>()
+                .ToList();
 
         #endregion
 
@@ -34,14 +39,24 @@ namespace Multiplayer.API
         {
             this.server = serverInstance;
 
-            server.PlayerConnected += OnPlayerConnected;
-            server.PlayerDisconnected += OnPlayerDisconnected;
+            server.PlayerConnected += OnPlayerConnectedInternal;
+            server.PlayerDisconnected += OnPlayerDisconnectedInternal;
         }
 
         internal void Dispose()
         {
-            server.PlayerConnected -= OnPlayerConnected;
-            server.PlayerDisconnected -= OnPlayerDisconnected;
+            server.PlayerConnected -= OnPlayerConnectedInternal;
+            server.PlayerDisconnected -= OnPlayerDisconnectedInternal;
+        }
+
+        private void OnPlayerConnectedInternal(Networking.Data.ServerPlayer serverPlayer)
+        {
+            OnPlayerConnected?.Invoke(new ServerPlayerWrapper(serverPlayer));
+        }
+
+        private void OnPlayerDisconnectedInternal(Networking.Data.ServerPlayer serverPlayer)
+        {
+            OnPlayerDisconnected?.Invoke(new ServerPlayerWrapper(serverPlayer));
         }
         #endregion
     }
