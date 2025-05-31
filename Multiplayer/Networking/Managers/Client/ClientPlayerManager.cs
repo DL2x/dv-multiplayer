@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using DV;
-using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Player;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -12,8 +11,8 @@ public class ClientPlayerManager
 {
     private readonly Dictionary<byte, NetworkedPlayer> playerMap = new();
 
-    public Action<byte, NetworkedPlayer> OnPlayerConnected;
-    public Action<byte, NetworkedPlayer> OnPlayerDisconnected;
+    public Action<NetworkedPlayer> OnPlayerConnected;
+    public Action<NetworkedPlayer> OnPlayerDisconnected;
     public IReadOnlyCollection<NetworkedPlayer> Players => playerMap.Values;
 
     private readonly GameObject playerPrefab;
@@ -37,7 +36,7 @@ public class ClientPlayerManager
         networkedPlayer.Username = username;
         //networkedPlayer.Guid = guid;
         playerMap.Add(id, networkedPlayer);
-        OnPlayerConnected?.Invoke(id, networkedPlayer);
+        OnPlayerConnected?.Invoke(networkedPlayer);
     }
 
     public void RemovePlayer(byte id)
@@ -45,7 +44,7 @@ public class ClientPlayerManager
         if (!playerMap.TryGetValue(id, out NetworkedPlayer networkedPlayer))
             return;
 
-        OnPlayerDisconnected?.Invoke(id, networkedPlayer);
+        OnPlayerDisconnected?.Invoke(networkedPlayer);
         Object.Destroy(networkedPlayer.gameObject);
         playerMap.Remove(id);
     }

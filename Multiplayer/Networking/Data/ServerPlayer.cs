@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace Multiplayer.Networking.Data;
 
-public class ServerPlayer : IPlayer, IDisposable
+public class ServerPlayer : IDisposable
 {
     #region ID Management
     private readonly IdPool<byte> idPool;

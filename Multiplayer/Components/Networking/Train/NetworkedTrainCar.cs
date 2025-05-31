@@ -611,7 +611,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         return true;
     }
 
-    private void Server_OnPlayerDisconnect(IPlayer player)
+    private void Server_OnPlayerDisconnect(ServerPlayer player)
     {
         //todo: resolve player disconnection during chain interaction
         if (frontInteractionPlayer == player || rearInteractionPlayer == player)

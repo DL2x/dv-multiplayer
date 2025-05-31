@@ -40,8 +40,8 @@ namespace Multiplayer.Networking.Managers.Server;
 
 public class NetworkServer : NetworkManager
 {
-    public Action<IPlayer> PlayerConnected;
-    public Action<IPlayer> PlayerDisconnected;
+    public Action<ServerPlayer> PlayerConnected;
+    public Action<ServerPlayer> PlayerDisconnected;
     protected override string LogPrefix => "[Server]";
 
     private readonly Queue<ITransportPeer> joinQueue = new();   //Queue for players attempting to join while server is loading
