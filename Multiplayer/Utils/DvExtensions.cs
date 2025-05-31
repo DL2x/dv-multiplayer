@@ -128,18 +128,11 @@ public static class DvExtensions
         foreach (ServerPlayer serverPlayer in NetworkLifecycle.Instance.Server.ServerPlayers)
         {
             float sqDist = (serverPlayer.WorldPosition - anchor).sqrMagnitude;
-            /*
-            if(origin == "UnusedTrainCarDeleter.AreDeleteConditionsFulfilled_Patch0")
-                Multiplayer.LogDebug(() => $"AnyPlayerSqrMag(): car: {UnusedTrainCarDeleterPatch.current?.ID}, player: {serverPlayer.Username}, result: {sqDist}");
-            */
+
             if (sqDist < result)
                 result = sqDist;
         }
 
-        /*
-        if (origin == "UnusedTrainCarDeleter.AreDeleteConditionsFulfilled_Patch0")
-            Multiplayer.LogDebug(() => $"AnyPlayerSqrMag(): player: result: {result}");
-        */
         return result;
     }
 
