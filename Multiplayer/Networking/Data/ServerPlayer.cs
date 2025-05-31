@@ -1,15 +1,32 @@
-using System;
-using System.Collections.Generic;
+using MPAPI.Interfaces;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
+using Multiplayer.Networking.TransportLayers;
+using Multiplayer.Utils;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Multiplayer.Networking.Data;
 
-public class ServerPlayer
+public class ServerPlayer : IPlayer, IDisposable
 {
-    public byte Id { get; set; }
+    #region ID Management
+    private readonly IdPool<byte> idPool;
+
+    public void Dispose()
+    {
+        if (Id != 0)
+        {
+            idPool.ReleaseId(Id);
+            Id = 0;
+        }
+    }
+    #endregion
+
+    public ITransportPeer Peer { get; private set; }
+    public byte Id { get; private set; }
     public bool IsLoaded { get; set; }
     public string Username { get; set; }
     public string OriginalUsername { get; set; }
@@ -25,6 +42,19 @@ public class ServerPlayer
 
     private Vector3 _lastWorldPos = Vector3.zero;
     private Vector3 _lastAbsoluteWorldPosition = Vector3.zero;
+
+    public ServerPlayer(IdPool<byte> idPool, ITransportPeer peer, string username, string originalUsername, Guid guid)
+    {
+        this.idPool = idPool;
+        Id = idPool.NextId;
+
+        Peer = peer;
+
+        Username = username;
+        OriginalUsername = originalUsername;
+        Guid = guid;
+    }
+
 
     #region Positioning
     public Vector3 AbsoluteWorldPosition

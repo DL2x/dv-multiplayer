@@ -33,19 +33,23 @@ using Multiplayer.Networking.Packets.Unconnected;
 using System.Text;
 using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.TransportLayers;
+using MPAPI.Interfaces;
 
 
 namespace Multiplayer.Networking.Managers.Server;
 
 public class NetworkServer : NetworkManager
 {
-    public Action<uint> PlayerConnected;
-    public Action<uint> PlayerDisconnected;
+    public Action<IPlayer> PlayerConnected;
+    public Action<IPlayer> PlayerDisconnected;
     protected override string LogPrefix => "[Server]";
 
-    private readonly Queue<ITransportPeer> joinQueue = new();
-    private readonly Dictionary<byte, ServerPlayer> serverPlayers = [];
-    private readonly Dictionary<byte, ITransportPeer> Peers = [];
+    private readonly Queue<ITransportPeer> joinQueue = new();   //Queue for players attempting to join while server is loading
+
+    private readonly IdPool<byte> playerIdPool = new();                             //player Id management
+    private readonly Dictionary<byte, ServerPlayer> serverPlayers = [];             //player Id to ServerPlayer mapping
+    private readonly Dictionary<byte, ITransportPeer> peers = [];                   //player Id to peer mapping
+    private readonly Dictionary<ITransportPeer, ServerPlayer> peerToPlayer = [];    //peer to ServerPlayer mapping
 
     private LobbyServerManager lobbyServerManager;
     public readonly bool IsSinglePlayer;
@@ -109,11 +113,15 @@ public class NetworkServer : NetworkManager
 
         //Alert all clients (except host)
         var packet =  WritePacket(new ClientboundDisconnectPacket());
-        foreach (var peer in Peers.Values)
+        foreach (var peer in peers.Values)
         {
             if (peer != SelfPeer)
                 peer?.Disconnect(packet);
         }
+
+        //Reset player ID pool
+        foreach (var player in serverPlayers.Values)
+            player.Dispose();
 
         base.Stop();
     }
@@ -195,7 +203,7 @@ public class NetworkServer : NetworkManager
 
     public bool TryGetPeer(byte id, out ITransportPeer peer)
     {
-        return Peers.TryGetValue(id, out peer);
+        return peers.TryGetValue(id, out peer);
     }
 
     #region Net Events
@@ -206,21 +214,33 @@ public class NetworkServer : NetworkManager
 
     public override void OnPeerDisconnected(ITransportPeer peer, DisconnectReason disconnectReason)
     {
-        byte id = (byte)peer.Id;
-        Log($"Player {(serverPlayers.TryGetValue(id, out ServerPlayer player) ? player : id)} disconnected: {disconnectReason}");
+        if (!peerToPlayer.TryGetValue(peer, out ServerPlayer player))
+        {
+            LogWarning($"Peer {peer.GetType()}, peerId: {peer.Id} disconnected but no player found");
+            return;
+        }
+
+        Log($"Player {player.Username} disconnected: {disconnectReason}");
 
         if (WorldStreamingInit.isLoaded)
             SaveGameManager.Instance.UpdateInternalData();
 
-        serverPlayers.Remove(id);
-        Peers.Remove(id);
+        serverPlayers.Remove(player.Id);
+        peers.Remove(player.Id);
+        peerToPlayer.Remove(peer);
 
-        SendPacketToAll(new ClientboundPlayerDisconnectPacket
-        {
-            Id = id
-        }, DeliveryMethod.ReliableUnordered);
+        SendPacketToAll
+            (
+                new ClientboundPlayerDisconnectPacket
+                {
+                    Id = player.Id
+                },
+                DeliveryMethod.ReliableUnordered
+            );
 
-        PlayerDisconnected?.Invoke(id);
+        PlayerDisconnected?.Invoke(player);
+
+        player.Dispose();
     }
 
     public override void OnNetworkLatencyUpdate(ITransportPeer peer, int latency)
@@ -262,14 +282,14 @@ public class NetworkServer : NetworkManager
     private void SendPacketToAll<T>(T packet, DeliveryMethod deliveryMethod) where T : class, new()
     {
         NetDataWriter writer = WritePacket(packet);
-        foreach (KeyValuePair<byte, ITransportPeer> kvp in Peers)
+        foreach (KeyValuePair<byte, ITransportPeer> kvp in peers)
             kvp.Value?.Send(writer, deliveryMethod);
     }
 
     private void SendPacketToAll<T>(T packet, DeliveryMethod deliveryMethod, ITransportPeer excludePeer) where T : class, new()
     {
         NetDataWriter writer = WritePacket(packet);
-        foreach (KeyValuePair<byte, ITransportPeer> kvp in Peers)
+        foreach (KeyValuePair<byte, ITransportPeer> kvp in peers)
         {
             if (kvp.Key == excludePeer.Id)
                 continue;
@@ -279,14 +299,14 @@ public class NetworkServer : NetworkManager
     private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod) where T : INetSerializable, new()
     {
         NetDataWriter writer = WriteNetSerializablePacket(packet);
-        foreach (KeyValuePair<byte, ITransportPeer> kvp in Peers)
+        foreach (KeyValuePair<byte, ITransportPeer> kvp in peers)
             kvp.Value.Send(writer, deliveryMethod);
     }
 
     private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod, ITransportPeer excludePeer) where T : INetSerializable, new()
     {
         NetDataWriter writer = WriteNetSerializablePacket(packet);
-        foreach (KeyValuePair<byte, ITransportPeer> kvp in Peers)
+        foreach (KeyValuePair<byte, ITransportPeer> kvp in peers)
         {
             if (kvp.Key == excludePeer.Id)
                 continue;
@@ -542,7 +562,7 @@ public class NetworkServer : NetworkManager
     {
         Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items to {player.Username}");
 
-        if (Peers.TryGetValue(player.Id, out ITransportPeer peer) && peer != SelfPeer)
+        if (peers.TryGetValue(player.Id, out ITransportPeer peer) && peer != SelfPeer)
         {
             SendNetSerializablePacket(peer, new CommonItemChangePacket { Items = items },
                 DeliveryMethod.ReliableOrdered);
@@ -666,15 +686,17 @@ public class NetworkServer : NetworkManager
 
         ITransportPeer peer = request.Accept();
 
-        ServerPlayer serverPlayer = new()
-        {
-            Id = (byte)peer.Id,
-            Username = overrideUsername,
-            OriginalUsername = packet.Username,
-            Guid = guid
-        };
+        ServerPlayer serverPlayer = new
+        (
+            playerIdPool,
+            peer,
+            overrideUsername,
+            packet.Username,
+            guid
+        );
 
         serverPlayers.Add(serverPlayer.Id, serverPlayer);
+        peerToPlayer.Add(peer, serverPlayer);
 
         ClientboundLoginResponsePacket acceptPacket = new()
         {
@@ -686,7 +708,7 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundSaveGameDataRequestPacket(ServerboundSaveGameDataRequestPacket packet, ITransportPeer peer)
     {
-        if (Peers.ContainsKey((byte)peer.Id))
+        if (peers.ContainsKey((byte)peer.Id))
         {
             LogWarning("Denied save game data request from already connected peer!");
             return;
@@ -701,7 +723,12 @@ public class NetworkServer : NetworkManager
     private void OnServerboundClientReadyPacket(ServerboundClientReadyPacket packet, ITransportPeer peer)
     {
 
-        byte peerId = (byte)peer.Id;
+        if (!peerToPlayer.TryGetValue(peer, out ServerPlayer serverPlayer))
+        {
+            LogError($"Ready packet received for {peer.GetType()}, peerId: {peer.Id}, but ServerPlayer not found");
+            peer.Disconnect();
+            return;
+        }
 
         // Allow clients to connect before the server is fully loaded
         if (!IsLoaded)
@@ -716,13 +743,12 @@ public class NetworkServer : NetworkManager
             AppUtil.Instance.RequestSystemOnValueChanged(0.0f);
 
         // Allow the player to receive packets
-        Peers.Add(peerId, peer);
+        peers.Add(serverPlayer.Id, peer);
 
         // Send the new player to all other players
-        ServerPlayer serverPlayer = serverPlayers[peerId];
         ClientboundPlayerJoinedPacket clientboundPlayerJoinedPacket = new()
         {
-            Id = peerId,
+            Id = serverPlayer.Id,
             Username = serverPlayer.Username,
             //Guid = serverPlayer.Guid.ToByteArray()
         };
@@ -791,7 +817,7 @@ public class NetworkServer : NetworkManager
         // Send existing players
         foreach (ServerPlayer player in ServerPlayers)
         {
-            if (player.Id == peer.Id)
+            if (player.Id == serverPlayer.Id)
                 continue;
             SendPacket(peer, new ClientboundPlayerJoinedPacket
             {
@@ -854,17 +880,23 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonCouplerInteractionPacket(CommonCouplerInteractionPacket packet, ITransportPeer peer)
     {
+        if(!peerToPlayer.TryGetValue(peer, out var player))
+        {
+            LogWarning($"Received Coupler Interaction from {peer.GetType()}, peerId: {peer.Id}, but could not find matching player.");
+            return;
+        }
+
         //todo: add validation that to ensure the client is near the coupler - this packet may also be used for remote operations and may need to factor that in in the future
         if(NetworkedTrainCar.Get(packet.NetId, out var netTrainCar))
         {
-            if(netTrainCar.Server_ValidateCouplerInteraction(packet, peer))
+            if(netTrainCar.Server_ValidateCouplerInteraction(packet, player))
             {
                 //passed validation, send to all but the originator
                 SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
             }
             else
             {
-                Multiplayer.LogDebug(() => $"OnCommonCouplerInteractionPacket([{packet.Flags}, {netTrainCar.CurrentID}, {packet.NetId}], {peer.Id}) Sending validation failure");
+                LogDebug(() => $"OnCommonCouplerInteractionPacket([{packet.Flags}, {netTrainCar.CurrentID}, {packet.NetId}], {player.Id}) Sending validation failure");
                 //failed validation notify client
                 SendPacket(
                             peer,
@@ -880,7 +912,7 @@ public class NetworkServer : NetworkManager
         }
         else
         {
-            Multiplayer.LogDebug(() => $"OnCommonCouplerInteractionPacket([{packet.Flags}, {netTrainCar.CurrentID}, {packet.NetId}], {peer.Id}) Sending destroy");
+            LogDebug(() => $"OnCommonCouplerInteractionPacket([{packet.Flags}, {netTrainCar.CurrentID}, {packet.NetId}], {player.Id}) Sending destroy");
             //Car doesn't exist, tell client to delete it
             SendDestroyTrainCar(netTrainCar, peer);
         }
