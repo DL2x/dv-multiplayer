@@ -11,6 +11,7 @@ using DV.ThingTypes;
 using JetBrains.Annotations;
 using LocoSim.Definitions;
 using LocoSim.Implementations;
+using MPAPI.Interfaces;
 using Multiplayer.Components.Networking.Player;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Data.Train;
@@ -112,8 +113,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private bool frontInteracting = false;
     private bool rearInteracting = false;
 
-    private int frontInteractionPeer;
-    private int rearInteractionPeer;
+    private ServerPlayer frontInteractionPlayer;
+    private ServerPlayer rearInteractionPlayer;
     #region Client
 
     public bool Client_Initialized { get; private set; }
@@ -565,34 +566,35 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         NetworkLifecycle.Instance.Server.SendCarHealthUpdate(NetId, TrainCarHealthData.From(TrainCar));
     }
 
-    public bool Server_ValidateCouplerInteraction(CommonCouplerInteractionPacket packet, ITransportPeer peer)
+    public bool Server_ValidateCouplerInteraction(CommonCouplerInteractionPacket packet, ServerPlayer player)
     {
         Multiplayer.LogDebug(() =>
-                $"Server_ValidateCouplerInteraction([[{(CouplerInteractionType)packet.Flags}], {CurrentID}, {packet.NetId}], {peer.Id}) " +
-                $"isFront: {packet.IsFrontCoupler}, frontInteracting: {frontInteracting}, frontInteractionPeer: {frontInteractionPeer}, " +
-                $"rearInteracting: {rearInteracting}, rearInteractionPeer: {rearInteractionPeer}"
+                $"Server_ValidateCouplerInteraction([[{(CouplerInteractionType)packet.Flags}], {CurrentID}, {packet.NetId}], {player.Id}) " +
+                $"isFront: {packet.IsFrontCoupler}, frontInteracting: {frontInteracting}, frontInteractionPeer: {frontInteractionPlayer}, " +
+                $"rearInteracting: {rearInteracting}, rearInteractionPeer: {rearInteractionPlayer}"
                 );
+
         //Ensure no one else is interacting
-        if (packet.IsFrontCoupler && frontInteracting && peer.Id != frontInteractionPeer ||
-           packet.IsFrontCoupler == false && rearInteracting && peer.Id != rearInteractionPeer)
+        if (packet.IsFrontCoupler && frontInteracting && player != frontInteractionPlayer ||
+           packet.IsFrontCoupler == false && rearInteracting && player != rearInteractionPlayer)
         {
-            Multiplayer.LogDebug(() => $"Server_ValidateCouplerInteraction([{packet.Flags}, {CurrentID}, {packet.NetId}], {peer.Id}) Failed to validate!");
+            Multiplayer.LogDebug(() => $"Server_ValidateCouplerInteraction([{packet.Flags}, {CurrentID}, {packet.NetId}], {player.Id}) Failed to validate!");
             return false;
         }
 
-        Multiplayer.LogDebug(() => $"Server_ValidateCouplerInteraction([{packet.Flags}, {CurrentID}, {packet.NetId}], {peer.Id}) No one interacting");
+        Multiplayer.LogDebug(() => $"Server_ValidateCouplerInteraction([{packet.Flags}, {CurrentID}, {packet.NetId}], {player.Id}) No one interacting");
 
         if (((CouplerInteractionType)packet.Flags).HasFlag(CouplerInteractionType.Start))
         {
             if (packet.IsFrontCoupler)
             {
                 frontInteracting = true;
-                frontInteractionPeer = peer.Id;
+                frontInteractionPlayer = player;
             }
             else
             {
                 rearInteracting = true;
-                rearInteractionPeer = peer.Id;
+                rearInteractionPlayer = player;
             }
         }
         else
@@ -605,17 +607,17 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         //todo: Additional checks for player location/proximity
 
-        Multiplayer.LogDebug(() => $"Server_ValidateCouplerInteraction([{packet.Flags}, {CurrentID}, {packet.NetId}], {peer.Id}) Validation passed!");
+        Multiplayer.LogDebug(() => $"Server_ValidateCouplerInteraction([{packet.Flags}, {CurrentID}, {packet.NetId}], {player.Id}) Validation passed!");
         return true;
     }
 
-    private void Server_OnPlayerDisconnect(uint id)
+    private void Server_OnPlayerDisconnect(IPlayer player)
     {
-        //todo: resove player disconnection during chain interaction
-        if (frontInteractionPeer == id || rearInteractionPeer == id)
+        //todo: resolve player disconnection during chain interaction
+        if (frontInteractionPlayer == player || rearInteractionPlayer == player)
         {
-            Multiplayer.LogWarning($"Server_OnPlayerDisconnect() Coupler interaction in unknown state [{CurrentID}, {NetId}] isFront: {frontInteractionPeer == id}");
-            if (frontInteractionPeer == id)
+            Multiplayer.LogWarning($"Server_OnPlayerDisconnect() Coupler interaction in unknown state [{CurrentID}, {NetId}] isFront: {frontInteractionPlayer == player}");
+            if (frontInteractionPlayer == player)
             {
                 frontInteracting = false;
                 //NetworkLifecycle.Instance.Client.SendCouplerInteraction(cou, coupler, otherCoupler);

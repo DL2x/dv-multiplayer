@@ -2,6 +2,7 @@ using DV.Scenarios.Common;
 using DV.Utils;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using MPAPI;
 using Multiplayer.API;
 using Multiplayer.Components.Networking.UI;
 using Multiplayer.Networking.Data;
@@ -140,7 +141,7 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
 
         // Register server API
         var serverAPI = new ServerAPIProvider(server);
-        MPAPI.MultiplayerAPI.RegisterServer(serverAPI);
+        MultiplayerAPI.RegisterServer(serverAPI);
 
         StartClient(IPAddress.Loopback.ToString(), port, Multiplayer.Settings.Password, IsSinglePlayer, null);
 
@@ -221,6 +222,10 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         Stats?.Hide();
         Server?.Stop();
         Client?.Stop();
+
+        // Clear API registrations
+        MultiplayerAPI.ClearServer();
+
         Server = null;
         Client = null;
     }

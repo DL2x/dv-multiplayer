@@ -34,30 +34,14 @@ namespace Multiplayer.API
         {
             this.server = serverInstance;
 
-            server.PlayerConnected += PlayerConnected;
-            server.PlayerDisconnected += PlayerDisconnected;
+            server.PlayerConnected += OnPlayerConnected;
+            server.PlayerDisconnected += OnPlayerDisconnected;
         }
 
         internal void Dispose()
         {
-            server.PlayerConnected -= PlayerConnected;
-            server.PlayerDisconnected -= PlayerDisconnected;
-        }
-
-        private void PlayerConnected(uint playerId)
-        {
-            //todo resolve player
-            IPlayer player = null;
-
-            OnPlayerConnected?.Invoke(player);
-        }
-
-        private void PlayerDisconnected(uint playerId)
-        {
-            //todo resolve player
-            IPlayer player = null;
-
-            OnPlayerDisconnected?.Invoke(player);
+            server.PlayerConnected -= OnPlayerConnected;
+            server.PlayerDisconnected -= OnPlayerDisconnected;
         }
         #endregion
     }
