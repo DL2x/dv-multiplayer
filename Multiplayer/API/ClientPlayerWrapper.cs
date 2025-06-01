@@ -1,6 +1,5 @@
 using MPAPI.Interfaces;
 using Multiplayer.Components.Networking.Player;
-using Multiplayer.Networking.Data;
 using System;
 using UnityEngine;
 
@@ -29,6 +28,6 @@ public class ClientPlayerWrapper : IPlayer
     public bool IsLoaded => true; // If we have the object, it's loaded
     public bool IsHost => _isHost;
     public int Ping => _networkedPlayer.GetPing();
-    public bool IsOnCar => _networkedPlayer.IsOnCar; // You'll need to add this logic
-    public TrainCar OccupiedCar => _networkedPlayer.OccupiedCar; // You'll need to track this in NetworkedPlayer
+    public bool IsOnCar => _networkedPlayer.IsOnCar;
+    public TrainCar OccupiedCar => _networkedPlayer.OccupiedCar;
 }
