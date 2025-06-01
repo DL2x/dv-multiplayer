@@ -1,9 +1,6 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using DV.CabControls;
 using DV.Customization.Paint;
+using DV.Damage;
 using DV.MultipleUnit;
 using DV.Simulation.Brake;
 using DV.Simulation.Cars;
@@ -18,6 +15,11 @@ using Multiplayer.Networking.Packets.Clientbound.Train;
 using Multiplayer.Networking.Packets.Common.Train;
 using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace Multiplayer.Components.Networking.Train;
@@ -86,11 +88,13 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private bool hasSimFlow;
     private SimulationFlow simulationFlow;
     public FireboxSimController firebox;
+    private readonly Dictionary<TrainDamage, TrainDamage.HealthChanged> trainDamageDelegates = [];
 
     private HashSet<string> dirtyPorts;
     private Dictionary<string, float> lastSentPortValues;
     private HashSet<string> dirtyFuses;
     private float lastSentFireboxValue;
+    private readonly Dictionary<string, float> lastSentTrainDamages = [];
 
     private bool handbrakeDirty;
     private bool mainResPressureDirty;
@@ -208,6 +212,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             TrainCar.PaintInterior.OnThemeChanged += Common_OnPaintThemeChange;
 
         NetworkLifecycle.Instance.OnTick += Common_OnTick;
+
         if (NetworkLifecycle.Instance.IsHost())
         {
             NetworkLifecycle.Instance.OnTick += Server_OnTick;
@@ -220,6 +225,36 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             TrainCar.rearCoupler.Uncoupled += Server_CouplerUncoupled;
 
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate += Server_CarHealthUpdate;
+
+            //find all TrainDamages and subscribe
+            if (TryGetComponent<DamageController>(out DamageController damageController))
+            {
+                var trainDamageFields = typeof(DamageController)
+                    .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Where(field => field.FieldType == typeof(TrainDamage))
+                    .Select(field => new { Field = field, Damage = (TrainDamage)field.GetValue(damageController) })
+                    .Where(value => value != null)
+                    .ToArray();
+
+                if (trainDamageFields != null && trainDamageFields.Length > 0)
+                {
+                    for (int i = 0; i < trainDamageFields.Length; i++)
+                    {
+                        var fieldName = trainDamageFields[i].Field.Name;
+                        var fieldValue = trainDamageFields[i].Damage;
+
+                        //create a delegate for each field
+                        void DamagesUpdate(float health) => Server_TrainDamagesHealthUpdate(fieldName, health);
+
+                        //subscribe to the event
+                        trainDamageFields[i].Damage.HealthPercentageChanged += DamagesUpdate;
+
+                        //store delegates and set a last sent value to an impossible value
+                        trainDamageDelegates.Add(fieldValue, DamagesUpdate);
+                        lastSentTrainDamages.Add(fieldName, -1f);
+                    }
+                }
+            }
 
             brakeSystem.MainResPressureChanged += Server_MainResUpdate;
             brakeSystem.heatController.OverheatingActiveStateChanged += Server_BrakeHeatUpdate;
@@ -235,6 +270,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         NetworkLifecycle.Instance?.Client.SendTrainSyncRequest(NetId);
     }
+
     public void OnDisable()
     {
         if (UnloadWatcher.isQuitting)
@@ -281,6 +317,11 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             TrainCar.rearCoupler.Uncoupled -= Server_CouplerUncoupled;
 
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate -= Server_CarHealthUpdate;
+
+            //Unsubscribe from damage updates
+            if (trainDamageDelegates != null && lastSentTrainDamages.Count > 0)
+                foreach (var kvp in trainDamageDelegates)
+                    kvp.Key.HealthPercentageChanged -= kvp.Value;
 
             if (brakeSystem != null)
             {
@@ -356,10 +397,6 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         foreach (string portId in simulationFlow.fullPortIdToPort.Keys)
         {
             dirtyPorts.Add(portId);
-            //if (simulationFlow.TryGetPort(portId, out Port port))
-            //{
-            //    lastSentPortValues[portId] = port.value;
-            //}
         }
 
         foreach (string fuseId in simulationFlow.fullFuseIdToFuse.Keys)
@@ -425,7 +462,23 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void Server_CarHealthUpdate(float health)
     {
+        //Multiplayer.LogDebug(() => $"Server_CarHealthUpdate({health}) netId: {NetId}");
         carHealthDirty = true;
+    }
+
+    private void Server_TrainDamagesHealthUpdate(string field, float health)
+    {
+        //Multiplayer.LogDebug(() => $"Server_TrainDamagesHealthUpdate({field}, {health}) netId: {NetId}");
+
+        // Check if value has changed before updating
+        if (!lastSentTrainDamages.TryGetValue(field, out float lastValue)
+            || Mathf.Abs(lastValue - health) > MAX_PORT_DELTA
+            || (health == 0 && lastValue != 0)
+            || (health == 1 && lastValue != 1))
+        {
+            lastSentTrainDamages[field] = health;
+            carHealthDirty = true;
+        }
     }
 
     private void Server_MainResUpdate(float normalizedPressure, float pressure)
@@ -1267,7 +1320,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             TrainCar.Derail();
             movementPart.RigidbodySnapshot.Apply(TrainCar.rb);
 
-        //    Client_trainRigidbodyQueue.ReceiveSnapshot(movementPart.RigidbodySnapshot, tick);
+            //    Client_trainRigidbodyQueue.ReceiveSnapshot(movementPart.RigidbodySnapshot, tick);
 
             //Multiplayer.LogDebug(() => $"Derailed car {TrainCar.ID} positioned at {TrainCar.transform.position}");
         }
