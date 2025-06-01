@@ -114,25 +114,18 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         switch (packet.Action)
         {
             case CashRegisterAction.Cancel:
-                if (CashRegister.cancelButton.InteractionAllowed)
-                {
                     CashRegister?.Cancel();
                     success = true;
-                }
 
                 break;
 
             case CashRegisterAction.Buy:
-                if (CashRegister.buyButton.InteractionAllowed)
-                {
                     success = CashRegister?.Buy() ?? false;
                     if (Inventory.Instance.PlayerMoney <= CashRegister.GetTotalCost())
                         response = CashRegisterAction.RejectFunds;
 
-                }
-
                 break;
-
+                
             case CashRegisterAction.SetFunds:
                 double spend = 0;
 
@@ -146,7 +139,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
                     success = Inventory.Instance.RemoveMoney(spend);
 
-                    if(success)
+                    if(success && player.Id != NetworkLifecycle.Instance.Server.SelfId)
                         CashRegister?.AddCash(spend);
                 }
                 else
@@ -184,35 +177,39 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         {
             case CashRegisterAction.Cancel:
 
-                if (isCancelling)
-                    cancelAccepted = true;
-
                 isCancelling = false;
                 isBuying = false;
 
-                CashRegister?.cancelAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
+                foreach (var module in CashRegister.registerModules)
+                    module.ResetData();
 
-                //foreach (var module in CashRegister.registerModules)
-                //    module.ResetData();
+                CashRegister.OnUnitsToBuyChanged();
 
-                CashRegister?.Cancel();
+                if (CashRegister.DepositedCash > 0)
+                {
+                    CashRegister?.cancelAudio?.Play(CashRegister.transform.position, 1f, 1f, 0f, 1f, 500f, default, null, CashRegister.transform, false, 0f, null);
+                    CashRegister.DepositedCash = 0;
+                    CashRegister?.OnDepositedUpdated();
+                }
+
+                //CashRegister?.Cancel();
 
                 break;
 
             case CashRegisterAction.Buy:
 
-                if (isBuying)
-                    buyAccepted = true;
-
                 isCancelling = false;
                 isBuying = false;
 
-                CashRegister?.buyAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
+                CashRegister?.buyAudio?.Play(CashRegister.transform.position, 1f, 1f, 0f, 1f, 500f, default, null, CashRegister.transform, false, 0f, null);
 
                 foreach(var module in CashRegister.registerModules)
                     module.ResetData();
 
                 CashRegister?.OnUnitsToBuyChanged();
+
+                CashRegister.DepositedCash = 0;
+                CashRegister?.OnDepositedUpdated();
 
                 CashRegister.IsProcessingTransaction = false;
 
@@ -233,7 +230,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
                 isBuying = false;
                 isCancelling = false;
 
-                CashRegister?.notEnoughMoneyAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
+                CashRegister?.notEnoughMoneyAudio?.Play(CashRegister.transform.position, 1f, 1f, 0f, 1f, 500f, default, null, CashRegister.transform, false, 0f, null);
 
                 break;
         }
@@ -274,7 +271,6 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         yield return new WaitUntil(() => Time.time >= timeOut || isCancelling == false);
 
         isCancelling = false;
-        cancelAccepted = false;
 
         EnableInteraction();
     }
