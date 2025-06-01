@@ -41,7 +41,6 @@ using DV.UserManagement;
 using DV.Common;
 using DV.Customization.Paint;
 using Multiplayer.Networking.TransportLayers;
-using System.Collections;
 
 namespace Multiplayer.Networking.Managers.Client;
 
@@ -838,6 +837,8 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundCarHealthUpdatePacket(ClientboundCarHealthUpdatePacket packet)
     {
+        //LogDebug(() => $"Received Car Health Update for netId {packet.NetId}: BodyHP: {packet.Health.BodyHP}, WheelsHP: {packet.Health.WheelsHP}, MechanicalPT: {packet.Health.MechanicalPT}, ElectricalPT: {packet.Health.ElectricalPT}, WindowsBroken: {packet.Health.WindowsBroken}");
+
         if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
             return;
 

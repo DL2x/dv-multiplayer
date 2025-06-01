@@ -66,7 +66,7 @@ public class NetworkServer : NetworkManager
 
     public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData) : base(settings)
     {
-        Log(()=>$"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
+        Log($"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
 
         IsSinglePlayer = singlePlayer;
         ServerData = serverData;
@@ -457,6 +457,9 @@ public class NetworkServer : NetworkManager
 
     public void SendCarHealthUpdate(ushort netId, TrainCarHealthData health)
     {
+
+        //LogDebug(() => $"Sending Car Health Update for netId {netId}: BodyHP: {health.BodyHP}, WheelsHP: {health.WheelsHP}, MechanicalPT: {health.MechanicalPT}, ElectricalPT: {health.ElectricalPT}, WindowsBroken: {health.WindowsBroken}");
+
         SendPacketToAll(new ClientboundCarHealthUpdatePacket
         {
             NetId = netId,
