@@ -1,4 +1,3 @@
-using System;
 
 namespace MPAPI.Interfaces;
 
@@ -31,5 +30,17 @@ public interface IMultiplayerAPI
     /// Gets whether this current session is single player
     /// </summary>
     bool IsSinglePlayer { get; }
+
+    /// <summary>
+    // Gets the NetId for an object
+    // returns true if the object has a NetId
+    /// </summary>
+    bool TryGetNetId<T>(T obj, out ushort netId) where T : class;
+
+    /// <summary>
+    // Gets the object for an NetId
+    // returns true if the object was found
+    /// </summary>
+    bool TryGetObjectFromNetId<T>(ushort netId, out T obj) where T : class;
 
 }

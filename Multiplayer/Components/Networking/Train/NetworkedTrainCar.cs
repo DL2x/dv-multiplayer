@@ -65,6 +65,17 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         return trainCarsToNetworkedTrainCars.TryGetValue(trainCar, out networkedTrainCar);
     }
 
+    public static bool TryGetNetIdFromTrainCar(TrainCar trainCar, out ushort netId)
+    {
+        netId = 0;
+
+        if (!trainCarsToNetworkedTrainCars.TryGetValue(trainCar, out var networkedTrainCar) || networkedTrainCar == false || networkedTrainCar.NetId == 0)
+            return false;
+
+        netId = networkedTrainCar.NetId;
+        return true;
+    }
+
     #endregion
 
     private const int MAX_COUPLER_ITERATIONS = 10;
