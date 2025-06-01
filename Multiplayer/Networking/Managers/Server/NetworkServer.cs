@@ -592,7 +592,7 @@ public class NetworkServer : NetworkManager
         };
 
         if (peer == null)
-            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
+            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered);
         else
             SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
     }
@@ -1230,6 +1230,7 @@ public class NetworkServer : NetworkManager
         else
             LogWarning($"OnCommonPitStopInteractionPacket() Failed to find PitStopStation with netId: {packet.NetId}");
     }
+
     private void OnCommonPitStopPlugInteractionPacket(CommonPitStopPlugInteractionPacket packet, ITransportPeer peer)
     {
         bool foundPlayer = TryGetServerPlayer(peer, out var player);

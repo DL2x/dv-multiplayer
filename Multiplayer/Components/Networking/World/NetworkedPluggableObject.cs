@@ -25,7 +25,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     }
     #endregion
 
-    protected override bool IsIdServerAuthoritative => true;
+    protected override bool IsIdServerAuthoritative => false;
 
     #region Server Variables
     public PlugInteractionType CurrentInteraction {  get; set; }
@@ -49,10 +49,15 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     #region Unity
     protected override void Awake()
     {
-        base.Awake();
+        if (NetId == 0)
+            base.Awake();
 
         PluggableObject = GetComponent<PluggableObject>();
         Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Awake() {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Awake() {this.GetObjectPath()}, netId: {NetId}");
+
+        if (NetworkLifecycle.Instance.IsHost())
+            Refreshed = true;
     }
 
     protected IEnumerator Start()
@@ -132,6 +137,26 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     public void ProcessPacket(CommonPitStopPlugInteractionPacket packet)
     {
         var interaction = (PlugInteractionType)packet.InteractionType;
+        ProcessInteraction(interaction, packet.PlayerId, packet.TrainCarNetId, packet.IsLeftSide);
+    }
+
+    public void ProcessBulkUpdate(PitStopPlugData data)
+    {
+        var interaction = data.State;
+        ProcessInteraction(interaction, data.PlayerId, data.TrainCarNetId, data.IsLeftSide);
+
+        if (data.State == PlugInteractionType.Dropped)
+        {
+            transform.position = data.Position + WorldMover.currentMove;
+            transform.rotation = data.Rotation;
+        }
+
+        Refreshed = true;
+    }
+
+    public void ProcessInteraction(PlugInteractionType interaction, byte playerId, ushort trainNetId, bool isLeftSide)
+    {
+
         bool result;
 
         NetworkedPlayer player = null;
@@ -145,7 +170,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
             case PlugInteractionType.PickedUp:
                 //Handle the picked up state
                 isGrabbed = true;
-                playerHolding = packet.PlayerId;
+                playerHolding = playerId;
                 PluggableObject.controlGrabbed = true;
                 BlockInteraction(true);
 
@@ -207,7 +232,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
                 break;
 
             case PlugInteractionType.DockSocket:
-                Multiplayer.LogDebug(() => $"ProcessPacket() NetId: {NetId}, DockSocket, trainCar: {packet.TrainCarNetId}, isLeft: {packet.IsLeftSide}");
+                Multiplayer.LogDebug(() => $"ProcessPacket() NetId: {NetId}, DockSocket, trainCar: {trainNetId}, isLeft: {isLeftSide}");
 
                 if (isGrabbed)
                 {
@@ -218,7 +243,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
                     }
                 }
 
-                if (NetworkedTrainCar.GetTrainCar(packet.TrainCarNetId, out var trainCar))
+                if (NetworkedTrainCar.GetTrainCar(trainNetId, out var trainCar))
                 {
                     isGrabbed = false;
                     playerHolding = 0;
@@ -228,20 +253,20 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
                     PluggableObject.Unplug();
 
                     var sockets = trainCar.GetComponentsInChildren<PlugSocket>();
-                    if (packet.IsLeftSide)
+                    if (isLeftSide)
                     {
                         result = PluggableObject.InstantSnapTo(sockets[0]);
-                        Multiplayer.LogDebug(() => $"ProcessPacket() NetId: {NetId}, DockSocket, trainCar: {packet.TrainCarNetId}, isLeft: {packet.IsLeftSide}, result: {result}");
+                        Multiplayer.LogDebug(() => $"ProcessPacket() NetId: {NetId}, DockSocket, trainCar: {trainNetId}, isLeft: {isLeftSide}, result: {result}");
                     }
                     else
                     {
                         result = PluggableObject.InstantSnapTo(sockets[1]);
-                        Multiplayer.LogDebug(() => $"ProcessPacket() NetId: {NetId}, DockSocket, trainCar: {packet.TrainCarNetId}, isLeft: {packet.IsLeftSide}, result: {result}");
+                        Multiplayer.LogDebug(() => $"ProcessPacket() NetId: {NetId}, DockSocket, trainCar: {trainNetId}, isLeft: {isLeftSide}, result: {result}");
                     }
                 }
                 else
                 {
-                    Multiplayer.LogDebug(() => $"ProcessPacket() NetId: {NetId}, DockSocket, trainCar: {packet.TrainCarNetId}. TrainCar not found!");
+                    Multiplayer.LogDebug(() => $"ProcessPacket() NetId: {NetId}, DockSocket, trainCar: {trainNetId}. TrainCar not found!");
                 }
                 break;
         }
@@ -261,6 +286,9 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
     public void InitPitStop(NetworkedPitStopStation netPitStop)
     {
+        if (NetId == 0)
+            base.Awake();
+
         if(plugToStation.TryGetValue(this, out _))
         {
             Multiplayer.LogWarning($"Lookup cache 'plugToStation' already contains NetworkedPitStopStation \"{netPitStop?.StationName}\", skipping Init");

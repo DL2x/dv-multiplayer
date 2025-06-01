@@ -8,7 +8,7 @@ namespace Multiplayer.Networking.Data;
 
 public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, byte playerId, ushort trainCarNetId, bool isLeft, Vector3 pos, Quaternion rot)
 {
-    public readonly ushort NetID = netId;
+    public readonly ushort NetId = netId;
     public readonly byte PlayerId = playerId;
     public readonly PlugInteractionType State = state;
     public readonly ushort TrainCarNetId = trainCarNetId;
@@ -32,7 +32,7 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
 
     public static void Serialize(NetDataWriter writer, PitStopPlugData data)
     {
-        writer.Put(data.NetID);
+        writer.Put(data.NetId);
         writer.Put((byte)data.State);
 
         switch (data.State)

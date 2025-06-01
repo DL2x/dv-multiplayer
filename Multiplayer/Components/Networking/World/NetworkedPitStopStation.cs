@@ -86,7 +86,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     public PitStopStation Station { get; set; }
     public string StationName { get; private set; }
 
-    private ResourceType[] resourceTypes = Array.Empty<ResourceType>();
+    private ResourceType[] resourceTypes = [];
 
     private GrabHandlerHingeJoint carSelectorGrab;
     private GrabHandlerHingeJoint faucetPositionerGrab;
@@ -756,31 +756,37 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         // Make sure the data elements exist prior to attempting to load them
         InitialiseData();
 
-        Multiplayer.LogDebug(() => $"PitStop bulk data car count matches");
+        Multiplayer.LogDebug(() => $"PitStop bulk data car count matches. Station module count: {Station?.locoResourceModules?.resourceModules?.Count()}, Packet resource count: {packet?.ResourceData?.Count()}");
 
         // Load the data for each car and resource module
         foreach (var resource in packet.ResourceData)
         {
             var module = Station.locoResourceModules.resourceModules.FirstOrDefault(lm => lm.resourceType == resource.ResourceType);
 
-            if (module)
+            if (module != null)
                 if (module.resourceData.Count == resource.Values.Count())
                     for (int i = 0; i < module.resourceData.Count; i++)
-                        module.resourceData[i].unitsToBuy = resource.Values[i];
+                        module.SetUnitsToBuy(resource.Values[i]);
+                        //module.resourceData[i].unitsToBuy = resource.Values[i];
                 else
                     Multiplayer.LogWarning($"PitStop bulk data count mismatch post-force: {module.resourceData.Count} != {resource.Values.Count()}");
             else
                 Multiplayer.LogWarning($"PitStop module not found for resource type: {resource.ResourceType}");
         }
 
+        Multiplayer.LogDebug(() => $"PitStop bulk data Plugs");
+
         //sync plugs
         foreach (var plug in packet.PlugData)
         {
-            //todo: set plug states
+            NetworkedPluggableObject.Get(plug.NetId, out var netPlug);
+            netPlug.ProcessBulkUpdate(plug);
         }
 
         // Mark data as refreshed to allow player interactions
         Refreshed = true;
+
+        Multiplayer.LogDebug(() => $"PitStop bulk data Refreshed");
     }
 
     /// <summary>
