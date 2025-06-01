@@ -1302,7 +1302,7 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonCashRegisterWithModulesActionPacket(CommonCashRegisterWithModulesActionPacket packet, ITransportPeer peer)
     {
-        if (TryGetServerPlayer(peer, out var player))
+        if (!TryGetServerPlayer(peer, out var player))
         {
             LogWarning($"Cash Register With Modules Action received, but player was not found");
             return;

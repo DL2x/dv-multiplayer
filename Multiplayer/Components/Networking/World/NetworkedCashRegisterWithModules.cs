@@ -62,7 +62,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
     protected override bool IsIdServerAuthoritative => false;
 
     #region Server Variables
-
+    bool processingAction = false;
     #endregion
 
     #region Client Variables
@@ -100,15 +100,17 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
     {
         float sqrDistance = (player.WorldPosition - transform.position).sqrMagnitude;
         bool success = false;
+        CashRegisterAction response = CashRegisterAction.RejectGeneric;
 
         NetworkLifecycle.Instance.Server?.LogDebug(() => $"Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount})");
 
-        if (sqrDistance > GrabberRaycasterDV.FPS_INTERACTION_RANGE_SQR)
+        if (sqrDistance > GrabberRaycasterDV.FPS_INTERACTION_RANGE_SQR * 2) //need to find the real distance, likely related to player capsual size
         {
             NetworkLifecycle.Instance.Server?.LogDebug(() => $"Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount}) {CashRegister.GetObjectPath()}. Player too far! Player pos: {player.WorldPosition}, register pos: {transform.position}, sqrMag: {sqrDistance}");
             return;
         }
 
+        processingAction = true;
         switch (packet.Action)
         {
             case CashRegisterAction.Cancel:
@@ -122,7 +124,12 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
             case CashRegisterAction.Buy:
                 if (CashRegister.buyButton.InteractionAllowed)
+                {
                     success = CashRegister?.Buy() ?? false;
+                    if (Inventory.Instance.PlayerMoney <= CashRegister.GetTotalCost())
+                        response = CashRegisterAction.RejectFunds;
+
+                }
 
                 break;
 
@@ -157,11 +164,13 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
                     new CommonCashRegisterWithModulesActionPacket
                     {
                         NetId = NetId,
-                        Action = CashRegisterAction.Reject,
+                        Action = response,
                         Amount = CashRegister.DepositedCash
                     },
                     player.Peer
                 );
+
+        processingAction = false;
     }
 
     #endregion
@@ -170,6 +179,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
     public void Client_ProcessCashRegisterAction(CashRegisterAction action, double amount)
     {
+        NetworkLifecycle.Instance.Client?.LogDebug(() => $"Client_ProcessCashRegisterAction({action}, {amount}) isBuying: {isBuying}, buyAccepted: {buyAccepted}, isCancelling: {isCancelling}, cancelAccepted: {cancelAccepted}");
         switch (action)
         {
             case CashRegisterAction.Cancel:
@@ -181,6 +191,11 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
                 isBuying = false;
 
                 CashRegister?.cancelAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
+
+                //foreach (var module in CashRegister.registerModules)
+                //    module.ResetData();
+
+                CashRegister?.Cancel();
 
                 break;
 
@@ -194,64 +209,69 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
                 CashRegister?.buyAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
 
+                foreach(var module in CashRegister.registerModules)
+                    module.ResetData();
+
+                CashRegister?.OnUnitsToBuyChanged();
+
+                CashRegister.IsProcessingTransaction = false;
+
                 break;
 
             case CashRegisterAction.SetFunds:
+                CashRegister?.SetCash(amount);
 
-                if (CashRegister.DepositedCash == 0 && amount > 0)
-                {
-
-                }
                 break;
 
-            case CashRegisterAction.Reject:
+            case CashRegisterAction.RejectGeneric:
                 isBuying = false;
                 isCancelling = false;
                
+                break;
+
+            case CashRegisterAction.RejectFunds:
+                isBuying = false;
+                isCancelling = false;
+
+                CashRegister?.notEnoughMoneyAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
+
                 break;
         }
     }
 
     public IEnumerator Buy()
     {
-        if (isBuying || isCancelling)
+        if (isBuying || isCancelling || NetworkLifecycle.Instance.IsProcessingPacket)
             yield break;
 
         DisableInteraction();
+        CashRegister.IsProcessingTransaction = true;
 
         NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.Buy);
 
         isBuying = true;
-        buyAccepted = false;
         float timeOut = Time.time + NetworkLifecycle.Instance.Client.RPC_Timeout;
 
         yield return new WaitUntil(() => Time.time >= timeOut || isBuying == false);
 
-        if (!buyAccepted)
-            CashRegister?.cancelAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
-
         isBuying = false;
-        buyAccepted = false;
 
+        CashRegister.IsProcessingTransaction = false;
         EnableInteraction();
     }
 
     public IEnumerator Cancel()
     {
-        if (isBuying || isCancelling)
+        if (isBuying || isCancelling || NetworkLifecycle.Instance.IsProcessingPacket)
             yield break;
 
         DisableInteraction();
 
         NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.Cancel);
         isCancelling = true;
-        cancelAccepted = false;
         float timeOut = Time.time + NetworkLifecycle.Instance.Client.RPC_Timeout;
 
         yield return new WaitUntil(() => Time.time >= timeOut || isCancelling == false);
-
-        if (cancelAccepted)
-            CashRegister?.cancelAudio?.Play(transform.position, 1f, 1f, 0f, 1f, 500f, default, null, transform, false, 0f, null);
 
         isCancelling = false;
         cancelAccepted = false;
@@ -261,7 +281,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
     public void SetCash(double amount)
     {
-        if (isBuying || isCancelling || NetworkLifecycle.Instance.IsProcessingPacket)
+        if (isBuying || isCancelling || processingAction || NetworkLifecycle.Instance.IsProcessingPacket)
             return;
 
         NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.SetFunds, amount);
