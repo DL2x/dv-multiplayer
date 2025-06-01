@@ -1,5 +1,6 @@
 using DV.Damage;
 using LiteNetLib.Utils;
+using Multiplayer.Utils;
 using System;
 
 namespace Multiplayer.Networking.Data.Train;
@@ -32,7 +33,12 @@ public readonly struct TrainCarHealthData
 
             if (dmgCtrl.windows != null)
                 dmgCtrl.windows.windowsBroken = WindowsBroken;
+
+            return;
         }
+
+        var dmgModel = trainCar.GetComponent<CarDamageModel>();
+        dmgModel?.SetHealth(BodyHP);
     }
 
     public static TrainCarHealthData From(TrainCar trainCar)
