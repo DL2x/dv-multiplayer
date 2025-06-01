@@ -4,6 +4,8 @@ using JetBrains.Annotations;
 using UnityEngine;
 using UnityModManagerNet;
 using MPAPI;
+using MPAPI.Interfaces;
+using MultiplayerAPITest.TestComponents;
 
 namespace MultiplayerAPITest;
 
@@ -26,6 +28,11 @@ public static class MultiplayerAPITest
         {
             Log($"Multiplayer Mod is loaded: {MultiplayerAPI.IsMultiplayerLoaded}");
 
+            if (MultiplayerAPI.IsMultiplayerLoaded)
+            {
+                MultiplayerAPI.ServerStarted += OnServerStarted;
+                MultiplayerAPI.ClientStarted += OnClientStarted;
+            }
 
             Log("Patching...");
             harmony = new Harmony(ModEntry.Info.Id);
@@ -41,6 +48,18 @@ public static class MultiplayerAPITest
         }
 
         return true;
+    }
+
+    private static void OnServerStarted(IServer server)
+    {
+        GameObject go = new GameObject("MPAPI ServerTest", [typeof(ServerTest)]);
+        GameObject.DontDestroyOnLoad(go);
+    }
+
+    private static void OnClientStarted(IClient client)
+    {
+        GameObject go = new GameObject("MPAPI ClientTest", [typeof(ServerTest)]);
+        GameObject.DontDestroyOnLoad(go);
     }
 
     #region Logging
