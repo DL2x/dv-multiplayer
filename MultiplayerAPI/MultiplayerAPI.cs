@@ -1,9 +1,16 @@
 using MPAPI.Interfaces;
+using System;
 
 namespace MPAPI;
 
 public static class MultiplayerAPI
 {
+    public static event Action<IServer> ServerStarted;
+    public static event Action<IClient> ClientStarted;
+
+    public static event Action ServerStopped;
+    public static event Action ClientStopped;
+
     private static IMultiplayerAPI _instance;
     private static IServer _server;
     private static IClient _client;
@@ -44,6 +51,7 @@ public static class MultiplayerAPI
     internal static void RegisterClient(IClient client)
     {
         _client = client;
+        ClientStarted?.Invoke(client);
     }
 
     /// <summary>
@@ -52,6 +60,7 @@ public static class MultiplayerAPI
     internal static void ClearClient()
     {
         _client = null;
+        ClientStopped?.Invoke();
     }
 
     /// <summary>
@@ -61,6 +70,7 @@ public static class MultiplayerAPI
     internal static void RegisterServer(IServer server)
     {
         _server = server;
+        ServerStarted?.Invoke(server);
     }
 
 
@@ -70,5 +80,6 @@ public static class MultiplayerAPI
     internal static void ClearServer()
     {
         _server = null;
+        ServerStopped?.Invoke();
     }
 }
