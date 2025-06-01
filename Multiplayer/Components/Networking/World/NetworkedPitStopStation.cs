@@ -71,11 +71,13 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     const float FAUCET_SNAP_THRESHOLD = 0.005f;
 
     const float DEFAULT_DISABLER_SQR_DISTANCE = 250000f;
+    const float DEFAULT_DISABLER_INTERVAL = 2f;
     const float NEARBY_REMOVAL_DELAY = 3f;
 
     #region Server variables
     private Dictionary<byte, float> playerToLastNearbyTime;
     private float disablerSqrDistance = DEFAULT_DISABLER_SQR_DISTANCE;
+    private float disablerCheckInterval = DEFAULT_DISABLER_INTERVAL;
 
     private bool processingAsHost = false;
     #endregion
@@ -126,9 +128,12 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
             var disabler = GetComponentInParent<PlayerDistanceGameObjectsDisabler>();
             if (disabler != null)
+            {
                 disablerSqrDistance = disabler.disableSqrDistance;
+                disablerCheckInterval = disabler.checkPeriodPerGO;
+            }
 
-            NetworkLifecycle.Instance.OnTick += PlayerDistanceChecker;
+            StartCoroutine(PlayerDistanceChecker());
 
             //ensure host can interact
             Refreshed = true;
@@ -144,6 +149,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     protected override void OnDestroy()
     {
         pitStopStationToNetworkedPitStopStation.Remove(Station);
+
+        if (NetworkLifecycle.Instance.IsHost())
+            StopCoroutine(PlayerDistanceChecker());
 
         if (carSelectorGrab != null)
         {
@@ -309,60 +317,68 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         //Multiplayer.LogWarning($"OnPlayerDisconnect()");
     }
 
-    private void PlayerDistanceChecker(uint tick)
+    private IEnumerator PlayerDistanceChecker()
     {
-        //if not active then there is no one close by
-        if (gameObject == null || !gameObject.activeInHierarchy || Station == null || Station.pitstop == null)
-            return;
+        //wait for game to finish loading
+        yield return new WaitForSeconds(1f);
 
-        foreach (var player in NetworkLifecycle.Instance.Server.ServerPlayers)
+        while (true)
         {
-            if (player.Id == NetworkLifecycle.Instance.Server.SelfId || !player.IsLoaded)
-                continue;
+            yield return new WaitForSeconds(disablerCheckInterval);
 
-            float sqrDistance = (player.WorldPosition - transform.position).sqrMagnitude;
-
-            bool initialised = playerToLastNearbyTime.TryGetValue(player.Id, out float lastVisit);
-
-            if (sqrDistance > disablerSqrDistance)
+            //if not active then there is no one close by
+            if (gameObject != null && gameObject.activeInHierarchy && Station != null && Station.pitstop != null)
             {
-                // Too far away for too long, stop tracking
-                if ((Time.time - lastVisit) > NEARBY_REMOVAL_DELAY)
-                    playerToLastNearbyTime.Remove(player.Id);
-
-                continue;
-            }
-
-            //player nearby recently, update time
-            playerToLastNearbyTime[player.Id] = Time.time;
-
-            if (!initialised)
-            {
-                if (!NetworkLifecycle.Instance.Server.TryGetPeer(player.Id, out var peer))
-                    continue;
-
-                if (Station.pitstop.IsCarInPitStop())
+                foreach (var player in NetworkLifecycle.Instance.Server.ServerPlayers)
                 {
-                    // One struct per module type
-                    var resourceCount = Station.locoResourceModules.resourceModules.Count();
-                    LocoResourceModuleData[] stateData = new LocoResourceModuleData[resourceCount];
-                    int i;
-                    for (i = 0; i < resourceCount; i++)
+                    if (player.Id == NetworkLifecycle.Instance.Server.SelfId || !player.IsLoaded)
+                        continue;
+
+                    float sqrDistance = (player.WorldPosition - transform.position).sqrMagnitude;
+
+                    bool initialised = playerToLastNearbyTime.TryGetValue(player.Id, out float lastVisit);
+
+                    if (sqrDistance > disablerSqrDistance)
                     {
-                        stateData[i] = LocoResourceModuleData.From(Station.locoResourceModules.resourceModules[i]);
+                        // Too far away for too long, stop tracking
+                        if ((Time.time - lastVisit) > NEARBY_REMOVAL_DELAY)
+                            playerToLastNearbyTime.Remove(player.Id);
+
+                        continue;
                     }
 
-                    PitStopPlugData[] plugData = new PitStopPlugData[resourceToPluggableObject.Count];
+                    //player nearby recently, update time
+                    playerToLastNearbyTime[player.Id] = Time.time;
 
-                    i = 0;
-                    foreach (var plug in resourceToPluggableObject)
+                    if (!initialised)
                     {
-                        plugData[i] = PitStopPlugData.From(plug.Value);
-                        i++;
-                    }
+                        if (!NetworkLifecycle.Instance.Server.TryGetPeer(player.Id, out var peer))
+                            continue;
 
-                    // Send current state
-                    NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, stateData, plugData, peer);
+                        if (Station.pitstop.IsCarInPitStop())
+                        {
+                            // One struct per module type
+                            var resourceCount = Station.locoResourceModules.resourceModules.Count();
+                            LocoResourceModuleData[] stateData = new LocoResourceModuleData[resourceCount];
+                            int i;
+                            for (i = 0; i < resourceCount; i++)
+                            {
+                                stateData[i] = LocoResourceModuleData.From(Station.locoResourceModules.resourceModules[i]);
+                            }
+
+                            PitStopPlugData[] plugData = new PitStopPlugData[resourceToPluggableObject.Count];
+
+                            i = 0;
+                            foreach (var plug in resourceToPluggableObject)
+                            {
+                                plugData[i] = PitStopPlugData.From(plug.Value);
+                                i++;
+                            }
+
+                            // Send current state
+                            NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, stateData, plugData, peer);
+                        }
+                    }
                 }
             }
         }
