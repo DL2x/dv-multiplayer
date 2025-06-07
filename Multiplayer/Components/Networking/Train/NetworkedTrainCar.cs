@@ -166,7 +166,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         brakeSystem = TrainCar.brakeSystem;
 
-        Multiplayer.LogDebug(() => $"TrainCar Created: {TrainCar?.ID}, {NetId}");
+        Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId})");
 
         foreach (Coupler coupler in TrainCar.couplers)
         {
@@ -178,6 +178,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             if (coupler.ChainScript != null)
                 coupler.ChainScript.StateChanged += (state) => { Client_CouplerStateChange(state, coupler); };
         }
+
+        //Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId}) Couplers complete");
 
         SimController simController = GetComponent<SimController>();
         if (simController != null)
@@ -203,6 +205,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             }
         }
 
+        //Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId}) SimController complete");
+
         brakeSystem.HandbrakePositionChanged += Common_OnHandbrakePositionChanged;
         brakeSystem.BrakeCylinderReleased += Common_OnBrakeCylinderReleased;
 
@@ -212,6 +216,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             TrainCar.PaintInterior.OnThemeChanged += Common_OnPaintThemeChange;
 
         NetworkLifecycle.Instance.OnTick += Common_OnTick;
+
+        //Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId}) CommonTick subscribed");
 
         if (NetworkLifecycle.Instance.IsHost())
         {
@@ -226,6 +232,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate += Server_CarHealthUpdate;
 
+            //Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId}) Subscribing to DamageControllers");
+
             //find all TrainDamages and subscribe
             if (TryGetComponent<DamageController>(out DamageController damageController))
             {
@@ -235,6 +243,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                     .Select(field => new { Field = field, Damage = (TrainDamage)field.GetValue(damageController) })
                     .Where(value => value != null)
                     .ToArray();
+
+                //Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId}) Subscribing to DamageControllers. TrainDamageFields: {trainDamageFields?.Length}");
 
                 if (trainDamageFields != null && trainDamageFields.Length > 0)
                 {
@@ -256,6 +266,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                 }
             }
 
+            //Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId}) DamageControllers subscribed");
+
             brakeSystem.MainResPressureChanged += Server_MainResUpdate;
             brakeSystem.heatController.OverheatingActiveStateChanged += Server_BrakeHeatUpdate;
 
@@ -264,6 +276,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                 firebox.fireboxContentsPort.ValueUpdatedInternally += Common_OnFireboxUpdate;
                 firebox.fireOnPort.ValueUpdatedInternally += Common_OnFireboxUpdate;
             }
+
+            //Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId}) Firebox subscribed");
 
             StartCoroutine(Server_WaitForLogicCar());
         }

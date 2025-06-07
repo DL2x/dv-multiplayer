@@ -42,7 +42,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             .ThenBy(p => p.transform.position.z)
             .ToArray();
 
-        Multiplayer.LogDebug(() => $"InitialisePitStops() Found: {stations?.Length}");
+        //Multiplayer.LogDebug(() => $"InitialisePitStops() Found: {stations?.Length}");
 
         foreach (var station in stations)
         {
@@ -54,7 +54,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
             pitStopStationToNetworkedPitStopStation[station] = netStation;
 
-            Multiplayer.LogDebug(() => $"InitialisePitStops() Station: {station?.GetObjectPath()}, netId: {netStation.NetId}");
+            //Multiplayer.LogDebug(() => $"InitialisePitStops() Station: {station?.GetObjectPath()}, netId: {netStation.NetId}");
 
             CoroutineManager.Instance.StartCoroutine(netStation.Init());
 

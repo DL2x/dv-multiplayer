@@ -82,10 +82,10 @@ public static class PlayerDistanceGameObjectsDisablerPatch
 
         foreach (CodeInstruction instruction in instructions)
         {
-            Multiplayer.LogDebug(() => $"Checking instruction: {instruction}");
+            //Multiplayer.LogDebug(() => $"Checking instruction: {instruction}");
             if (instruction.opcode == OpCodes.Call && instruction.operand?.ToString() == targetMethod.operand?.ToString())
             {
-                Multiplayer.LogDebug(() => "Found target method, replacing");
+                //Multiplayer.LogDebug(() => "Found target method, replacing");
                 newCode.Add(new CodeInstruction(OpCodes.Ldloc_1));
                 newCode.Add(newMethod);                        //skip 0
                 newCode.Add(new CodeInstruction(OpCodes.Nop)); //skip 1

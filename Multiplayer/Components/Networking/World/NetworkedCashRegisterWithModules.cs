@@ -41,7 +41,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
             .ThenBy(r => r.transform.position.z)
             .ToArray();
 
-        Multiplayer.LogDebug(() => $"InitialiseCashRegisters() Found: {registers?.Length}");
+        //Multiplayer.LogDebug(() => $"InitialiseCashRegisters() Found: {registers?.Length}");
 
         foreach (var register in registers)
         {
@@ -53,7 +53,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
             cashRegisterToNetworkedCashRegister[register] = netRegister;
 
-            Multiplayer.LogDebug(() => $"InitialiseCashRegisters() Register: {register?.GetObjectPath()}, netId: {netRegister.NetId}");
+            //Multiplayer.LogDebug(() => $"InitialiseCashRegisters() Register: {register?.GetObjectPath()}, netId: {netRegister.NetId}");
         }
     }
 
@@ -82,7 +82,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
     protected override void Awake()
     {
-        Multiplayer.LogDebug(()=>$"CashRegisterWithModules.Awake() {transform.GetObjectPath()}, {transform.position}, netId: {NetId}");
+        //Multiplayer.LogDebug(()=>$"CashRegisterWithModules.Awake() {transform.GetObjectPath()}, {transform.position}, netId: {NetId}");
 
         if (NetId == 0)
             base.Awake();
