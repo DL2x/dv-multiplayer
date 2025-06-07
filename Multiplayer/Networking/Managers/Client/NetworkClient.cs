@@ -524,7 +524,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundDestroyTrainCarPacket(ClientboundDestroyTrainCarPacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar netTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
         {
             LogWarning($"Received DestroyTrainCarPacket for netId: {packet.NetId}, but NetworkedTrainCar was not found.");
             return;
@@ -566,7 +566,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonCouplerInteractionPacket(CommonCouplerInteractionPacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out var netTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
         {
             LogError($"OnCommonCouplerInteractionPacket netId: {packet.NetId}, TrainCar not found!");
             return;
@@ -579,7 +579,7 @@ public class NetworkClient : NetworkManager
         //    TrainCar trainCar = null;
         //    TrainCar otherTrainCar = null;
 
-        //    if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out trainCar) || !NetworkedTrainCar.GetTrainCar(packet.OtherNetId, out otherTrainCar))
+        //    if (!NetworkedTrainCar.TryGet(packet.NetId, out trainCar) || !NetworkedTrainCar.TryGet(packet.OtherNetId, out otherTrainCar))
         //    {
         //        LogDebug(() => $"OnCommonTrainCouplePacket() netId: {packet.NetId}, trainCar found?: {trainCar != null}, otherNetId: {packet.OtherNetId}, otherTrainCar found?: {otherTrainCar != null}");
         //        return;
@@ -596,7 +596,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonTrainUncouplePacket(CommonTrainUncouplePacket packet)
     {
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
         {
             LogDebug(() => $"OnCommonTrainUncouplePacket() netId: {packet.NetId}, trainCar found?: {trainCar != null}");
             return;
@@ -610,8 +610,8 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonHoseConnectedPacket(CommonHoseConnectedPacket packet)
     {
-        bool foundTrainCar = NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar);
-        bool foundOtherTrainCar = NetworkedTrainCar.GetTrainCar(packet.OtherNetId, out TrainCar otherTrainCar);
+        bool foundTrainCar = NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar);
+        bool foundOtherTrainCar = NetworkedTrainCar.TryGet(packet.OtherNetId, out TrainCar otherTrainCar);
 
         if (!foundTrainCar || trainCar == null ||
             !foundOtherTrainCar || otherTrainCar == null)
@@ -656,7 +656,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonHoseDisconnectedPacket(CommonHoseDisconnectedPacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar netTrainCar) || netTrainCar.IsDestroying)
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar) || netTrainCar.IsDestroying)
             return;
 
         TrainCar trainCar = netTrainCar.TrainCar;
@@ -670,7 +670,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonMuConnectedPacket(CommonMuConnectedPacket packet)
     {
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar) || !NetworkedTrainCar.GetTrainCar(packet.OtherNetId, out TrainCar otherTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar) || !NetworkedTrainCar.TryGet(packet.OtherNetId, out TrainCar otherTrainCar))
             return;
 
         MultipleUnitCable cable = packet.IsFront ? trainCar.muModule.frontCable : trainCar.muModule.rearCable;
@@ -681,7 +681,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonMuDisconnectedPacket(CommonMuDisconnectedPacket packet)
     {
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
             return;
 
         MultipleUnitCable cable = packet.IsFront ? trainCar.muModule.frontCable : trainCar.muModule.rearCable;
@@ -691,7 +691,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonCockFiddlePacket(CommonCockFiddlePacket packet)
     {
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
             return;
 
         Coupler coupler = packet.IsFront ? trainCar.frontCoupler : trainCar.rearCoupler;
@@ -701,7 +701,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonBrakeCylinderReleasePacket(CommonBrakeCylinderReleasePacket packet)
     {
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
             return;
 
         trainCar.brakeSystem.ReleaseBrakeCylinderPressure();
@@ -709,7 +709,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonHandbrakePositionPacket(CommonHandbrakePositionPacket packet)
     {
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
             return;
 
         trainCar.brakeSystem.SetHandbrakePosition(packet.Position);
@@ -717,7 +717,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonSimFlowPacket(CommonTrainPortsPacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
         networkedTrainCar.Common_UpdatePorts(packet);
@@ -725,7 +725,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonTrainFusesPacket(CommonTrainFusesPacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
         networkedTrainCar.Common_UpdateFuses(packet);
@@ -733,7 +733,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundBrakeStateUpdatePacket(ClientboundBrakeStateUpdatePacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
 
@@ -744,7 +744,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundFireboxStatePacket(ClientboundFireboxStatePacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
 
@@ -753,7 +753,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundCargoStatePacket(ClientboundCargoStatePacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
         LogDebug(() => $"OnClientboundCargoStatePacket() {networkedTrainCar.CurrentID}, health: {packet.CargoHealth}");
@@ -822,7 +822,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundCargoHealthUpdatePacket(ClientboundCargoHealthUpdatePacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
         CargoDamageModel cargoDamageModel = networkedTrainCar.TrainCar.CargoDamage;
@@ -840,7 +840,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundCarHealthUpdatePacket(ClientboundCarHealthUpdatePacket packet)
     {
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
             return;
 
         packet.Health.LoadTo(trainCar);
@@ -849,9 +849,9 @@ public class NetworkClient : NetworkManager
     private void OnClientboundRerailTrainPacket(ClientboundRerailTrainPacket packet)
     {
 
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
             return;
-        if (!NetworkedRailTrack.Get(packet.TrackId, out NetworkedRailTrack networkedRailTrack))
+        if (!NetworkedRailTrack.TryGet(packet.TrackId, out NetworkedRailTrack networkedRailTrack))
             return;
 
         Log($"Rerailing [{trainCar?.ID}, {packet.NetId}] to track {networkedRailTrack?.RailTrack?.LogicTrack()?.ID}");
@@ -861,7 +861,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundWindowsBrokenPacket(ClientboundWindowsBrokenPacket packet)
     {
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
             return;
         DamageController damageController = trainCar.GetComponent<DamageController>();
         if (damageController == null)
@@ -874,7 +874,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundWindowsRepairedPacket(ClientboundWindowsRepairedPacket packet)
     {
-        if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
             return;
         DamageController damageController = trainCar.GetComponent<DamageController>();
         if (damageController == null)
@@ -1002,7 +1002,7 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonPaintThemePacket(CommonPaintThemePacket packet)
     {
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar netTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
             return;
 
         Log($"Received paint theme change for {netTrainCar?.CurrentID}");

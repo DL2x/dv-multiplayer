@@ -965,7 +965,7 @@ public class NetworkServer : NetworkManager
         }
 
         //todo: add validation that to ensure the client is near the coupler - this packet may also be used for remote operations and may need to factor that in in the future
-        if(NetworkedTrainCar.Get(packet.NetId, out var netTrainCar))
+        if(NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
         {
             if(netTrainCar.Server_ValidateCouplerInteraction(packet, player))
             {
@@ -1051,7 +1051,7 @@ public class NetworkServer : NetworkManager
         if (!TryGetServerPlayer(peer, out ServerPlayer player))
             return;
 
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
         //is value valid?
@@ -1074,7 +1074,7 @@ public class NetworkServer : NetworkManager
         if (!TryGetServerPlayer(peer, out ServerPlayer player))
             return;
 
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
         if (!NetworkLifecycle.Instance.IsHost(peer))
@@ -1090,7 +1090,7 @@ public class NetworkServer : NetworkManager
     {
         if (!TryGetServerPlayer(peer, out ServerPlayer player))
             return;
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
         //if not the host && validation fails then ignore packet
@@ -1115,7 +1115,7 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundTrainSyncRequestPacket(ServerboundTrainSyncRequestPacket packet)
     {
-        if (NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             networkedTrainCar.Server_DirtyAllState();
     }
 
@@ -1123,7 +1123,7 @@ public class NetworkServer : NetworkManager
     {
         if (!TryGetServerPlayer(peer, out ServerPlayer player))
             return;
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
         if (networkedTrainCar.HasPlayers)
@@ -1158,9 +1158,9 @@ public class NetworkServer : NetworkManager
     {
         if (!TryGetServerPlayer(peer, out ServerPlayer player))
             return;
-        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
-        if (!NetworkedRailTrack.Get(packet.TrackId, out NetworkedRailTrack networkedRailTrack))
+        if (!NetworkedRailTrack.TryGet(packet.TrackId, out NetworkedRailTrack networkedRailTrack))
             return;
 
         TrainCar trainCar = networkedTrainCar.TrainCar;

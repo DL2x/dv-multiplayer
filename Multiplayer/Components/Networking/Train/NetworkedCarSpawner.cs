@@ -156,7 +156,7 @@ public static class NetworkedCarSpawner
 
         if (couplingData.IsCoupled)
         {
-            if (!NetworkedTrainCar.GetTrainCar(couplingData.ConnectionNetId, out TrainCar otherCar))
+            if (!NetworkedTrainCar.TryGet(couplingData.ConnectionNetId, out TrainCar otherCar))
             {
                 Multiplayer.LogWarning($"HandleCoupling([{currentCoupler?.train?.ID}, {currentCoupler?.train?.GetNetId()}]) did not find car at {(currentCoupler.isFrontCoupler ? "Front" : "Rear")} car with netId: {couplingData.ConnectionNetId}");
             }

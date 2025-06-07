@@ -127,7 +127,7 @@ public class NetworkedPlayer : MonoBehaviour
 
     public void UpdateCar(ushort netId)
     {
-        IsOnCar = NetworkedTrainCar.GetTrainCar(netId, out var trainCar);
+        IsOnCar = NetworkedTrainCar.TryGet(netId, out TrainCar trainCar);
         OccupiedCar = trainCar;
 
         if (IsOnCar)

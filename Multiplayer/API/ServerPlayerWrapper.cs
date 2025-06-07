@@ -36,7 +36,7 @@ public class ServerPlayerWrapper : IPlayer
 
     internal TrainCar GetOccupiedCar()
     {
-        NetworkedTrainCar.GetTrainCar(_serverPlayer.CarId, out var trainCar);
+        NetworkedTrainCar.TryGet(_serverPlayer.CarId, out TrainCar trainCar);
         return trainCar;
     }
 }

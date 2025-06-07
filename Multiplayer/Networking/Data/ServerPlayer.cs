@@ -65,7 +65,7 @@ public class ServerPlayer : IDisposable
             Vector3 pos;
             try
             {
-                if (CarId == 0 || !NetworkedTrainCar.Get(CarId, out NetworkedTrainCar car))
+                if (CarId == 0 || !NetworkedTrainCar.TryGet(CarId, out NetworkedTrainCar car))
                 {
                     if (CarId != 0)
                         Multiplayer.LogDebug(() => $"AbsoluteWorldPosition() noID {Username}: CarId: {CarId}");
@@ -99,7 +99,7 @@ public class ServerPlayer : IDisposable
             Vector3 pos;
             try
             {
-                if (CarId == 0 || !NetworkedTrainCar.Get(CarId, out NetworkedTrainCar car))
+                if (CarId == 0 || !NetworkedTrainCar.TryGet(CarId, out NetworkedTrainCar car))
                 {
                     if(CarId != 0)
                         Multiplayer.LogDebug(() =>$"WorldPosition() noID {Username}: CarId: {CarId}");
@@ -126,7 +126,7 @@ public class ServerPlayer : IDisposable
             return pos;
         }
     }  
-    public float WorldRotationY => CarId == 0 || !NetworkedTrainCar.Get(CarId, out NetworkedTrainCar car)
+    public float WorldRotationY => CarId == 0 || !NetworkedTrainCar.TryGet(CarId, out NetworkedTrainCar car)
         ? RawRotationY
         : (Quaternion.Euler(0, RawRotationY, 0) * car.transform.rotation).eulerAngles.y;
     #endregion

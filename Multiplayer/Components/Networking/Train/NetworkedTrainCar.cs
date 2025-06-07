@@ -32,17 +32,17 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private static readonly Dictionary<string, TrainCar> trainCarIdToTrainCars = [];
     private static readonly Dictionary<HoseAndCock, Coupler> hoseToCoupler = [];
 
-    public static bool Get(ushort netId, out NetworkedTrainCar obj)
+    public static bool TryGet(ushort netId, out NetworkedTrainCar obj)
     {
         bool b = Get(netId, out IdMonoBehaviour<ushort, NetworkedTrainCar> rawObj);
         obj = (NetworkedTrainCar)rawObj;
         return b;
     }
 
-    public static bool GetTrainCar(ushort netId, out TrainCar obj)
+    public static bool TryGet(ushort netId, out TrainCar trainCar)
     {
-        bool b = Get(netId, out NetworkedTrainCar networkedTrainCar);
-        obj = b ? networkedTrainCar.TrainCar : null;
+        bool b = TryGet(netId, out NetworkedTrainCar networkedTrainCar);
+        trainCar = b ? networkedTrainCar.TrainCar : null;
         return b;
     }
 
@@ -65,7 +65,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         return trainCarsToNetworkedTrainCars.TryGetValue(trainCar, out networkedTrainCar);
     }
 
-    public static bool TryGetNetIdFromTrainCar(TrainCar trainCar, out ushort netId)
+    public static bool TryGetNetId(TrainCar trainCar, out ushort netId)
     {
         netId = 0;
 
@@ -885,7 +885,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         if (packet.OtherNetId != 0)
         {
-            if (GetTrainCar(packet.OtherNetId, out otherCar))
+            if (TryGet(packet.OtherNetId, out otherCar))
                 otherCoupler = packet.IsFrontOtherCoupler ? otherCar?.frontCoupler : otherCar?.rearCoupler;
         }
 

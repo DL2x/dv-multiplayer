@@ -180,7 +180,7 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
     {
 
         List<Car> cars = CarNetIDs
-            .Select(netId => NetworkedTrainCar.GetTrainCar(netId, out TrainCar trainCar) ? trainCar : null)
+            .Select(netId => NetworkedTrainCar.TryGet(netId, out TrainCar trainCar) ? trainCar : null)
             .Where(car => car != null)
             .Select(car =>car.logicCar)
             .ToList();
@@ -297,7 +297,7 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
         //Multiplayer.LogDebug(() => $"TransportTaskData.ToTask() CarNetIDs !null {CarNetIDs != null}, count: {CarNetIDs?.Length}");
 
         List<Car> cars = CarNetIDs
-            .Select(netId => NetworkedTrainCar.GetTrainCar(netId, out TrainCar trainCar) ? trainCar.logicCar : null)
+            .Select(netId => NetworkedTrainCar.TryGet(netId, out TrainCar trainCar) ? trainCar.logicCar : null)
             .Where(car => car != null)
             .ToList();
 

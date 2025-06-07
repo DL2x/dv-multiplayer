@@ -568,7 +568,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         gameObject.SetActive(true);
         Multiplayer.LogDebug(() => $"NetworkedItem.HandleAttachedState() ItemNetId: {snapshot?.ItemNetId} attempting attachment to car {snapshot.CarNetId}, at the front {snapshot.AttachedFront}");
 
-        if (!NetworkedTrainCar.GetTrainCar(snapshot.CarNetId, out TrainCar trainCar))
+        if (!NetworkedTrainCar.TryGet(snapshot.CarNetId, out TrainCar trainCar))
         {
             Multiplayer.LogWarning($"NetworkedItem.HandleAttachedState() CarNetId: {snapshot?.CarNetId} not found for ItemNetId: {snapshot?.ItemNetId}");
             return;
