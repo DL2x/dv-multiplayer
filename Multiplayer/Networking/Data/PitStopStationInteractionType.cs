@@ -5,8 +5,7 @@ namespace Multiplayer.Networking.Data;
 public enum PitStopStationInteractionType : byte
 {
     Reject,
-    ResourceGrab,
-    ResourceUngrab,
+    LeverState,
     ResourceUpdate,
 
     CarSelectorGrab,
@@ -16,8 +15,4 @@ public enum PitStopStationInteractionType : byte
     FaucetGrab,
     FaucetUngrab,
     FaucetPosition,
-
-    PayOrder,
-    CancelOrder,
-    ProcessOrder
 }
