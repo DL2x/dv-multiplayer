@@ -1412,16 +1412,18 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableOrdered);
     }
 
-    public void SendPitStopPlugInteractionPacket(ushort netId, PlugInteractionType interaction, ushort trainCarNetId = 0, bool left = false)
+    public void SendPitStopPlugInteractionPacket(ushort netId, PlugInteractionType interaction, Vector3? position = null, Quaternion? rotation = null, ushort trainCarNetId = 0, bool isConnectedLeft = false)
     {
-        LogDebug(()=>$"SendPitStopInteractionPacket({netId}, {interaction}, {trainCarNetId}, {left})");
+        LogDebug(()=>$"SendPitStopInteractionPacket({netId}, {interaction}, {position}, {rotation}, {trainCarNetId}, {isConnectedLeft})");
 
         SendPacketToServer(new CommonPitStopPlugInteractionPacket
         {
             NetId = netId,
-            InteractionType = (byte)interaction,
+            InteractionType = interaction,
             TrainCarNetId = trainCarNetId,
-            IsLeftSide = left,
+            IsLeftSide = isConnectedLeft,
+            Position = position,
+            Rotation = rotation,
 
         }, DeliveryMethod.ReliableOrdered);
     }

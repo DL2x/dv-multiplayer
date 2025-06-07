@@ -137,24 +137,17 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     public void ProcessPacket(CommonPitStopPlugInteractionPacket packet)
     {
         var interaction = (PlugInteractionType)packet.InteractionType;
-        ProcessInteraction(interaction, packet.PlayerId, packet.TrainCarNetId, packet.IsLeftSide);
+        ProcessInteraction(interaction, packet.PlayerId, packet.TrainCarNetId, packet.IsLeftSide, packet.Position, packet.Rotation);
     }
 
     public void ProcessBulkUpdate(PitStopPlugData data)
     {
         var interaction = data.State;
-        ProcessInteraction(interaction, data.PlayerId, data.TrainCarNetId, data.IsLeftSide);
-
-        if (data.State == PlugInteractionType.Dropped)
-        {
-            transform.position = data.Position + WorldMover.currentMove;
-            transform.rotation = data.Rotation;
-        }
-
+        ProcessInteraction(interaction, data.PlayerId, data.TrainCarNetId, data.IsLeftSide, data.Position, data.Rotation);
         Refreshed = true;
     }
 
-    public void ProcessInteraction(PlugInteractionType interaction, byte playerId, ushort trainNetId, bool isLeftSide)
+    public void ProcessInteraction(PlugInteractionType interaction, byte playerId, ushort trainNetId, bool isLeftSide, Vector3? newPosition, Quaternion? newRotation)
     {
 
         bool result;
@@ -205,7 +198,13 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
                 BlockInteraction(false);
 
                 PluggableObject.Unplug();
- 
+
+                if (newPosition == null || newRotation == null)
+                    return;
+
+                transform.position = (Vector3)newPosition + WorldMover.currentMove;
+                transform.rotation = (Quaternion)newRotation;
+
                 break;
 
             case PlugInteractionType.DockHome:
@@ -328,7 +327,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
             return;
 
         Multiplayer.LogDebug(() => $"NetworkedPluggableObject.OnUngrabbed() [{transform.parent.name}, {NetId}] station: {Station?.StationName}");
-        NetworkLifecycle.Instance.Client?.SendPitStopPlugInteractionPacket(NetId, PlugInteractionType.Dropped);
+        NetworkLifecycle.Instance.Client?.SendPitStopPlugInteractionPacket(NetId, PlugInteractionType.Dropped, transform.position - WorldMover.currentMove, transform.rotation);
     }
 
     private void OnPlugged(PluggableObject plug, PlugSocket socket)
@@ -344,7 +343,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
         PlugInteractionType interaction;
         bool left = false;
-        ushort trainCarNetId = 0;
+        ushort carNetId = 0;
 
         if (socket == plug.startAttachedTo)
             interaction = PlugInteractionType.DockHome;
@@ -359,7 +358,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
                     return;
                 }
 
-                trainCarNetId = netTrainCar.NetId;
+                carNetId = netTrainCar.NetId;
 
                 interaction = PlugInteractionType.DockSocket;
                 var sockets = trainCar.GetComponentsInChildren<PlugSocket>();
@@ -373,7 +372,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
             }
         }
 
-        NetworkLifecycle.Instance.Client?.SendPitStopPlugInteractionPacket(NetId, interaction, trainCarNetId, left);
+        NetworkLifecycle.Instance.Client?.SendPitStopPlugInteractionPacket(NetId, interaction, trainCarNetId: carNetId, isConnectedLeft: left);
     }
     #endregion
 }
