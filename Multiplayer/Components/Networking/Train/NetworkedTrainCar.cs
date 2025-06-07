@@ -235,13 +235,13 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             //Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId}) Subscribing to DamageControllers");
 
             //find all TrainDamages and subscribe
-            if (TryGetComponent<DamageController>(out DamageController damageController))
+            if (TryGetComponent<DamageController>(out DamageController damageController) && damageController != null)
             {
                 var trainDamageFields = typeof(DamageController)
                     .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(field => field.FieldType == typeof(TrainDamage))
                     .Select(field => new { Field = field, Damage = (TrainDamage)field.GetValue(damageController) })
-                    .Where(value => value != null)
+                    .Where(value => value.Damage != null)
                     .ToArray();
 
                 //Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({TrainCar?.ID}, {NetId}) Subscribing to DamageControllers. TrainDamageFields: {trainDamageFields?.Length}");
