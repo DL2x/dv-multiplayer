@@ -32,6 +32,79 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         return b;
     }
 
+
+    public static bool TryGet(ushort netId, out StationController stationController)
+    {
+        if (Get(netId, out var networkedStationController))
+        {
+            stationController = networkedStationController.StationController;
+            return true;
+        }
+
+        stationController = null;
+        return false;
+    }
+
+    public static bool TryGet(ushort netId, out Station station)
+    {
+        if (Get(netId, out var networkedStationController))
+        {
+            station = networkedStationController.StationController.logicStation;
+            return true;
+        }
+
+        station = null;
+        return false;
+    }
+
+    public static bool TryGet(ushort netId, out JobValidator jobValidator)
+    {
+        if (Get(netId, out var networkedStationController))
+        {
+            jobValidator = networkedStationController.JobValidator;
+            return true;
+        }
+
+        jobValidator = null;
+        return false;
+    }
+
+    public static bool TryGetNetId(StationController stationController, out ushort netId)
+    {
+        if (GetFromStationController(stationController, out var networkedStationController))
+        {
+            netId = networkedStationController.NetId;
+            return true;
+        }
+
+        netId = 0;
+        return false;
+    }
+
+    public static bool TryGetNetId(Station station, out ushort netId)
+    {
+        if (GetFromStation(station, out var networkedStationController))
+        {
+            netId = networkedStationController.NetId;
+            return true;
+        }
+
+        netId = 0;
+        return false;
+    }
+
+    public static bool TryGetNetId(JobValidator jobValidator, out ushort netId)
+    {
+        if (GetFromJobValidator(jobValidator, out var networkedStationController))
+        {
+            netId = networkedStationController.NetId;
+            return true;
+        }
+
+        netId = 0;
+        return false;
+    }
+
     public static Dictionary<ushort, string>GetAll()
     {
         Dictionary<ushort, string> result = [];
@@ -328,7 +401,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         //extract all cars from the job and verify they have been initialised
         foreach (var carNetId in jobData.GetCars())
         {
-            if (!NetworkedTrainCar.Get(carNetId, out NetworkedTrainCar car) || !car.Client_Initialized)
+            if (!NetworkedTrainCar.TryGet(carNetId, out NetworkedTrainCar car) || !car.Client_Initialized)
             {
                 //car not spawned or not yet initialised
                 return false;
@@ -523,7 +596,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
             while (frameCounter < MAX_FRAMES)
             {
 
-                if (NetworkedTrainCar.GetTrainCar(carNetId, out trainCar) &&
+                if (NetworkedTrainCar.TryGet(carNetId, out trainCar) &&
                     trainCar != null &&
                     trainCar.trainPlatesCtrl?.trainCarPlates != null &&
                     trainCar.trainPlatesCtrl.trainCarPlates.Count > 0)

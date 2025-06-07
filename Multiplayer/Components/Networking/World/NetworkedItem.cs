@@ -57,6 +57,18 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     {
         return itemBaseToNetworkedItem.TryGetValue(item, out networkedItem);
     }
+
+    public static bool TryGetNetId(ItemBase item, out ushort netID)
+    {
+        if (itemBaseToNetworkedItem.TryGetValue(item, out var networkedItem))
+        {
+            netID = networkedItem.NetId;
+            return true;
+        }
+
+        netID = 0;
+        return false;
+    }
     #endregion
 
     private const float PositionThreshold = 0.1f;

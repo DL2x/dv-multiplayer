@@ -1,7 +1,11 @@
+using DV.CabControls;
+using DV.Logic.Job;
 using DV.Utils;
 using JetBrains.Annotations;
 using MPAPI.Interfaces;
+using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
+using Multiplayer.Components.Networking.World;
 using System;
 using System.Collections.Generic;
 
@@ -17,7 +21,19 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
     protected override void Awake()
     {
         base.Awake();
-        RegisterHandler<TrainCar>(NetworkedTrainCar.TryGetNetIdFromTrainCar, NetworkedTrainCar.GetTrainCar);
+        RegisterHandler<TrainCar>(NetworkedTrainCar.TryGetNetId, NetworkedTrainCar.TryGet);
+
+        RegisterHandler<Junction>(NetworkedJunction.TryGetNetId, NetworkedJunction.TryGet);
+        RegisterHandler<TurntableRailTrack>(NetworkedTurntable.TryGetNetId, NetworkedTurntable.TryGet);
+        RegisterHandler<RailTrack>(NetworkedRailTrack.TryGetNetId, NetworkedRailTrack.TryGet);
+
+        RegisterHandler<StationController>(NetworkedStationController.TryGetNetId, NetworkedStationController.TryGet);
+        RegisterHandler<Station>(NetworkedStationController.TryGetNetId, NetworkedStationController.TryGet);
+        RegisterHandler<JobValidator>(NetworkedStationController.TryGetNetId, NetworkedStationController.TryGet);
+
+        RegisterHandler<Job>(NetworkedJob.TryGetNetId, NetworkedJob.GetJob);
+
+        RegisterHandler<ItemBase>(NetworkedItem.TryGetNetId, NetworkedItem.GetItem);
     }
 
     public void RegisterHandler<T>(TryGetNetIdDelegate<T> tryGetNetId, TryGetObjectDelegate<T> tryGetObject) where T : class

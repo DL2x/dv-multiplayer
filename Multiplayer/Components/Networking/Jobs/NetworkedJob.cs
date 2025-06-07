@@ -44,6 +44,18 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         return jobIdToNetworkedJob.TryGetValue(jobId, out networkedJob);
     }
 
+    public static bool TryGetNetId(Job job, out ushort netId)
+    {
+        if (TryGetFromJob(job, out var networkedJob))
+        {
+            netId = networkedJob.NetId;
+            return true;
+        }
+
+        netId = 0;
+        return false;
+    }
+
     #endregion
     protected override bool IsIdServerAuthoritative => true;
     public enum DirtyCause
