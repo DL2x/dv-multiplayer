@@ -108,4 +108,26 @@ public class CashRegisterBasePatch
         else
             netCashRegister.SetCash(amount);
     }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(CashRegisterBase.OnEnable))]
+    private static bool OnEnable(CashRegisterBase __instance)
+    {
+        if (__instance is not CashRegisterWithModules)
+            return true;
+
+        //prevent clients from clearing cash registers when loading
+        return NetworkLifecycle.Instance.IsHost();
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(CashRegisterBase.OnDisable))]
+    private static bool OnDisable(CashRegisterBase __instance)
+    {
+        if (__instance is not CashRegisterWithModules)
+            return true;
+
+        //prevent clients from clearing cash registers when loading the game or leaving the area
+        return NetworkLifecycle.Instance.IsHost();
+    }
 }

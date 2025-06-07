@@ -67,10 +67,8 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
     #region Client Variables
     bool isBuying;
-    bool buyAccepted;
 
     bool isCancelling;
-    bool cancelAccepted;
 
     #endregion
 
@@ -172,7 +170,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
     public void Client_ProcessCashRegisterAction(CashRegisterAction action, double amount)
     {
-        NetworkLifecycle.Instance.Client?.LogDebug(() => $"Client_ProcessCashRegisterAction({action}, {amount}) isBuying: {isBuying}, buyAccepted: {buyAccepted}, isCancelling: {isCancelling}, cancelAccepted: {cancelAccepted}");
+        NetworkLifecycle.Instance.Client?.LogDebug(() => $"Client_ProcessCashRegisterAction({action}, {amount}) isBuying: {isBuying}, isCancelling: {isCancelling}");
         switch (action)
         {
             case CashRegisterAction.Cancel:
