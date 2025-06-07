@@ -1,5 +1,6 @@
 using MPAPI.Interfaces;
 using MPAPI.Interfaces.Packets;
+using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Utils;
 using System;
@@ -66,6 +67,25 @@ namespace Multiplayer.API
         public float AnyPlayerSqrMag(Vector3 anchor) => DvExtensions.AnyPlayerSqrMag(anchor);
         #endregion
 
+        #region Chat
+        public void SendServerChatMessage(string message, IPlayer player = null)
+        {
+            ServerPlayer serverPlayer = player as ServerPlayer;
+            ChatManager.ServerMessage(message, null, serverPlayer?.Peer);
+        }
+
+        public bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, Action<string[], IPlayer> callback)
+        {
+            //todo: create chat command registration system
+            throw new NotImplementedException();
+        }
+
+        public void RegisterChatFilter(Func<string, IPlayer, bool> callback)
+        {
+            //todo: create chat filter system
+            throw new NotImplementedException();
+        }
+        #endregion
 
         #region Class Helpers
         internal ServerAPIProvider(NetworkServer serverInstance)
