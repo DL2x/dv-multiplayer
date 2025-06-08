@@ -99,7 +99,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     private readonly Dictionary<ResourceType, (RotaryAmplitudeChecker amplitudeChecker, LocoResourceModule module, Action<int> leverHandler)> leverStateLookup = [];
     private readonly Dictionary<ResourceType, GrabHandlerHingeJoint> grabbedHandlerLookup = [];
     private readonly Dictionary<ResourceType, NetworkedPluggableObject> resourceToPluggableObject = [];
-    private readonly Dictionary<ResourceType, LocoResourceModule> resourceToModule = [];
+    private readonly Dictionary<ResourceType, LocoResourceModule> resourceTypeToLocoResourceModule = [];
 
     private readonly Dictionary<ResourceType, bool> isResourceGrabbedDict = [];
     private readonly Dictionary<ResourceType, bool> wasResourceGrabbedDict = [];
@@ -507,7 +507,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             {
                 yield return new WaitUntil(() => resourceModule.initialized);
 
-                resourceToModule[resourceModule.resourceType] = resourceModule;
+                resourceTypeToLocoResourceModule[resourceModule.resourceType] = resourceModule;
 
                 var checker = resourceModule.GetComponentInChildren<RotaryAmplitudeChecker>();
                 var grab = resourceModule.GetComponentInChildren<GrabHandlerHingeJoint>();
@@ -777,13 +777,13 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         // Load the data for each car and resource module
         foreach (var resource in packet.ResourceData)
         {
-            var module = Station.locoResourceModules.resourceModules.FirstOrDefault(lm => lm.resourceType == resource.ResourceType);
+            if (!resourceTypeToLocoResourceModule.TryGetValue(resource.ResourceType, out var module))
+                continue;
 
             if (module != null)
                 if (module.resourceData.Count == resource.Values.Count())
                     for (int i = 0; i < module.resourceData.Count; i++)
-                        module.SetUnitsToBuy(resource.Values[i]);
-                //module.resourceData[i].unitsToBuy = resource.Values[i];
+                        module.resourceData[i].unitsToBuy = resource.Values[i];
                 else
                     Multiplayer.LogWarning($"PitStop bulk data count mismatch post-force: {module.resourceData.Count} != {resource.Values.Count()}");
             else
@@ -796,7 +796,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         foreach (var plug in packet.PlugData)
         {
             NetworkedPluggableObject.Get(plug.NetId, out var netPlug);
-            netPlug.ProcessBulkUpdate(plug);
+            netPlug?.ProcessBulkUpdate(plug);
         }
 
         // Mark data as refreshed to allow player interactions
@@ -835,7 +835,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}");
 
         // Validate resource module exists
-        if (!resourceToModule.TryGetValue(resourceType, out LocoResourceModule resourceModule))
+        if (!resourceTypeToLocoResourceModule.TryGetValue(resourceType, out LocoResourceModule resourceModule))
         {
             Multiplayer.LogWarning($"Could not find LocoResourceModule for ResourceType \"{resourceType}\" at Pit Stop station {StationName}");
             return;
