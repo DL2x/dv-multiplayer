@@ -5,10 +5,8 @@ using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Utils;
-using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace Multiplayer.Components.Networking.World;
@@ -53,7 +51,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
             base.Awake();
 
         PluggableObject = GetComponent<PluggableObject>();
-        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Awake() {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
+        //Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Awake() {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
         Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Awake() {this.GetObjectPath()}, netId: {NetId}");
 
         if (NetworkLifecycle.Instance.IsHost())
@@ -62,10 +60,10 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
     protected IEnumerator Start()
     {
-        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Start() {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
+        //Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Start() {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
         yield return new WaitUntil(() => PluggableObject?.controlBase != null);
 
-        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Start() Controlbase {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
+        //Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Start() Controlbase {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
 
         grabHandler = this.GetComponent<GrabHandlerGizmoItem>();
 
@@ -74,6 +72,11 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
         PluggableObject.PluggedIn += OnPlugged;
 
         handlersInitialised = true;
+    }
+
+    protected void OnDisable()
+    {
+        Refreshed = false;
     }
 
     protected override void OnDestroy()
@@ -142,6 +145,13 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
     public void ProcessBulkUpdate(PitStopPlugData data)
     {
+        CoroutineManager.Instance.StartCoroutine(WaitForInit(data));
+    }
+
+    private IEnumerator WaitForInit(PitStopPlugData data)
+    {
+        yield return new WaitUntil(()=> PluggableObject != null && PluggableObject.initialized);
+
         var interaction = data.State;
         ProcessInteraction(interaction, data.PlayerId, data.TrainCarNetId, data.IsLeftSide, data.Position, data.Rotation);
         Refreshed = true;
@@ -149,7 +159,6 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
     public void ProcessInteraction(PlugInteractionType interaction, byte playerId, ushort trainNetId, bool isLeftSide, Vector3? newPosition, Quaternion? newRotation)
     {
-
         bool result;
 
         NetworkedPlayer player = null;
@@ -279,8 +288,10 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
             PluggableObject.DisableColliders();
         }
         else
+        {
             PluggableObject.EnableStandaloneComponents();
             PluggableObject.EnableColliders();
+        }
     }
 
     public void InitPitStop(NetworkedPitStopStation netPitStop)
