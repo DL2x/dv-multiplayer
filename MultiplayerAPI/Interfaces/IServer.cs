@@ -12,8 +12,17 @@ public interface IServer
     event Action<IPlayer> OnPlayerDisconnected;
 
     #region Server Properties
+
+    /// <summary>
+    /// Gets number of players currently connected to the server
+    /// </summary>
+    /// <returns>Positive integer representing the number of connected players</param>
     int PlayerCount { get; }
 
+    /// <summary>
+    /// Gets IPlayer objects for all players connected to the server
+    /// </summary>
+    /// <returns>Read-only collection of IPlayer objects</param>
     public IReadOnlyCollection<IPlayer> Players { get; }
 
     #endregion
@@ -76,7 +85,7 @@ public interface IServer
     /// Returns the distance (Square Magnitude) of the closest player to a given GameObject
     /// </summary>
     /// <param name="gameObject">GameObject to compare players against</param>
-    // <returns>Returns the distance (Square Magnitude) of the closest player, or float.MaxValue if no player is nearby</returns>
+    /// <returns>Returns the distance (Square Magnitude) of the closest player, or float.MaxValue if no player is nearby</returns>
     float AnyPlayerSqrMag(GameObject gameObject);
 
     /// <summary>
@@ -101,9 +110,9 @@ public interface IServer
     /// <param name="commandLong">Command to be filtered for, without a leading '/' e.g. 'server'</param>
     /// <param name="commandShort">Optional short command to be filtered for, without a leading '/' e.g. 's'</param>
     /// <param name="helpMessage">Optional callback for a help message e.g. "Send a message as the server (host only)\r\n\t\t/server <message>\r\n\t\t/s <message>" It is recommended to provide localisation/translation for this string</param>
-    /// <param name="callback">Action to execute when the command is triggered. First parameter contains command arguments as string array, second parameter is the player who executed the command.</param>
+    /// <param name="callback">Action to execute when the command is triggered. First parameter contains message without the command e.g. '/command parameter1 parameter2' will become 'parameter1 parameter2', second parameter is the player who executed the command.</param>
     /// <returns>True if the command was successfully registered, false if registration failed (e.g. command already exists).</returns>
-    bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, Action<string[], IPlayer> callback);
+    bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, Action<string, IPlayer> callback);
 
 
     /// <summary>

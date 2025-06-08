@@ -70,20 +70,17 @@ namespace Multiplayer.API
         #region Chat
         public void SendServerChatMessage(string message, IPlayer player = null)
         {
-            ServerPlayer serverPlayer = player as ServerPlayer;
-            ChatManager.ServerMessage(message, null, serverPlayer?.Peer);
+            server.ChatManager.ServerMessage(message, null, player);
         }
 
-        public bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, Action<string[], IPlayer> callback)
+        public bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, Action<string, IPlayer> callback)
         {
-            //todo: create chat command registration system
-            throw new NotImplementedException();
+           return server.ChatManager.RegisterChatCommand(commandLong, commandShort, helpMessage, callback);
         }
 
         public void RegisterChatFilter(Func<string, IPlayer, bool> callback)
         {
-            //todo: create chat filter system
-            throw new NotImplementedException();
+            server.ChatManager.RegisterChatFilter(callback);
         }
         #endregion
 

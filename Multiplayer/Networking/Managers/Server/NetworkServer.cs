@@ -8,6 +8,7 @@ using DV.WeatherSystem;
 using Humanizer;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using MPAPI.Interfaces;
 using MPAPI.Interfaces.Packets;
 using Multiplayer.API;
 using Multiplayer.Components.Networking;
@@ -35,8 +36,6 @@ using System.Net;
 using System.Text;
 using UnityEngine;
 using UnityModManagerNet;
-using static DV.Interaction.Inputs.InputManager;
-
 
 namespace Multiplayer.Networking.Managers.Server;
 
@@ -67,6 +66,9 @@ public class NetworkServer : NetworkManager
 
     public readonly IDifficulty Difficulty;
     private bool IsLoaded;
+
+    private readonly ChatManager _chatManager;
+    public ChatManager ChatManager => _chatManager;
 
     //we don't care if the client doesn't have these mods
     public static string[] modWhiteList = ["RuntimeUnityEditor", "BookletOrganizer", "RemoteDispatch"];
@@ -832,7 +834,7 @@ public class NetworkServer : NetworkManager
         };
         SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, peer);
 
-        ChatManager.ServerMessage(serverPlayer.Username + " joined the game", null, peer);
+        ChatManager.ServerMessage(serverPlayer.Username + " joined the game", null, (IPlayer) serverPlayer);
 
         Log($"Client {peer.Id} is ready. Sending world state");
 
@@ -1258,7 +1260,8 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonChatPacket(CommonChatPacket packet, ITransportPeer peer)
     {
-        ChatManager.ProcessMessage(packet.message, peer);
+        if (TryGetServerPlayer(peer, out ServerPlayer player))
+            ChatManager.ProcessMessage(packet.message, (IPlayer)player);
     }
     #endregion
 
