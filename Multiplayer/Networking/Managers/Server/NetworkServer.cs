@@ -1,39 +1,38 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using DV;
 using DV.InventorySystem;
 using DV.Logic.Job;
 using DV.Scenarios.Common;
 using DV.ServicePenalty;
 using DV.ThingTypes;
 using DV.WeatherSystem;
+using DV;
 using Humanizer;
-using LiteNetLib;
 using LiteNetLib.Utils;
-using Multiplayer.Components.Networking;
+using LiteNetLib;
+using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
-using Multiplayer.Components.Networking.Jobs;
+using Multiplayer.Components.Networking;
+using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.Data;
-using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
 using Multiplayer.Networking.Packets.Clientbound.Train;
 using Multiplayer.Networking.Packets.Clientbound.World;
-using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Common.Train;
+using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Serverbound.Train;
 using Multiplayer.Networking.Packets.Serverbound;
+using Multiplayer.Networking.Packets.Unconnected;
+using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System;
 using UnityEngine;
 using UnityModManagerNet;
-using System.Net;
-using Multiplayer.Networking.Packets.Serverbound.Train;
-using Multiplayer.Networking.Packets.Unconnected;
-using System.Text;
-using Multiplayer.Networking.Data.Train;
-using Multiplayer.Networking.TransportLayers;
-
 
 namespace Multiplayer.Networking.Managers.Server;
 
@@ -136,7 +135,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonChangeJunctionPacket, ITransportPeer>(OnCommonChangeJunctionPacket);
         netPacketProcessor.SubscribeReusable<CommonRotateTurntablePacket, ITransportPeer>(OnCommonRotateTurntablePacket);
         netPacketProcessor.SubscribeReusable<CommonCouplerInteractionPacket, ITransportPeer>(OnCommonCouplerInteractionPacket);
-        //netPacketProcessor.SubscribeReusable<CommonTrainCouplePacket, ITransportPeer>(OnCommonTrainCouplePacket);
+
         netPacketProcessor.SubscribeReusable<CommonTrainUncouplePacket, ITransportPeer>(OnCommonTrainUncouplePacket);
         netPacketProcessor.SubscribeReusable<CommonHoseConnectedPacket, ITransportPeer>(OnCommonHoseConnectedPacket);
         netPacketProcessor.SubscribeReusable<CommonHoseDisconnectedPacket, ITransportPeer>(OnCommonHoseDisconnectedPacket);
@@ -156,7 +155,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, ITransportPeer>(OnCommonItemChangePacket);
 
         netPacketProcessor.SubscribeReusable<CommonPitStopInteractionPacket, ITransportPeer>(OnCommonPitStopInteractionPacket);
-        netPacketProcessor.SubscribeReusable<CommonPitStopPlugInteractionPacket, ITransportPeer>(OnCommonPitStopPlugInteractionPacket);
+        netPacketProcessor.SubscribeNetSerializable<CommonPitStopPlugInteractionPacket, ITransportPeer>(OnCommonPitStopPlugInteractionPacket);
 
         netPacketProcessor.SubscribeReusable<CommonCashRegisterWithModulesActionPacket, ITransportPeer>(OnCommonCashRegisterWithModulesActionPacket);
     }

@@ -1,6 +1,5 @@
-using System;
-using System.Collections.Generic;
-using DV;
+using DV.Common;
+using DV.Customization.Paint;
 using DV.Damage;
 using DV.InventorySystem;
 using DV.Logic.Job;
@@ -8,39 +7,41 @@ using DV.MultipleUnit;
 using DV.ServicePenalty.UI;
 using DV.ThingTypes;
 using DV.UI;
+using DV.UserManagement;
 using DV.WeatherSystem;
+using DV;
+using LiteNetLib.Utils;
 using LiteNetLib;
 using Multiplayer.Components.MainMenu;
-using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Player;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.UI;
 using Multiplayer.Components.Networking.World;
+using Multiplayer.Components.Networking;
 using Multiplayer.Components.SaveGame;
+using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.Data;
-using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
 using Multiplayer.Networking.Packets.Clientbound.Train;
 using Multiplayer.Networking.Packets.Clientbound.World;
-using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Common.Train;
+using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Serverbound.Train;
 using Multiplayer.Networking.Packets.Serverbound;
-using Multiplayer.Networking.Data.Train;
+using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Patches.SaveGame;
 using Multiplayer.Utils;
 using Newtonsoft.Json.Linq;
+using Object = UnityEngine.Object;
+using System.Collections.Generic;
+using System.Linq;
+using System;
 using UnityEngine;
 using UnityModManagerNet;
-using Object = UnityEngine.Object;
-using Multiplayer.Networking.Packets.Serverbound.Train;
-using System.Linq;
-using LiteNetLib.Utils;
-using DV.UserManagement;
-using DV.Common;
-using DV.Customization.Paint;
-using Multiplayer.Networking.TransportLayers;
+
 
 namespace Multiplayer.Networking.Managers.Client;
 
@@ -175,7 +176,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket>(OnCommonItemChangePacket);
 
         netPacketProcessor.SubscribeReusable<CommonPitStopInteractionPacket>(OnCommonPitStopInteractionPacket);
-        netPacketProcessor.SubscribeReusable<CommonPitStopPlugInteractionPacket>(OnCommonPitStopPlugInteractionPacket);
+        netPacketProcessor.SubscribeNetSerializable<CommonPitStopPlugInteractionPacket>(OnCommonPitStopPlugInteractionPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPitStopBulkUpdatePacket>(OnClientboundPitStopBulkUpdatePacket);
 
         netPacketProcessor.SubscribeReusable<CommonCashRegisterWithModulesActionPacket>(OnCommonCashRegisterWithModulesActionPacket);
