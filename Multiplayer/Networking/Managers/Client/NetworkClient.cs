@@ -200,6 +200,18 @@ public class NetworkClient : NetworkManager
         WorldStreamingInit.LoadingFinished -= OnLoaded;
     }
 
+    private void OnLoaded()
+    {
+        Log($"WorldStreamingInit.LoadingFinished()");
+        NetworkedItemManager.Instance.CheckInstance();
+        Log($"WorldStreamingInit.LoadingFinished() CacheWorldItems()");
+        NetworkedItemManager.Instance.CacheWorldItems();
+        Log($"WorldStreamingInit.LoadingFinished() SendReadyPacket()");
+        SendReadyPacket();
+
+        WorldStreamingInit.LoadingFinished -= OnLoaded;
+    }
+
     #region Net Events
 
     public override void OnPeerConnected(ITransportPeer peer)
