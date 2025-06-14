@@ -58,7 +58,7 @@ public static class MultiplayerAPITest
 
     private static void OnClientStarted(IClient client)
     {
-        GameObject go = new GameObject("MPAPI ClientTest", [typeof(ServerTest)]);
+        GameObject go = new GameObject("MPAPI ClientTest", [typeof(ClientTest)]);
         GameObject.DontDestroyOnLoad(go);
     }
 

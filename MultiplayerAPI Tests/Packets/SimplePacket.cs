@@ -1,9 +1,10 @@
 using MPAPI.Interfaces.Packets;
+using MultiplayerAPITest.Enums;
 using UnityEngine;
 
 namespace MultiplayerAPITest.Packets
 {
-    internal class SimpleModPacket : IPacket
+    internal class SimplePacket : IPacket
     {
         //Public properties are automatically serialised
         //acceptable types are:
@@ -14,11 +15,12 @@ namespace MultiplayerAPITest.Packets
 
         //Be mindful of the amount of data per packet.
         //  Avoid sending long strings or large structures
-        //  Consider using an numeric Id system to represent objects
-        //  Use the MP API to get the NetId (ushort) for TrainCars, rather than the car's string Id
-        public string CarId { get; set; }   //It's better to use ushort and call `MultiplayerAPI.GetTrainCarNetId(TrainCar)`
-                                            //See SimplePacketWithNetId for an example
+        //  Consider using a numeric Id system to represent objects.
+        //      The MP API provides Net Ids for common objects (e.g. TrainCars, Jobs, Switches, Turntables and RailTrack),
+        //      see `TryGetNetId<T>(T obj, out ushort netId)`
+        public string CarId { get; set; }   //It's better to use ushort. See SimplePacketWithNetId for an example
         public Vector3 Position {  get; set; }
-     
+        public WheelArrangement WheelArrangement { get; set; }
+
     }
 }
