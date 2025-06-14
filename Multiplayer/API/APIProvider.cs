@@ -6,10 +6,6 @@ namespace Multiplayer.API
 {
     public class APIProvider : IMultiplayerAPI
     {
-        public APIProvider()
-        {
-            NetIdProvider.Instance.CheckInitialization();
-        }
 
         public bool IsMultiplayerLoaded => true;
         

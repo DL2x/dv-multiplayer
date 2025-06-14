@@ -68,7 +68,7 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
     }
 
     [UsedImplicitly]
-    protected new static string AllowAutoCreate()
+    public new static string AllowAutoCreate()
     {
         return $"[{nameof(NetIdProvider)}]";
     }

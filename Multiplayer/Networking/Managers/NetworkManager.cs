@@ -1,12 +1,13 @@
-using System;
-using System.Net;
-using System.Net.Sockets;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Multiplayer.API;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.Serialization;
 using Multiplayer.Networking.TransportLayers;
+using System;
+using System.Net;
+using System.Net.Sockets;
 
 namespace Multiplayer.Networking.Managers;
 
@@ -76,6 +77,7 @@ public abstract class NetworkManager
 
     public virtual bool Start()
     {
+        NetIdProvider.Instance.CheckInitialization();
         return transport.Start();
     }
     public virtual bool Start(IPAddress ipv4, IPAddress ipv6, int port)
@@ -105,6 +107,8 @@ public abstract class NetworkManager
         transport.OnNetworkLatencyUpdate -= OnNetworkLatencyUpdate;
 
         Settings.OnSettingsUpdated -= OnSettingsUpdated;
+
+        NetIdProvider.Destroy(NetIdProvider.Instance);
     }
 
     protected NetDataWriter WritePacket<T>(T packet) where T : class, new()
