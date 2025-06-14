@@ -22,7 +22,6 @@ public class ClientPlayerWrapper : IPlayer
         get => _networkedPlayer.Username;
         set => _networkedPlayer.Username = value;
     }
-    public Guid Guid => Guid.Empty; // NetworkedPlayer doesn't store GUID
     public Vector3 Position => _networkedPlayer.transform.position;
     public float RotationY => _networkedPlayer.transform.rotation.eulerAngles.y;
     public bool IsLoaded => true; // If we have the object, it's loaded

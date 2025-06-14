@@ -2,6 +2,7 @@ using MPAPI.Interfaces;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.TransportLayers;
 using System;
 using UnityEngine;
 
@@ -9,7 +10,7 @@ namespace Multiplayer.API;
 
 public class ServerPlayerWrapper : IPlayer
 {
-    private readonly ServerPlayer _serverPlayer;
+    internal readonly ServerPlayer _serverPlayer;
     private readonly bool _isHost;
 
     public ServerPlayerWrapper(ServerPlayer serverPlayer)
@@ -39,4 +40,6 @@ public class ServerPlayerWrapper : IPlayer
         NetworkedTrainCar.TryGet(_serverPlayer.CarId, out TrainCar trainCar);
         return trainCar;
     }
+
+    internal ITransportPeer Peer => _serverPlayer.Peer;
 }

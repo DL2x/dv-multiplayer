@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace MPAPI.Interfaces
@@ -5,7 +6,7 @@ namespace MPAPI.Interfaces
     public interface IPlayer
     {
         public byte Id { get; }
-        public string Username { get; set; }
+        public string Username { get; }
         Vector3 Position { get; }
         float RotationY { get; }
         bool IsLoaded { get; }
