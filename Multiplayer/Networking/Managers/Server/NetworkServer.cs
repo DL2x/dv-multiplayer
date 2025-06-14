@@ -43,6 +43,7 @@ public class NetworkServer : NetworkManager
 {
     public Action<ServerPlayer> PlayerConnected;
     public Action<ServerPlayer> PlayerDisconnected;
+    public Action<ServerPlayer> PlayerReady;
     protected override string LogPrefix => "[Server]";
 
     private readonly Queue<ITransportPeer> joinQueue = new();   //Queue for players attempting to join while server is loading
@@ -67,7 +68,7 @@ public class NetworkServer : NetworkManager
     public readonly IDifficulty Difficulty;
     private bool IsLoaded;
 
-    private readonly ChatManager _chatManager;
+    private readonly ChatManager _chatManager = new(); 
     public ChatManager ChatManager => _chatManager;
 
     //we don't care if the client doesn't have these mods
@@ -347,13 +348,14 @@ public class NetworkServer : NetworkManager
         SendPacketToAll(packet, deliveryMethod);
     }
 
-    public void SendExternalPacketToAll<T>(T packet, bool reliable, byte excludePlayerId) where T : class, IPacket, new()
+    public void SendExternalPacketToAll<T>(T packet, bool reliable, ITransportPeer excludePeer) where T : class, IPacket, new()
     {
-        if (!TryGetPeer(excludePlayerId, out var peer))
-            return;
-
         var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
-        SendPacketToAll(packet, deliveryMethod, peer);
+
+        if(excludePeer == null)
+            SendPacketToAll(packet, deliveryMethod);
+        else
+            SendPacketToAll(packet, deliveryMethod, excludePeer);
     }
 
     public void SendExternalSerializablePacketToAll<T>(T packet, bool reliable) where T : class, ISerializablePacket, new()
@@ -363,41 +365,39 @@ public class NetworkServer : NetworkManager
         SendNetSerializablePacketToAll(wrapper, deliveryMethod);
     }
 
-    public void SendExternalSerializablePacketToAll<T>(T packet, bool reliable, byte excludePlayerId) where T : class, ISerializablePacket, new()
+    public void SendExternalSerializablePacketToAll<T>(T packet, bool reliable, ITransportPeer excludePeer) where T : class, ISerializablePacket, new()
     {
-        if (!TryGetPeer(excludePlayerId, out var peer))
-            return;
-
         var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
         var wrapper = new ExternalSerializablePacketWrapper<T> { Packet = packet };
-        SendNetSerializablePacketToAll(wrapper, deliveryMethod, peer);
+
+        if (excludePeer == null)
+            SendNetSerializablePacketToAll(wrapper, deliveryMethod);
+        else
+            SendNetSerializablePacketToAll(wrapper, deliveryMethod, excludePeer);
     }
 
-    public void SendExternalPacketToPlayer<T>(T packet, byte playerId, bool reliable) where T : class, IPacket, new()
+    public void SendExternalPacketToPlayer<T>(T packet, ITransportPeer peer, bool reliable) where T : class, IPacket, new()
     {
-        if (!TryGetPeer(playerId, out var peer))
-            return;
-
         var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
         SendPacket(peer, packet, deliveryMethod);
     }
 
-    public void SendExternalSerializablePacketToPlayer<T>(T packet, byte playerId, bool reliable) where T : class, ISerializablePacket, new()
+    public void SendExternalSerializablePacketToPlayer<T>(T packet, ITransportPeer peer, bool reliable) where T : class, ISerializablePacket, new()
     {
-        if (!TryGetPeer(playerId, out var peer))
-            return;
-
         var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
         var wrapper = new ExternalSerializablePacketWrapper<T> { Packet = packet };
+
         SendNetSerializablePacket(peer, wrapper, deliveryMethod);
     }
 
     #endregion
 
-    public void KickPlayer(ITransportPeer peer)
+    public void KickPlayer(ServerPlayer player)
     {
-        //peer.Send(WritePacket(new ClientboundDisconnectPacket()),DeliveryMethod.ReliableUnordered);
-        peer.Disconnect(WritePacket(new ClientboundDisconnectPacket { Kicked = true }));
+        if (player == null || player.Peer == null)
+            return;
+
+        player.Peer.Disconnect(WritePacket(new ClientboundDisconnectPacket { Kicked = true }));
     }
     public void SendGameParams(GameParams gameParams)
     {
@@ -649,7 +649,7 @@ public class NetworkServer : NetworkManager
         }
     }
 
-    public void SendChat(string message, ITransportPeer exclude = null)
+    public void SendChat(string message, ServerPlayer exclude = null)
     {
 
         if (exclude != null)
@@ -657,7 +657,7 @@ public class NetworkServer : NetworkManager
             NetworkLifecycle.Instance.Server.SendPacketToAll(new CommonChatPacket
             {
                 message = message
-            }, DeliveryMethod.ReliableUnordered, exclude);
+            }, DeliveryMethod.ReliableUnordered, exclude.Peer);
         }
         else
         {
@@ -668,11 +668,11 @@ public class NetworkServer : NetworkManager
         }
     }
 
-    public void SendWhisper(string message, ITransportPeer recipient)
+    public void SendWhisper(string message, ServerPlayer recipient)
     {
-        if (message != null || recipient != null)
+        if (!string.IsNullOrEmpty(message) && recipient != null && recipient.Peer != null)
         {
-            NetworkLifecycle.Instance.Server.SendPacket(recipient, new CommonChatPacket
+            NetworkLifecycle.Instance.Server.SendPacket(recipient.Peer, new CommonChatPacket
             {
                 message = message
             }, DeliveryMethod.ReliableUnordered);
@@ -834,7 +834,8 @@ public class NetworkServer : NetworkManager
         };
         SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, peer);
 
-        ChatManager.ServerMessage(serverPlayer.Username + " joined the game", null, (IPlayer) serverPlayer);
+        LogDebug(() => $"Chatmanager");
+        ChatManager.ServerMessage(serverPlayer.Username + " joined the game", null, serverPlayer);
 
         Log($"Client {peer.Id} is ready. Sending world state");
 
@@ -915,6 +916,7 @@ public class NetworkServer : NetworkManager
         SendPacket(peer, new ClientboundRemoveLoadingScreenPacket(), DeliveryMethod.ReliableOrdered);
 
         serverPlayer.IsLoaded = true;
+
     }
 
     private void OnServerboundPlayerPositionPacket(ServerboundPlayerPositionPacket packet, ITransportPeer peer)
@@ -1261,7 +1263,7 @@ public class NetworkServer : NetworkManager
     private void OnCommonChatPacket(CommonChatPacket packet, ITransportPeer peer)
     {
         if (TryGetServerPlayer(peer, out ServerPlayer player))
-            ChatManager.ProcessMessage(packet.message, (IPlayer)player);
+            ChatManager.ProcessMessage(packet.message, player);
     }
     #endregion
 

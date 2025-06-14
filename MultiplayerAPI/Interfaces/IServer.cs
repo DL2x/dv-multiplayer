@@ -6,10 +6,13 @@ using UnityEngine;
 
 namespace MPAPI.Interfaces;
 
+public delegate void ChatCommandCallback(string message, IPlayer sender);
+public delegate bool ChatFilterDelegate(ref string message, IPlayer sender);
 public interface IServer
 {
     event Action<IPlayer> OnPlayerConnected;
     event Action<IPlayer> OnPlayerDisconnected;
+    event Action<IPlayer> OnPlayerReady;
 
     #region Server Properties
 
@@ -24,6 +27,8 @@ public interface IServer
     /// </summary>
     /// <returns>Read-only collection of IPlayer objects</param>
     public IReadOnlyCollection<IPlayer> Players { get; }
+
+    IPlayer GetPlayer(byte id);
 
     #endregion
 
@@ -96,13 +101,20 @@ public interface IServer
     float AnyPlayerSqrMag(Vector3 anchor);
     #endregion
 
-    #region Chat
+    #region Chat API
     /// <summary>
     /// Sends a server chat message
     /// </summary>
     /// <param name="message">Message to be sent</param>
     /// <param name="excludePlayer">Player to exclude. If null, message will go to all players</param>
     void SendServerChatMessage(string message, IPlayer excludePlayer = null);
+
+    /// <summary>
+    /// Sends a chat message to a specific player
+    /// </summary>
+    /// <param name="message">Message to be sent</param>
+    /// <param name="player">Recipient player</param>
+    void SendWhisperChatMessage(string message, IPlayer player);
 
     /// <summary>
     /// Registers a chat command e.g. `/server` and optional short command '/s'
@@ -112,16 +124,17 @@ public interface IServer
     /// <param name="helpMessage">Optional callback for a help message e.g. "Send a message as the server (host only)\r\n\t\t/server <message>\r\n\t\t/s <message>" It is recommended to provide localisation/translation for this string</param>
     /// <param name="callback">Action to execute when the command is triggered. First parameter contains message without the command e.g. '/command parameter1 parameter2' will become 'parameter1 parameter2', second parameter is the player who executed the command.</param>
     /// <returns>True if the command was successfully registered, false if registration failed (e.g. command already exists).</returns>
-    bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, Action<string, IPlayer> callback);
+    bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, ChatCommandCallback callback);
 
 
     /// <summary>
     /// Registers a chat filter that processes non-command messages in registration order.
     /// Filters form a chain where each can either allow the message to continue to the next filter or block further processing.
     /// If all filters return true, the message will be sent to all players (default action).
+    /// This filter also applies to whispered messages, regardless of source (player or server)
     /// </summary>
-    /// <param name="callback">Filter function that processes the message. First parameter is the message content, second parameter is the player who sent the message. Return true to pass the message to the next filter/default action, false to block propagation.</param>
-    void RegisterChatFilter(Func<string, IPlayer, bool> callback);
+    /// <param name="callback">Filter function type `ChatFilterDelegate` that processes the message. First delegate parameter is the message content, second parameter is the player who sent the message. Return true to pass the message to the next filter/default action, false to block propagation.</param>
+    void RegisterChatFilter(ChatFilterDelegate callback);
 
     #endregion
 }

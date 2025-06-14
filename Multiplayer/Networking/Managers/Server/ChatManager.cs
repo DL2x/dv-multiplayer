@@ -1,7 +1,5 @@
-using MPAPI.Interfaces;
 using Multiplayer.Components.Networking;
 using Multiplayer.Networking.Data;
-using Multiplayer.Networking.TransportLayers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,15 +7,16 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Multiplayer.Networking.Managers.Server;
-
+public delegate void ChatCommandCallbackInternal(string message, ServerPlayer sender);
+public delegate bool ChatFilterDelegateInternal(ref string message, ServerPlayer sender);
 public class ChatManager
 {
     public const string COMMAND_SERVER = "server";
     public const string COMMAND_SERVER_SHORT = "s";
     public const string COMMAND_WHISPER = "whisper";
     public const string COMMAND_WHISPER_SHORT = "w";
-    public const string COMMAND_HELP_SHORT = "?";
     public const string COMMAND_HELP = "help";
+    public const string COMMAND_HELP_SHORT = "?";
     public const string COMMAND_LOG = "log";
     public const string COMMAND_LOG_SHORT = "l";
     public const string COMMAND_KICK = "kick";
@@ -25,9 +24,9 @@ public class ChatManager
     public const string MESSAGE_COLOUR_SERVER = "9CDCFE";
     public const string MESSAGE_COLOUR_HELP = "00FF00";
 
-    private readonly Dictionary<string, Action<string, IPlayer>> _registeredCommands = [];
+    private readonly Dictionary<string, ChatCommandCallbackInternal> _registeredCommands = [];
     private readonly Dictionary<string, Func<string>> _registeredHelpMessages = [];
-    private readonly List<Func<string, IPlayer, bool>> _chatFilters = [];
+    private readonly List<ChatFilterDelegateInternal> _chatFilters = [];
 
     public ChatManager()
     {
@@ -40,7 +39,7 @@ public class ChatManager
         (
             COMMAND_SERVER,
             COMMAND_SERVER_SHORT,
-            () => $"\r\n\r\n\t{Locale.CHAT_HELP_SERVER_MSG}" +
+            () => $"{Locale.CHAT_HELP_SERVER_MSG}" +
                     $"\r\n\t\t/{COMMAND_SERVER} <{Locale.CHAT_HELP_MSG}>" +
                     $"\r\n\t\t/{COMMAND_SERVER_SHORT} <{Locale.CHAT_HELP_MSG}>",
             (message, sender) => ServerMessage(message, sender, null)
@@ -50,7 +49,7 @@ public class ChatManager
         (
             COMMAND_WHISPER,
             COMMAND_WHISPER_SHORT,
-            ()=> $"\r\n\r\n\t{Locale.CHAT_HELP_WHISPER_MSG}" +
+            ()=> $"{Locale.CHAT_HELP_WHISPER_MSG}" +
                     $"\r\n\t\t/{COMMAND_WHISPER} <{Locale.CHAT_HELP_PLAYER_NAME}> <{Locale.CHAT_HELP_MSG}>" +
                     $"\r\n\t\t/{COMMAND_WHISPER_SHORT} <{Locale.CHAT_HELP_PLAYER_NAME}> <{Locale.CHAT_HELP_MSG}>",
             WhisperMessage
@@ -60,7 +59,7 @@ public class ChatManager
         (
             COMMAND_HELP,
             COMMAND_HELP_SHORT,
-            ()=> $"\r\n\r\n\t{Locale.CHAT_HELP_HELP}" +
+            ()=> $"{Locale.CHAT_HELP_HELP}" +
                     $"\r\n\t\t/{COMMAND_HELP}" +
                     $"\r\n\t\t/{COMMAND_HELP_SHORT}",
             HelpMessage
@@ -70,7 +69,7 @@ public class ChatManager
         (
             COMMAND_KICK,
             null,
-            () => $"\r\n\r\n\tKick a player from the server (must be host)" +
+            () => $"Kick a player from the server (must be host)" +
                     $"\r\n\t\t/{COMMAND_KICK}",
             KickMessage
         );
@@ -86,7 +85,7 @@ public class ChatManager
 #endif
     }
 
-    public bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, Action<string, IPlayer> callback)
+    public bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, ChatCommandCallbackInternal callback)
     {
         if (string.IsNullOrEmpty(commandLong) || callback == null)
             return false;
@@ -110,7 +109,7 @@ public class ChatManager
         return true;
     }
 
-    public void RegisterChatFilter(Func<string, IPlayer, bool> callback)
+    public void RegisterChatFilter(ChatFilterDelegateInternal callback)
     {
         if (callback != null)
         {
@@ -118,11 +117,13 @@ public class ChatManager
         }
     }
 
-    public void ProcessMessage(string message, IPlayer sender)
+    public void ProcessMessage(string message, ServerPlayer sender)
     {
 
         if (string.IsNullOrEmpty(message))
             return;
+
+        Multiplayer.LogDebug(() => $"ProcessMessage(\'{message}\')");
 
         //Check if we have a command
         if (message.StartsWith("/"))
@@ -130,13 +131,18 @@ public class ChatManager
             string[] messageParams = message.Substring(1).Split(' ');
             string command = messageParams[0].ToLower();
 
+            Multiplayer.LogDebug(() => $"ProcessMessage(\'{message}\') starts with, substr: {message.Substring(0)}), command: {command}");
+
             //check registered commands
             if (!string.IsNullOrEmpty(command) && _registeredCommands.TryGetValue(command, out var commandCallback))
             {
                 //remove the command, leading slash and trailing space
-                message = message.Substring(command.Length + 2);
-                commandCallback(message, sender);
+                var cleanedMessage = message.Substring(command.Length + 1).Trim();
 
+                Multiplayer.LogDebug(() => $"ProcessMessage(\'{message}\') cleaned message: {cleanedMessage}");
+
+                commandCallback(cleanedMessage, sender);
+                
                 return;
             }
         }
@@ -145,9 +151,9 @@ public class ChatManager
         ProcessChatMessage(message, sender);
     }
 
-    private void ProcessChatMessage(string message, IPlayer sender)
+    private void ProcessChatMessage(string message, ServerPlayer sender)
     {
-        if (sender is not ServerPlayer player)
+        if (sender == null)
             return;
 
         //clean up the message to stop format injection
@@ -156,47 +162,29 @@ public class ChatManager
         //call each filter until either a filter returns false or all filters have been called
         foreach (var filter in _chatFilters)
         {
-            if (!filter(message, sender))
+            if (!filter(ref message, sender))
                 return;
         }
 
         message = $"<alpha=#50>{sender.Username}:</color> <noparse>{message}</noparse>";
-        NetworkLifecycle.Instance.Server.SendChat(message, player.Peer);
+        NetworkLifecycle.Instance.Server.SendChat(message, sender);
     }
 
-    public void ServerMessage(string message, IPlayer sender, IPlayer exclude = null)
+    public void ServerMessage(string message, ServerPlayer sender, ServerPlayer exclude = null)
     {
-        ServerPlayer senderPlayer = null;
-        ITransportPeer excludePeer = null;
-
-        if (sender != null)
-        {
-            if(sender is not ServerPlayer sp)
-                return;
-
-            senderPlayer = sp;
-        }
-
-        if (exclude != null)
-        {
-            if (exclude is not ServerPlayer ep)
-                return;
-            excludePeer = ep.Peer;
-        }
-       
         //If user is not the host, we should ignore - will require changes for dedicated server
-        if (senderPlayer != null && !NetworkLifecycle.Instance.IsHost(senderPlayer.Peer))
+        if (sender != null && !NetworkLifecycle.Instance.IsHost(sender.Peer))
             return;
 
         message = $"<color=#{MESSAGE_COLOUR_SERVER}>{message}</color>";
-        NetworkLifecycle.Instance.Server.SendChat(message, excludePeer);
+        NetworkLifecycle.Instance.Server.SendChat(message, exclude);
     }
 
-    private void WhisperMessage(string message, IPlayer sender)
+    private void WhisperMessage(string message, ServerPlayer sender)
     {
         Multiplayer.LogDebug(() => $"Whispering: \"{message}\", sender: {sender?.Username}, senderID: {sender?.Id}");
 
-        if (sender == null || sender is not ServerPlayer senderPlayer)
+        if (sender == null)
             return;
 
         if (string.IsNullOrEmpty(message))
@@ -214,13 +202,13 @@ public class ChatManager
         Multiplayer.LogDebug(()=>$"Whispering parse 1: \"{message}\", sender: {sender?.Username}, senderID: {sender?.Id}, peerName: {recipientName}");
 
         //look up the peer ID
-        ITransportPeer recipient = NetPeerFromName(recipientName);
+        var recipient = ServerPlayerFromUsername(recipientName);
         if(recipient == null)
         {
             Multiplayer.LogDebug(() => $"Whispering failed: \"{message}\", sender: {sender?.Username}, senderID: {sender?.Id}, peerName: {recipientName}");
 
             whisperMessage = $"<color=#{MESSAGE_COLOUR_SERVER}>{recipientName} not found - you're whispering into the void!</color>"; //todo: add translation
-            NetworkLifecycle.Instance.Server.SendWhisper(whisperMessage, senderPlayer.Peer);
+            NetworkLifecycle.Instance.Server.SendWhisper(whisperMessage, sender);
             return;
         }
 
@@ -229,49 +217,64 @@ public class ChatManager
         //clean up the message to stop format injection
         whisperMessage = Regex.Replace(whisperMessage, "</noparse>", string.Empty, RegexOptions.IgnoreCase);
 
+        //call each chat filter until either a filter returns false or all filters have been called
+        foreach (var filter in _chatFilters)
+        {
+            if (!filter(ref message, sender))
+                return;
+        }
+
         whisperMessage = "<i><alpha=#50>" + sender.Username + ":</color> <noparse>" + whisperMessage + "</noparse></i>";
 
         NetworkLifecycle.Instance.Server.SendWhisper(whisperMessage, recipient);
     }
 
-    public void KickMessage(string message, IPlayer sender)
+    public void KickMessage(string message, ServerPlayer sender)
     {
-        ITransportPeer player;
+        ServerPlayer playerToKick;
         string playerName;
+        string whisper;
 
         //If user is not the host, we should ignore - will require changes for dedicated server
-        if (sender == null || sender is not ServerPlayer senderPlayer || !NetworkLifecycle.Instance.IsHost(senderPlayer.Peer))
+        if (sender == null || !NetworkLifecycle.Instance.IsHost(sender.Peer))
             return;
 
         playerName = message.Split(' ')[0];
         if (string.IsNullOrEmpty(playerName))
             return;
 
-        player = NetPeerFromName(playerName);
+        playerToKick = ServerPlayerFromUsername(playerName);
 
-        if (player == null || NetworkLifecycle.Instance.IsHost(player))
+        if (playerToKick == null || NetworkLifecycle.Instance.IsHost(playerToKick.Peer))
         {
-            message = $"<color=#{MESSAGE_COLOUR_SERVER}>Unable to kick {playerName}</color>"; //todo: translate
+            whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>Unable to kick {playerName}</color>"; //todo: translate
         }
         else
         {
-            message = $"<color=#{MESSAGE_COLOUR_SERVER}>{playerName} was kicked</color>"; //todo: translate
+            whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>{playerName} was kicked</color>"; //todo: translate
 
-            NetworkLifecycle.Instance.Server.KickPlayer(player);
+            NetworkLifecycle.Instance.Server.KickPlayer(playerToKick);
         }
 
-        NetworkLifecycle.Instance.Server.SendWhisper(message, senderPlayer.Peer);
+        NetworkLifecycle.Instance.Server.SendWhisper(whisper, sender);
     }
 
-    private void HelpMessage(string _, IPlayer peer)
+    private void HelpMessage(string _, ServerPlayer player)
     {
-        if (peer == null || peer is not ServerPlayer player)
+
+        if (player == null)
             return;
+
+        Multiplayer.LogDebug(() => $"HelpMessage()");
 
         StringBuilder sb = new($"<color=#{MESSAGE_COLOUR_HELP}>{Locale.CHAT_HELP_AVAILABLE}");
 
         foreach (var helpMessage in _registeredHelpMessages)
-            sb.AppendLine(helpMessage.Value?.Invoke());
+        {
+            var help = helpMessage.Value?.Invoke();
+            if (help != null)
+                sb.AppendLine("\r\n\t" + help);
+        }
 
         sb.AppendLine("</color>");
 
@@ -282,7 +285,7 @@ public class ChatManager
                         "\r\n\t\t/server <message>" +
                         "\r\n\t\t/s <message>" +
 
-                        "\r\n\r\n\tWhisper to a player" +
+                        "\r\n\r\n\tWhisper to a playerToKick" +
                         "\r\n\t\t/whisper <PlayerName> <message>" +
                         "\r\n\t\t/w <PlayerName> <message>" +
 
@@ -292,26 +295,16 @@ public class ChatManager
 
                         "</color>";
         */
-        NetworkLifecycle.Instance.Server.SendWhisper(sb.ToString(), player.Peer);
+        NetworkLifecycle.Instance.Server.SendWhisper(sb.ToString(), player);
     }
 
 
-    private ITransportPeer NetPeerFromName(string peerName)
+    private ServerPlayer ServerPlayerFromUsername(string playerName)
     {
      
-        if(peerName == null || peerName == string.Empty)
+        if(string.IsNullOrEmpty(playerName))
             return null;
 
-        ServerPlayer player = NetworkLifecycle.Instance.Server.ServerPlayers.Where(p => p.Username == peerName).FirstOrDefault();
-        if (player == null)
-            return null;
-
-        if(NetworkLifecycle.Instance.Server.TryGetPeer(player.Id, out ITransportPeer peer))
-        {
-            return peer;
-        }
-
-        return null;
-
+        return NetworkLifecycle.Instance.Server.ServerPlayers.Where(p => p.Username == playerName).FirstOrDefault();
     }
 }
