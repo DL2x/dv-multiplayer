@@ -1,3 +1,4 @@
+using DV.CabControls.NonVR;
 using DV.Interaction;
 using DV.ThingTypes;
 using Multiplayer.Networking.Data;
@@ -98,6 +99,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     private readonly Dictionary<ResourceType, (RotaryAmplitudeChecker amplitudeChecker, LocoResourceModule module, Action<int> leverHandler)> leverStateLookup = [];
     private readonly Dictionary<ResourceType, GrabHandlerHingeJoint> grabbedHandlerLookup = [];
+    private readonly Dictionary<ResourceType, LeverNonVR> leverLookup = [];
     private readonly Dictionary<ResourceType, NetworkedPluggableObject> resourceToPluggableObject = [];
     private readonly Dictionary<ResourceType, LocoResourceModule> resourceTypeToLocoResourceModule = [];
 
@@ -183,6 +185,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         leverStateLookup.Clear();
         grabbedHandlerLookup.Clear();
+        leverLookup.Clear();
         base.OnDestroy();
     }
 
@@ -511,6 +514,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
                 var checker = resourceModule.GetComponentInChildren<RotaryAmplitudeChecker>();
                 var grab = resourceModule.GetComponentInChildren<GrabHandlerHingeJoint>();
+                var lever = resourceModule.GetComponentInChildren<LeverNonVR>();
                 if (checker != null && grab != null)
                 {
 
@@ -523,6 +527,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                     //Store delegate
                     leverStateLookup[resourceModule.resourceType] = (checker, resourceModule, LeverStatehandler);
                     grabbedHandlerLookup[resourceModule.resourceType] = grab;
+
+                    if(lever != null)
+                        leverLookup[resourceModule.resourceType] = lever;
 
                     //sb.AppendLine($"\t{resourceModule.resourceType}, Grab Handler found: {grab != null}, Name: {grab.name}");
                     sb.AppendLine($"\t{resourceModule.resourceType}, Rotary Amplitude Handler found: {checker != null}, Name: {checker.name}");
@@ -813,6 +820,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     {
         GrabHandlerHingeJoint grab = null;
         RotaryAmplitudeChecker amplitudeChecker = null;
+        LeverNonVR lever = null;
 
         // Validate interaction type
         if (!Enum.IsDefined(typeof(PitStopStationInteractionType), packet.InteractionType))
@@ -848,6 +856,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                 break;
 
             case PitStopStationInteractionType.LeverState:
+                leverLookup.TryGetValue(resourceType, out lever);
 
                 if (!grabbedHandlerLookup.TryGetValue(resourceType, out grab))
                 {
@@ -878,7 +887,10 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
                 if (!isLocallyGrabbed)
                 {
+
+                    lever?.BlockControl(grabbed);
                     grab?.SetMovingDisabled(grabbed);
+
                     if (grabbed)
                         grab?.ForceEndInteraction();
                 }
