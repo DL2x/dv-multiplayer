@@ -1,4 +1,6 @@
-namespace MPAPI.Interfaces.Packets;
+using MPAPI.Interfaces;
+
+namespace MPAPI.Types;
 
 /// <summary>
 /// Delegate for handling received packets on the server

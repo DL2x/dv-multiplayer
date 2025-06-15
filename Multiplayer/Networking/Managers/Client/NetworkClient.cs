@@ -13,6 +13,7 @@ using DV.WeatherSystem;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using MPAPI.Interfaces.Packets;
+using MPAPI.Types;
 using Multiplayer.API;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;

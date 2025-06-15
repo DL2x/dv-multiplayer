@@ -1,5 +1,6 @@
 using MPAPI.Interfaces;
 using MPAPI.Interfaces.Packets;
+using MPAPI.Types;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Networking.TransportLayers;

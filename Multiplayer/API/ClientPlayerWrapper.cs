@@ -1,6 +1,5 @@
 using MPAPI.Interfaces;
 using Multiplayer.Components.Networking.Player;
-using System;
 using UnityEngine;
 
 namespace Multiplayer.API;
