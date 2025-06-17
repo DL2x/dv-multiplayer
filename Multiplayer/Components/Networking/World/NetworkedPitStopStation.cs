@@ -82,6 +82,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     private float disablerSqrDistance = DEFAULT_DISABLER_SQR_DISTANCE;
     private float disablerCheckInterval = DEFAULT_DISABLER_INTERVAL;
 
+    private readonly Dictionary<LocoResourceModule, (Action FillStart, Action FillStop, Action DrainStart, Action DrainStop)> resourceStartStopDelegates = [];
+    private readonly Dictionary<LocoResourceModule, bool> resourceFlowing = [];
+
     private bool processingAsHost = false;
     #endregion
 
@@ -104,19 +107,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     private readonly Dictionary<ResourceType, LocoResourceModule> resourceTypeToLocoResourceModule = [];
 
     private readonly Dictionary<ResourceType, bool> isResourceGrabbedDict = [];
-    private readonly Dictionary<ResourceType, bool> wasResourceGrabbedDict = [];
     private readonly Dictionary<ResourceType, bool> isResourceRemoteGrabbedDict = [];
-    private readonly Dictionary<ResourceType, bool> wasResourceRemoteGrabbedDict = [];
     private readonly Dictionary<ResourceType, float> lastRemoteValueDict = [];
-    private float lastUpdateTime = 0.0f;
-
+ 
     private bool isFaucetGrabbed = false;
     private float lastFaucetUpdateTime = 0.0f;
     private float lastFaucetSent = 0.0f;
     private float faucetTargetPercentage = 0.0f;
     private bool faucetTargetReached = true;
-
-    private readonly Dictionary<ResourceType, float> lastUnitsToBuyDict = [];
 
     private bool Refreshed = false;
     #endregion
@@ -142,6 +140,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
             StartCoroutine(PlayerDistanceChecker());
 
+            NetworkLifecycle.Instance.OnTick += OnTick;
             //ensure host can interact
             Refreshed = true;
         }
@@ -158,7 +157,20 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         pitStopStationToNetworkedPitStopStation.Remove(Station);
 
         if (NetworkLifecycle.Instance.IsHost())
+        {
             StopCoroutine(PlayerDistanceChecker());
+
+            foreach (var kvp in resourceStartStopDelegates)
+            {
+                var (fillStart, fillStop, drainStart, drainStop) = kvp.Value;
+                kvp.Key.FillStarted -= fillStart;
+                kvp.Key.FillStopped -= fillStop;
+                kvp.Key.DrainStarted -= drainStart;
+                kvp.Key.DrainStopped -= drainStop;
+            }
+
+            resourceStartStopDelegates.Clear();
+        }
 
         if (carSelectorGrab != null)
         {
@@ -187,87 +199,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         grabbedHandlerLookup.Clear();
         leverLookup.Clear();
         base.OnDestroy();
-    }
-
-    protected void LateUpdate()
-    {
-        foreach (var resourceType in resourceTypes)
-        {
-            var module = Station.locoResourceModules.resourceModules.FirstOrDefault(x => x.resourceType == resourceType);
-
-            if (module == null
-                || !isResourceGrabbedDict.TryGetValue(resourceType, out var isResourceGrabbed)
-                || !wasResourceGrabbedDict.TryGetValue(resourceType, out var wasResourceGrabbed)
-                || !isResourceRemoteGrabbedDict.TryGetValue(resourceType, out var isResourceRemoteGrabbed)
-                || !wasResourceRemoteGrabbedDict.TryGetValue(resourceType, out var wasResourceRemoteGrabbed)
-                || !lastRemoteValueDict.TryGetValue(resourceType, out var lastRemoteValue)
-                || !lastUnitsToBuyDict.TryGetValue(resourceType, out var lastUnitsToBuy)
-                )
-                continue;
-
-            //Handle local grab interactions
-            if (isResourceGrabbed || (wasResourceGrabbed && lastUnitsToBuy != module.Data.unitsToBuy))
-            {
-                //ensure the delta is big enough to be worth sending or we have reached a limit
-                var delta = Math.Abs(lastUnitsToBuy - module.Data.unitsToBuy);
-                var deltaTime = Time.time - lastUpdateTime;
-
-                //Check if the units to buy have reached a limit (0 or AbsoluteMaxValue), as this overrides a delta below minimum
-                var unitsToBuyChanged =
-                       (module.Data.unitsToBuy == module.AbsoluteMinValue && lastUnitsToBuy != module.AbsoluteMinValue)
-                    || (module.Data.unitsToBuy == module.AbsoluteMaxValue && lastUnitsToBuy != module.AbsoluteMaxValue);
-
-                //Send the update if we've passed the time threshold AND we have a big enough change or hit a limit
-                if (deltaTime > MIN_UPDATE_TIME && (delta > MAX_DELTA || unitsToBuyChanged))
-                {
-                    lastUnitsToBuyDict[resourceType] = module.Data.unitsToBuy;
-                    lastUpdateTime = Time.time;
-
-                    Multiplayer.LogDebug(() => $"NetworkedPitStopStation.LateUpdate() isGrabbed: {isResourceGrabbed}, wasGrabbed: {wasResourceGrabbed}, previous: {lastUnitsToBuy}, new: {module.Data.unitsToBuy}, processingAsHost: {processingAsHost}. Sending PitstopInteractionPacket ResourceUpdate ");
-
-                    if (!(NetworkLifecycle.Instance.IsHost() && processingAsHost))
-                        NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket(
-                                NetId,
-                                PitStopStationInteractionType.ResourceUpdate,
-                                resourceType,
-                                lastUnitsToBuyDict[resourceType]
-                            );
-                }
-            }
-            //Local grab has ended, but needs to be finalised
-            else if (wasResourceGrabbed)
-            {
-                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.LateUpdate() wasGrabbed: {wasResourceGrabbed}, previous: {lastUnitsToBuy}, new: {module.Data.unitsToBuy}");
-                lastUnitsToBuyDict[resourceType] = module.Data.unitsToBuy;
-
-                if (!(NetworkLifecycle.Instance.IsHost() && processingAsHost))
-                    NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket(
-                        NetId,
-                        PitStopStationInteractionType.ResourceUpdate,
-                        resourceType,
-                        lastUnitsToBuyDict[resourceType]
-                    );
-
-                //Reset grab states
-                wasResourceGrabbedDict[resourceType] = false;
-            }
-
-            //allow things to settle after remote grab released
-            if (!isResourceRemoteGrabbed && wasResourceRemoteGrabbed)
-            {
-                float previous = module.Data.unitsToBuy;
-
-                SetUnits(module, lastRemoteValue);
-
-                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.LateUpdate() wasRemoteGrabbed: {wasResourceRemoteGrabbed}, previous: {previous}, new: {lastRemoteValue}");
-
-                if (previous == lastRemoteValue)
-                {
-                    //settled, stop tracking remote
-                    wasResourceRemoteGrabbedDict[resourceType] = false;
-                }
-            }
-        }
     }
 
     protected void Update()
@@ -407,7 +338,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             {
                 Multiplayer.LogDebug(() => $"ProcessInteractionPacketAsHost() ProcessPacketAsClient()");
                 ProcessInteractionPacketAsClient(packet);
-                LateUpdate();
             }
             processingAsHost = false;
             //Send to all other players
@@ -432,6 +362,50 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                     InteractionType = (byte)PitStopStationInteractionType.Reject
                 }
             );
+        }
+    }
+
+    private void OnFlowStarted(LocoResourceModule module)
+    {
+        resourceFlowing[module] = true;
+    }
+
+    private void OnFlowStopped(LocoResourceModule module)
+    {
+        resourceFlowing[module] = false;
+        SendResourceUpdate(module);
+    }
+
+    private void OnTick(uint tick)
+    {
+        foreach (var kvp in resourceFlowing)
+        {
+            if (!kvp.Value)
+                continue;
+
+            var module = kvp.Key;
+
+           SendResourceUpdate(module);
+        }
+    }
+
+    private void SendResourceUpdate(LocoResourceModule module)
+    {
+        CommonPitStopInteractionPacket packet = new()
+        {
+            NetId = this.NetId,
+            InteractionType = (byte)PitStopStationInteractionType.ResourceUpdate,
+            ResourceType = (int)module.resourceType,
+            Value = module.Data.unitsToBuy
+        };
+
+        foreach (var playerId in playerToLastNearbyTime.Keys)
+        {
+            if (NetworkLifecycle.Instance.Server.TryGetPeer(playerId, out var sendPeer))
+            {
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SendResourceUpdate({module.resourceType}) sending to peer: {sendPeer.Id}, value: {module.Data.unitsToBuy}, flowing: {module.IsFlowing}");
+                NetworkLifecycle.Instance.Server.SendPitStopInteractionPacket(sendPeer, packet);
+            }
         }
     }
     #endregion
@@ -494,11 +468,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         foreach (var resourceType in resourceTypes)
         {
             isResourceGrabbedDict[resourceType] = false;
-            wasResourceGrabbedDict[resourceType] = false;
             isResourceRemoteGrabbedDict[resourceType] = false;
-            wasResourceRemoteGrabbedDict[resourceType] = false;
             lastRemoteValueDict[resourceType] = 0.0f;
-            lastUnitsToBuyDict[resourceType] = 0.0f;
         }
 
         StringBuilder sb = new();
@@ -511,6 +482,22 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                 yield return new WaitUntil(() => resourceModule.initialized);
 
                 resourceTypeToLocoResourceModule[resourceModule.resourceType] = resourceModule;
+
+                //subscribe to fill/drain stop events
+                if (NetworkLifecycle.Instance.IsHost())
+                {
+                    void FillStartHandler() => OnFlowStarted(resourceModule);
+                    void FillStopHandler() => OnFlowStopped(resourceModule);
+                    void DrainStartHandler() => OnFlowStarted(resourceModule);
+                    void DrainStopHandler() => OnFlowStopped(resourceModule);
+
+                    resourceModule.FillStarted += FillStartHandler;
+                    resourceModule.FillStopped += FillStopHandler;
+                    resourceModule.DrainStarted += DrainStartHandler;
+                    resourceModule.DrainStopped += DrainStopHandler;
+
+                    resourceStartStopDelegates[resourceModule] = (FillStartHandler, FillStopHandler, DrainStartHandler, DrainStopHandler);
+                }
 
                 var checker = resourceModule.GetComponentInChildren<RotaryAmplitudeChecker>();
                 var grab = resourceModule.GetComponentInChildren<GrabHandlerHingeJoint>();
@@ -719,13 +706,10 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         {
             //lever returned home
             isResourceGrabbedDict[module.resourceType] = false;
-            wasResourceGrabbedDict[module.resourceType] = true;
         }
         else
         {
             isResourceGrabbedDict[module.resourceType] = true;
-            wasResourceGrabbedDict[module.resourceType] = true;
-            lastUnitsToBuyDict[module.resourceType] = module.Data.unitsToBuy;
         }
 
         NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket(NetId, PitStopStationInteractionType.LeverState, module.resourceType, state);
@@ -887,7 +871,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
                 if (!isLocallyGrabbed)
                 {
-
                     lever?.BlockControl(grabbed);
                     grab?.SetMovingDisabled(grabbed);
 
@@ -895,20 +878,18 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                         grab?.ForceEndInteraction();
                 }
 
-                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}, grabbed: {grabbed}, resourceModule: {resourceModule != null}, isResourceRemoteGrabbed: {isResourceRemoteGrabbedDict[resourceType]}, wasResourceRemoteGrabbed: {wasResourceRemoteGrabbedDict[resourceType]}");
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}, grabbed: {grabbed}, resourceModule: {resourceModule != null}, isResourceRemoteGrabbed: {isResourceRemoteGrabbedDict[resourceType]}");
 
                 resourceModule.OnValvePositionChange((int)packet.Value);
 
                 // Update remote grab state
                 isResourceRemoteGrabbedDict[resourceType] = grabbed;
-                if (grabbed)
-                    wasResourceRemoteGrabbedDict[resourceType] = true;
 
                 break;
 
             case PitStopStationInteractionType.ResourceUpdate:
 
-                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}, resourceModule: {resourceModule != null}, isResourceRemoteGrabbed: {isResourceRemoteGrabbedDict[resourceType]}, wasResourceRemoteGrabbed: {wasResourceRemoteGrabbedDict[resourceType]}");
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}, resourceModule: {resourceModule != null}, isResourceRemoteGrabbed: {isResourceRemoteGrabbedDict[resourceType]}");
 
                 // Validate the value range
                 if (packet.Value < resourceModule.AbsoluteMinValue || packet.Value > resourceModule.AbsoluteMaxValue)
@@ -917,16 +898,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                     return;
                 }
 
-                if (isResourceRemoteGrabbedDict[resourceType])
-                {
-                    lastRemoteValueDict[resourceType] = packet.Value;
-                    SetUnits(resourceModule, lastRemoteValueDict[resourceType]);
-                    Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}. SetUnits()");
-                }
-                else if (wasResourceRemoteGrabbedDict[resourceType])
-                {
-                    lastRemoteValueDict[resourceType] = packet.Value;
-                }
+                lastRemoteValueDict[resourceType] = packet.Value;
+                SetUnits(resourceModule, lastRemoteValueDict[resourceType]);
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}, flowing: {resourceModule.IsFlowing}");
 
                 break;
 

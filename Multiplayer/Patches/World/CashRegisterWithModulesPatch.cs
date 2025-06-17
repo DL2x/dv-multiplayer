@@ -4,6 +4,7 @@ using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Utils;
+using System;
 
 namespace Multiplayer.Patches.World;
 
@@ -54,6 +55,9 @@ public class CashRegisterWithModulesPatch
     [HarmonyPatch(nameof(CashRegisterWithModules.Cancel))]
     private static bool Cancel(CashRegisterWithModules __instance)
     {
+
+        Multiplayer.LogDebug(()=>$"CashRegisterWithModules.Cancel({__instance.GetObjectPath()})\r\n{Environment.StackTrace}");
+
         if (NetworkLifecycle.Instance.IsHost())
             return true;
 
@@ -128,6 +132,7 @@ public class CashRegisterBasePatch
             return true;
 
         //prevent clients from clearing cash registers when loading the game or leaving the area
+        __instance.StopAllCoroutines();
         return NetworkLifecycle.Instance.IsHost();
     }
 }
