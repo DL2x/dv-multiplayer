@@ -28,6 +28,9 @@ namespace Multiplayer
         #region Main Menu
         public static string MAIN_MENU__JOIN_SERVER => Get(MAIN_MENU__JOIN_SERVER_KEY);
         public const string MAIN_MENU__JOIN_SERVER_KEY = $"{PREFIX_MAIN_MENU}/join_server";
+
+        public static string MAIN_MENU__INCOMPATIBLE_MODS => Get(MAIN_MENU__INCOMPATIBLE_MODS_KEY);
+        public const string MAIN_MENU__INCOMPATIBLE_MODS_KEY = $"{PREFIX_MAIN_MENU}/incompatible_mods";
         #endregion
 
         #region Server Browser

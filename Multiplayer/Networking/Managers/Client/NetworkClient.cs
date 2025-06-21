@@ -42,7 +42,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityModManagerNet;
 using Object = UnityEngine.Object;
 
 namespace Multiplayer.Networking.Managers.Client;
@@ -86,8 +85,8 @@ public class NetworkClient : NetworkManager
             Username = Multiplayer.Settings.GetUserName(),
             Guid = Multiplayer.Settings.GetGuid().ToByteArray(),
             Password = password,
-            BuildMajorVersion = (ushort)BuildInfo.BUILD_VERSION_MAJOR,
-            Mods = ModInfo.FromModEntries(UnityModManager.modEntries)
+            BuildVersion = Multiplayer.LocalBuildInfo,
+            Mods = ModCompatibilityManager.Instance.GetLocalMods()
         };
         netPacketProcessor.Write(cachedWriter, serverboundClientLoginPacket);
         SelfPeer = Connect(address, port, cachedWriter);
@@ -270,15 +269,18 @@ public class NetworkClient : NetworkManager
         if (packet.Missing.Length != 0 || packet.Extra.Length != 0)
         {
             text += "\n\n";
+
             if (packet.Missing.Length != 0)
             {
                 text += Locale.Get(Locale.DISCONN_REASON__MODS_MISSING_KEY, placeholders: string.Join("\n - ", packet.Missing));
-                if (packet.Extra.Length != 0)
-                    text += "\n";
             }
 
             if (packet.Extra.Length != 0)
+            {
+                if (packet.Missing.Length != 0)
+                    text += "\n";
                 text += Locale.Get(Locale.DISCONN_REASON__MODS_EXTRA_KEY, placeholders: string.Join("\n - ", packet.Extra));
+            }
         }
 
         Log($"Received player deny packet: {text}");

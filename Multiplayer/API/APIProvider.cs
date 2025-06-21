@@ -1,4 +1,5 @@
 using MPAPI.Interfaces;
+using MPAPI.Types;
 using Multiplayer.Components.Networking;
 
 
@@ -6,7 +7,6 @@ namespace Multiplayer.API
 {
     public class APIProvider : IMultiplayerAPI
     {
-
         public bool IsMultiplayerLoaded => true;
         
         public bool IsConnected => NetworkLifecycle.Instance.IsClientRunning || NetworkLifecycle.Instance.IsServerRunning;
@@ -25,6 +25,11 @@ namespace Multiplayer.API
         public bool TryGetObjectFromNetId<T>(ushort netId, out T obj) where T : class
         {
             return NetIdProvider.Instance.TryGetObject<T>(netId, out obj);
+        }
+
+        public void SetModCompatibility(string modId, MultiplayerCompatibility compatibility)
+        {
+            ModCompatibilityManager.Instance.RegisterCompatibility(modId, compatibility);
         }
     }
 }

@@ -42,7 +42,9 @@ public static class Multiplayer
             return info.InformationalVersion.Split('+')[0];
         }
     }
-    
+
+    public static string LocalBuildInfo => BuildInfo.BUILD_VERSION_MAJOR.ToString() + " - " + BuildInfo.BUILDBOT_INFO;
+
 
     public static bool specLog = false;
 
@@ -102,9 +104,12 @@ public static class Multiplayer
             Log("Creating NetworkManager...");
             NetworkLifecycle.CreateLifecycle();
 
+            Log("Loading Compatibility Manager...");
+            ModCompatibilityManager.Instance.CheckInstance();
+
             Log("Loading API Provider...");
             _apiProvider = new APIProvider();
-            MPAPI.MultiplayerAPI.RegisterAPI(_apiProvider);
+            MultiplayerAPI.RegisterAPI(_apiProvider);
         }
         catch (Exception ex)
         {

@@ -1,3 +1,4 @@
+using MPAPI.Types;
 
 namespace MPAPI.Interfaces;
 
@@ -10,6 +11,12 @@ public interface IMultiplayerAPI
     /// Gets whether the multiplayer mod is currently loaded and active
     /// </summary>
     bool IsMultiplayerLoaded { get; }
+
+
+    /// <summary>Sets the mod's compatibility requirements</summary>
+    /// <param name="modId">String representing the your mod's Id (`ModEntry.Info.Id`)</param>
+    /// <param name="compatibility">ModCompatibility flags representing installation host/client requirements</param>
+    void SetModCompatibility(string modId, MultiplayerCompatibility compatibility);
 
     /// <summary>
     /// Returns true if either a host or client exist

@@ -8,7 +8,6 @@ using DV;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Util;
 using Multiplayer.Networking.Data;
-using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Utils;
 using System.Linq;
 using System.Reflection;
@@ -17,7 +16,7 @@ using TMPro;
 using UnityEngine.Events;
 using UnityEngine.UI;
 using UnityEngine;
-using UnityModManagerNet;
+using Multiplayer.API;
 
 namespace Multiplayer.Components.MainMenu;
 
@@ -51,6 +50,8 @@ public class HostGamePane : MonoBehaviour
     LauncherController lcInstance;
 
     public Action<ISaveGame> continueCareerRequested;
+
+    private bool incompatibleMods = true;
     #region setup
 
     public void Awake()
@@ -77,6 +78,9 @@ public class HostGamePane : MonoBehaviour
     {
         //Multiplayer.Log("HostGamePane OnEnable()");
         this.SetupListeners(true);
+
+        incompatibleMods = ModCompatibilityManager.Instance.CheckModCompatibility();
+        ValidateInputs(null);
     }
 
     // Disable listeners
@@ -335,7 +339,7 @@ public class HostGamePane : MonoBehaviour
         
         startButton = go.GetComponent<ButtonDV>();
         startButton.onClick.RemoveAllListeners();
-        startButton.onClick.AddListener(StartClick);
+        startButton.onClick.AddListener(OnStartClick);
     }
 
     private GameObject NewContentGroup(GameObject parent, Vector2 sizeDelta, int cellMaxHeight = 53)
@@ -383,10 +387,12 @@ public class HostGamePane : MonoBehaviour
     #endregion
 
     #region UI callbacks
-    private void ValidateInputs(string text)
+    private void ValidateInputs(string _)
     {
         bool valid = true;
 
+        if (incompatibleMods)
+            valid = false;
 
         if (!DVSteamworks.Success)
             valid = false;
@@ -406,7 +412,7 @@ public class HostGamePane : MonoBehaviour
         startButton.ToggleInteractable(valid);
     }
 
-    private void StartClick()
+    private void OnStartClick()
     {
 
         using (LobbyServerData serverData = new())
@@ -423,17 +429,18 @@ public class HostGamePane : MonoBehaviour
             serverData.CurrentPlayers = 0;
             serverData.MaxPlayers = (int)maxPlayers.value;
 
-            ModInfo[] serverMods = ModInfo.FromModEntries(UnityModManager.modEntries)
-                                .Where(mod => !NetworkServer.modWhiteList.Contains(mod.Id) && mod.Id != Multiplayer.ModEntry.Info.Id).ToArray();
-
-            string requiredMods = "";
-            if (serverMods.Length > 0)
+            // final check before we start the server
+            string requiredMods = ModCompatibilityManager.Instance.GetRequiredMods();
+            if (requiredMods == null)
             {
-                requiredMods = string.Join(", ", serverMods.Select(mod => $"{{{mod.Id}, {mod.Version}}}"));
+                
+                incompatibleMods = true;
+                ValidateInputs(null);
+                return;
             }
 
-            serverData.RequiredMods = requiredMods; //FIX THIS - get the mods required
-            serverData.GameVersion = BuildInfo.BUILD_VERSION_MAJOR.ToString();
+            serverData.RequiredMods = requiredMods;
+            serverData.GameVersion = Multiplayer.LocalBuildInfo;
             serverData.MultiplayerVersion = Multiplayer.Ver;
 
             serverData.ServerDetails = details.text.Trim();

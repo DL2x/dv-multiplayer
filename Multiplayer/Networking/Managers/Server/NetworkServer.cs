@@ -35,7 +35,6 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using UnityEngine;
-using UnityModManagerNet;
 
 namespace Multiplayer.Networking.Managers.Server;
 
@@ -725,12 +724,13 @@ public class NetworkServer : NetworkManager
         }
 
         if (packet.BuildMajorVersion != BuildInfo.BUILD_VERSION_MAJOR)
+        if (packet.BuildVersion != Multiplayer.LocalBuildInfo)
         {
-            LogWarning($"Denied login to incorrect game version! Got: {packet.BuildMajorVersion}, expected: {BuildInfo.BUILD_VERSION_MAJOR}");
+            LogWarning($"Denied login to incorrect game version! Got: {packet.BuildVersion}, expected: {Multiplayer.LocalBuildInfo}");
             ClientboundLoginResponsePacket denyPacket = new()
             {
                 ReasonKey = Locale.DISCONN_REASON__GAME_VERSION_KEY,
-                ReasonArgs = [BuildInfo.BUILD_VERSION_MAJOR.ToString(), packet.BuildMajorVersion.ToString()]
+                ReasonArgs = [Multiplayer.LocalBuildInfo, packet.BuildVersion.ToString()]
             };
             request.Reject(WritePacket(denyPacket));
             return;
@@ -747,18 +747,16 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        ModInfo[] clientMods = packet.Mods.Where(mod => !modWhiteList.Contains(mod.Id)).ToArray();
-        if (!serverMods.SequenceEqual(clientMods))
+        var validation = ModCompatibilityManager.Instance.ValidateClientMods(packet.Mods);
+        if (!validation.IsValid)
         {
-            ModInfo[] missing = serverMods.Except(clientMods).ToArray();
-            ModInfo[] extra = clientMods.Except(serverMods).ToArray();
 
-            LogWarning($"Denied login due to mod mismatch! {missing.Length} missing, {extra.Length} extra");
+            LogWarning($"Denied login due to mod mismatch! {validation.Missing.Count} missing, {validation.Extra} extra");
             ClientboundLoginResponsePacket denyPacket = new()
             {
                 ReasonKey = Locale.DISCONN_REASON__MODS_KEY,
-                Missing = missing,
-                Extra = extra
+                Missing = validation.Missing.ToArray(),
+                Extra = validation.Extra.ToArray(),
             };
             request.Reject(WritePacket(denyPacket));
             return;
