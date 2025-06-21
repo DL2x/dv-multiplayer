@@ -20,7 +20,7 @@ public class ChatManager
     public const string COMMAND_LOG = "log";
     public const string COMMAND_LOG_SHORT = "l";
     public const string COMMAND_KICK = "kick";
-   
+
     public const string MESSAGE_COLOUR_SERVER = "9CDCFE";
     public const string MESSAGE_COLOUR_HELP = "00FF00";
 
@@ -49,7 +49,7 @@ public class ChatManager
         (
             COMMAND_WHISPER,
             COMMAND_WHISPER_SHORT,
-            ()=> $"{Locale.CHAT_HELP_WHISPER_MSG}" +
+            () => $"{Locale.CHAT_HELP_WHISPER_MSG}" +
                     $"\r\n\t\t/{COMMAND_WHISPER} <{Locale.CHAT_HELP_PLAYER_NAME}> <{Locale.CHAT_HELP_MSG}>" +
                     $"\r\n\t\t/{COMMAND_WHISPER_SHORT} <{Locale.CHAT_HELP_PLAYER_NAME}> <{Locale.CHAT_HELP_MSG}>",
             WhisperMessage
@@ -59,7 +59,7 @@ public class ChatManager
         (
             COMMAND_HELP,
             COMMAND_HELP_SHORT,
-            ()=> $"{Locale.CHAT_HELP_HELP}" +
+            () => $"{Locale.CHAT_HELP_HELP}" +
                     $"\r\n\t\t/{COMMAND_HELP}" +
                     $"\r\n\t\t/{COMMAND_HELP_SHORT}",
             HelpMessage
@@ -142,7 +142,7 @@ public class ChatManager
                 Multiplayer.LogDebug(() => $"ProcessMessage(\'{message}\') cleaned message: {cleanedMessage}");
 
                 commandCallback(cleanedMessage, sender);
-                
+
                 return;
             }
         }
@@ -199,15 +199,15 @@ public class ChatManager
         string whisperMessage = parts[1];
 
 
-        Multiplayer.LogDebug(()=>$"Whispering parse 1: \"{message}\", sender: {sender?.Username}, senderID: {sender?.Id}, peerName: {recipientName}");
+        Multiplayer.LogDebug(() => $"Whispering parse 1: \"{message}\", sender: {sender?.Username}, senderID: {sender?.Id}, peerName: {recipientName}");
 
         //look up the peer ID
         var recipient = ServerPlayerFromUsername(recipientName);
-        if(recipient == null)
+        if (recipient == null)
         {
             Multiplayer.LogDebug(() => $"Whispering failed: \"{message}\", sender: {sender?.Username}, senderID: {sender?.Id}, peerName: {recipientName}");
 
-            whisperMessage = $"<color=#{MESSAGE_COLOUR_SERVER}>{recipientName} not found - you're whispering into the void!</color>"; //todo: add translation
+            whisperMessage = $"<color=#{MESSAGE_COLOUR_SERVER}>{Locale.Get(Locale.CHAT_WHISPER_NOT_FOUND_KEY, recipientName)}</color>";
             NetworkLifecycle.Instance.Server.SendWhisper(whisperMessage, sender);
             return;
         }
@@ -247,11 +247,11 @@ public class ChatManager
 
         if (playerToKick == null || NetworkLifecycle.Instance.IsHost(playerToKick.Peer))
         {
-            whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>Unable to kick {playerName}</color>"; //todo: translate
+            whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>{Locale.Get(Locale.CHAT_KICK_UNABLE_KEY, playerName)}</color>";
         }
         else
         {
-            whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>{playerName} was kicked</color>"; //todo: translate
+            whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>{Locale.Get(Locale.CHAT_KICK_KICKED_KEY, playerName)}</color>";
 
             NetworkLifecycle.Instance.Server.KickPlayer(playerToKick);
         }
@@ -301,8 +301,8 @@ public class ChatManager
 
     private ServerPlayer ServerPlayerFromUsername(string playerName)
     {
-     
-        if(string.IsNullOrEmpty(playerName))
+
+        if (string.IsNullOrEmpty(playerName))
             return null;
 
         return NetworkLifecycle.Instance.Server.ServerPlayers.Where(p => p.Username == playerName).FirstOrDefault();

@@ -182,6 +182,17 @@ namespace Multiplayer
         public const string CHAT_HELP_MSG_KEY = $"{PREFIX_CHAT_INFO}/help/msg";
         public static string CHAT_HELP_PLAYER_NAME => Get(CHAT_HELP_PLAYER_NAME_KEY);
         public const string CHAT_HELP_PLAYER_NAME_KEY = $"{PREFIX_CHAT_INFO}/help/playername";
+
+        public static string CHAT_WHISPER_NOT_FOUND => Get(CHAT_WHISPER_NOT_FOUND_KEY);
+        public const string CHAT_WHISPER_NOT_FOUND_KEY = $"{PREFIX_CHAT_INFO}/whisper/not_found";
+
+        public static string CHAT_KICK_UNABLE => Get(CHAT_KICK_UNABLE_KEY);
+        public const string CHAT_KICK_UNABLE_KEY = $"{PREFIX_CHAT_INFO}/kick/unable";
+        public static string CHAT_KICK_KICKED => Get(CHAT_KICK_KICKED_KEY);
+        public const string CHAT_KICK_KICKED_KEY = $"{PREFIX_CHAT_INFO}/kick/kicked";
+
+
+
         #endregion
 
         #region Pause Menu
