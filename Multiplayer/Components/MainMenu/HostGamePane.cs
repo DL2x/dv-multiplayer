@@ -76,7 +76,6 @@ public class HostGamePane : MonoBehaviour
 
     public void OnEnable()
     {
-        //Multiplayer.Log("HostGamePane OnEnable()");
         this.SetupListeners(true);
 
         incompatibleMods = ModCompatibilityManager.Instance.CheckModCompatibility();
@@ -139,7 +138,7 @@ public class HostGamePane : MonoBehaviour
             Multiplayer.LogError("Field Of View not found!");
             return;
         }
-        
+
         GameObject inputPrefab = MainMenuThingsAndStuff.Instance.references.popupTextInput.gameObject.FindChildByName("TextFieldTextIcon");
         if (inputPrefab == null)
         {
@@ -178,12 +177,12 @@ public class HostGamePane : MonoBehaviour
                              Locale.Get(Locale.SERVER_HOST__MOD_WARNING_KEY, ["<link=\"https://github.com/AMacro/dv-multiplayer/wiki/Mod-Compatibility\">", "</link>"]) + "<br><br>" +
                              Locale.SERVER_HOST__RECOMMEND + "<br><br>" +
                              Locale.SERVER_HOST__SIGNOFF;
-                             /*"First time hosts, please see the <link=\"https://github.com/AMacro/dv-multiplayer/wiki/Hosting\">Hosting</link> section of our Wiki.<br><br><br>" +
+        /*"First time hosts, please see the <link=\"https://github.com/AMacro/dv-multiplayer/wiki/Hosting\">Hosting</link> section of our Wiki.<br><br><br>" +
 
-                             "Using other mods may cause unexpected behaviour including de-syncs. See <link=\"https://github.com/AMacro/dv-multiplayer/wiki/Mod-Compatibility\">Mod Compatibility</link> for more info.<br><br>" +
-                             "It is recommended that other mods are disabled and Derail Valley restarted prior to playing in multiplayer.<br><br>" +
+        "Using other mods may cause unexpected behaviour including de-syncs. See <link=\"https://github.com/AMacro/dv-multiplayer/wiki/Mod-Compatibility\">Mod Compatibility</link> for more info.<br><br>" +
+        "It is recommended that other mods are disabled and Derail Valley restarted prior to playing in multiplayer.<br><br>" +
 
-                             "We hope to have your favourite mods compatible with multiplayer in the future.";*/
+        "We hope to have your favourite mods compatible with multiplayer in the future.";*/
 
 
         //Find scrolling viewport
@@ -215,7 +214,7 @@ public class HostGamePane : MonoBehaviour
         layoutGroup.childForceExpandHeight = true;
 
         layoutGroup.spacing = 0; // Adjust the spacing as needed
-        layoutGroup.padding = new RectOffset(0,0,0,0);
+        layoutGroup.padding = new RectOffset(0, 0, 0, 0);
 
         ContentSizeFitter sizeFitter = controls.AddComponent<ContentSizeFitter>();
         sizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -223,10 +222,10 @@ public class HostGamePane : MonoBehaviour
         /*
          *  Server name field 
          */
-        GameObject go = GameObject.Instantiate(inputPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta).transform,false);
+        GameObject go = GameObject.Instantiate(inputPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta).transform, false);
         go.name = "Server Name";
         serverName = go.GetComponent<TMP_InputField>();
-        serverName.text = Multiplayer.Settings.ServerName?.Trim().Substring(0,Mathf.Min(Multiplayer.Settings.ServerName.Trim().Length,MAX_SERVER_NAME_LEN));
+        serverName.text = Multiplayer.Settings.ServerName?.Trim().Substring(0, Mathf.Min(Multiplayer.Settings.ServerName.Trim().Length, MAX_SERVER_NAME_LEN));
         serverName.placeholder.GetComponent<TMP_Text>().text = Locale.SERVER_HOST_NAME;
         serverName.characterLimit = MAX_SERVER_NAME_LEN;
         go.AddComponent<UIElementTooltip>();
@@ -253,7 +252,7 @@ public class HostGamePane : MonoBehaviour
         gameVisibility = go.GetOrAddComponent<Selector>();
 
         //clean-up
-        
+
         if (gameVisibility.labelTMPro?.gameObject.TryGetComponent<I2.Loc.Localize>(out var loc) ?? false)
             GameObject.DestroyImmediate(loc);
         if (gameVisibility.labelTMPro?.gameObject.TryGetComponent<DV.Localization.Localize>(out var loc2) ?? false)
@@ -280,7 +279,7 @@ public class HostGamePane : MonoBehaviour
         /*
          *  Server details field 
          */
-        go = GameObject.Instantiate(inputPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta,106).transform, false);
+        go = GameObject.Instantiate(inputPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta, 106).transform, false);
         go.name = "Details";
         go.transform.GetComponent<RectTransform>().sizeDelta = new Vector2(go.transform.GetComponent<RectTransform>().sizeDelta.x, 106);
         details = go.GetComponent<TMP_InputField>();
@@ -312,11 +311,11 @@ public class HostGamePane : MonoBehaviour
         labelGo.GetComponent<Localize>().key = Locale.SERVER_HOST_MAX_PLAYERS_KEY;
         go.ResetTooltip();
         //labelGo.GetComponent<Localize>().UpdateLocalization();
-        
+
         maxPlayers.stepIncrement = 1;
         maxPlayers.minValue = MIN_PLAYERS;
         maxPlayers.maxValue = MAX_PLAYERS;
-        maxPlayers.value = Mathf.Clamp(Multiplayer.Settings.MaxPlayers,MIN_PLAYERS,MAX_PLAYERS);
+        maxPlayers.value = Mathf.Clamp(Multiplayer.Settings.MaxPlayers, MIN_PLAYERS, MAX_PLAYERS);
         go.SetActive(true);
         maxPlayers.interactable = true;
 
@@ -329,14 +328,14 @@ public class HostGamePane : MonoBehaviour
         port.characterValidation = TMP_InputField.CharacterValidation.Integer;
         port.characterLimit = MAX_PORT_LEN;
         port.placeholder.GetComponent<TMP_Text>().text = DEFAULT_PORT.ToString();
-        port.text = (Multiplayer.Settings.Port >= MIN_PORT && Multiplayer.Settings.Port <= MAX_PORT) ?  Multiplayer.Settings.Port.ToString() : DEFAULT_PORT.ToString();
+        port.text = (Multiplayer.Settings.Port >= MIN_PORT && Multiplayer.Settings.Port <= MAX_PORT) ? Multiplayer.Settings.Port.ToString() : DEFAULT_PORT.ToString();
 
         /*
          *  Start Game button
          */
         go = this.gameObject.UpdateButton("ButtonTextIcon Save", "ButtonTextIcon Start", Locale.SERVER_HOST_START_KEY, null, playSprite);
         go.FindChildByName("[text]").GetComponent<Localize>().UpdateLocalization();
-        
+
         startButton = go.GetComponent<ButtonDV>();
         startButton.onClick.RemoveAllListeners();
         startButton.onClick.AddListener(OnStartClick);
@@ -351,7 +350,7 @@ public class HostGamePane : MonoBehaviour
         contentGroup.transform.SetParent(parent.transform, false);
         groupRect.sizeDelta = sizeDelta;
 
-        ContentSizeFitter  sizeFitter = contentGroup.AddComponent<ContentSizeFitter>();
+        ContentSizeFitter sizeFitter = contentGroup.AddComponent<ContentSizeFitter>();
         sizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         // Add VerticalLayoutGroup and ContentSizeFitter
@@ -482,9 +481,6 @@ public class HostGamePane : MonoBehaviour
         //Multiplayer.Log($"OnRunClicked exists: {ContinueGameRequested != null}");
         ContinueGameRequested?.Invoke(lcInstance, null);
     }
-
-
-
     #endregion
 
 

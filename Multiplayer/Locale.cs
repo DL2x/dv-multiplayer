@@ -31,6 +31,18 @@ namespace Multiplayer
 
         public static string MAIN_MENU__INCOMPATIBLE_MODS => Get(MAIN_MENU__INCOMPATIBLE_MODS_KEY);
         public const string MAIN_MENU__INCOMPATIBLE_MODS_KEY = $"{PREFIX_MAIN_MENU}/incompatible_mods";
+
+        public static string MAIN_MENU__UPDATE_TITLE => Get(MAIN_MENU__MAIN_MENU__UPDATE_TITLE_KEY);
+        public const string MAIN_MENU__MAIN_MENU__UPDATE_TITLE_KEY = $"{PREFIX_MAIN_MENU}/update_title";
+
+        public static string MAIN_MENU__UPDATE_LATEST => Get(MAIN_MENU__UPDATE_LATEST_KEY);
+        public const string MAIN_MENU__UPDATE_LATEST_KEY = $"{PREFIX_MAIN_MENU}/update_latest";
+
+        public static string MAIN_MENU__UPDATE_INSTALLED => Get(MAIN_MENU__UPDATE_INSTALLED_KEY);
+        public const string MAIN_MENU__UPDATE_INSTALLED_KEY = $"{PREFIX_MAIN_MENU}/update_installed";
+
+        public static string MAIN_MENU__UPDATE_ACTION => Get(MAIN_MENU__UPDATE_ACTION_KEY);
+        public const string MAIN_MENU__UPDATE_ACTION_KEY = $"{PREFIX_MAIN_MENU}/update_action";
         #endregion
 
         #region Server Browser
@@ -132,6 +144,9 @@ namespace Multiplayer
 
         public static string DISCONN_REASON__MODS_EXTRA => Get(DISCONN_REASON__MODS_EXTRA_KEY);
         public const string DISCONN_REASON__MODS_EXTRA_KEY = $"{PREFIX_DISCONN_REASON}/mods_extra";
+
+        public static string DISCONN_REASON__MODS_INCOMPATIBLE => Get(DISCONN_REASON__MODS_INCOMPATIBLE_KEY);
+        public const string DISCONN_REASON__MODS_INCOMPATIBLE_KEY = $"{PREFIX_DISCONN_REASON}/mods_incompatible";
         #endregion
 
         #region Career Manager

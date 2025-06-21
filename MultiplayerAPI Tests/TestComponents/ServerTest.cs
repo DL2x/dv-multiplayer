@@ -1,4 +1,3 @@
-using CommandTerminal;
 using DV.Logic.Job;
 using I2.Loc;
 using MPAPI;
@@ -8,9 +7,6 @@ using MultiplayerAPITest.Packets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 
@@ -32,7 +28,7 @@ internal class ServerTest : MonoBehaviour
         server.OnPlayerDisconnected += OnPlayerDisconnected;
         server.OnPlayerReady += OnPlayerReady;
 
-        //subscribe to packets and chat commands;
+        // Subscribe to packets and chat commands
         Subscribe();
     }
 
@@ -48,11 +44,9 @@ internal class ServerTest : MonoBehaviour
         server.OnPlayerReady -= OnPlayerReady;
     }
 
-
-    //Setup subscriptions for the packets we want to/expect to receive
     private void Subscribe()
     {
-        // Subscribe to network packets
+        // Subscribe to network packets - note: only packets that will be received by server need to be registered here
         server.RegisterPacket<SimplePacket>(OnTestSimpleModPacket);
         server.RegisterPacket<SimplePacketWithNetId>(OnSimplePacketWithNetId);
         server.RegisterSerializablePacket<ComplexModPacket>(OnTestComplexModPacket);
@@ -93,42 +87,31 @@ internal class ServerTest : MonoBehaviour
         // Note: This event occurs immediately prior to destroying the player object
         // Complete all cleanup prior to returning from this method
 
-        Log($"Player \"{player?.Id}\" has disconnected");
+        Log($"Player \"{player?.Username}\" has disconnected");
     }
     #endregion
 
     #region Packet Callbacks
 
-    //method called when a `TestSimplePacket` packet is received
+    // Method called when a `SimplePacket` packet is received
     private void OnTestSimpleModPacket(SimplePacket packet, IPlayer player)
     {
-
-        Log($"Received {packet.GetType()} from player: {player.Username}");
-
-        Log($"CarId: {packet.CarId}, Position: {packet.Position}, WheelArraangement: {packet.WheelArrangement}");
-
+        Log($"Received {packet.GetType()} from player: {player.Username}, CarId: {packet.CarId}, Position: {packet.Position}, WheelArraangement: {packet.WheelArrangement}");
     }
 
-    //method called when a `TestSimplePacket` packet is received
+    // Method called when a `SimplePacketWithNetId` packet is received
     private void OnSimplePacketWithNetId(SimplePacketWithNetId packet, IPlayer player)
     {
-
-        Log($"Received {packet.GetType()} from player: {player.Username}");
-
-        Log($"CarId: {packet.CarNetId}, Position: {packet.Position}, Wheel Arrangement: {packet.WheelArrangement}");
-
+        Log($"Received {packet.GetType()} from player: {player.Username}, CarId: {packet.CarNetId}, Position: {packet.Position}, Wheel Arrangement: {packet.WheelArrangement}");
     }
 
-    //method called when a `TestComplexModPacket` packet is received
+    //method called when a `ComplexModPacket` packet is received
     private void OnTestComplexModPacket(ComplexModPacket packet, IPlayer player)
     {
-
-        Log($"Received {packet.GetType()} from player: {player.Username}");
-
-        StringBuilder sb = new("\r\nPacket Data");
+        StringBuilder sb = new($"Received {packet.GetType()}\r\nPacket Data");
 
         foreach (var kvp in packet.CarToPositionMap)
-            sb.AppendLine($"CarId: {kvp.Key}, Position: {kvp.Value}");
+            sb.AppendLine($"\tCarId: {kvp.Key}, Position: {kvp.Value}");
 
         Log(sb.ToString());
     }
@@ -176,6 +159,7 @@ internal class ServerTest : MonoBehaviour
     #endregion
 
     #region Chat Command Callbacks
+    // Called when a player uses the chat command '/packet' or '/p'
     private void OnChatCommandSendPacket(string message, IPlayer sender)
     {
         string[] args = message.Split(' ');
@@ -238,6 +222,7 @@ internal class ServerTest : MonoBehaviour
         }
     }
 
+    // Called when a player uses the chat command '/locopos' or '/lp'
     private void OnChatCommandSendLocoPos(string message, IPlayer sender)
     {
         //this chat command has no arguments
@@ -276,7 +261,7 @@ internal class ServerTest : MonoBehaviour
             LogWarning($"Received 'ClosestPlayer' chat command from player \"{sender.Username}\", but the second argument is empty. Command: {message}");
         }
 
-        var tc = GetTrainCarFromID(args[0]);
+        var tc = GetTrainCarFromID(args[0].ToUpper());
 
         if (tc != null)
         {
@@ -300,7 +285,7 @@ internal class ServerTest : MonoBehaviour
         StringBuilder whisper = new($"<color=#{MESSAGE_COLOUR_SERVER}>There {(server.PlayerCount > 1 ? "are" : "is")} {server.PlayerCount} connected player{(server.PlayerCount > 1 ? "s" : "")}:");
 
         foreach (var player in server.Players)
-            whisper.Append($"<br>\t{(player.IsHost? "<b>" : "")}{player.Username}{(player.IsHost ? "</b>" : "")} Id: {player.Id}, Ping: {player.Ping}{(player.IsOnCar? $", Riding {player.OccupiedCar.ID}" : "")}");
+            whisper.Append($"<br>\t{(player.IsHost ? "<b>" : "")}{player.Username}{(player.IsHost ? "</b>" : "")} Id: {player.Id}, Ping: {player.Ping}{(player.IsOnCar ? $", Riding {player.OccupiedCar.ID}" : "")}");
 
         whisper.Append("</color>");
 
@@ -412,7 +397,7 @@ internal class ServerTest : MonoBehaviour
             var badWordstart = message.IndexOf(badWord, StringComparison.OrdinalIgnoreCase);
             while (badWordstart >= 0)
             {
-                message = message.Remove(badWordstart,badWord.Length).Insert(badWordstart, new string('*', badWord.Length));
+                message = message.Remove(badWordstart, badWord.Length).Insert(badWordstart, new string('*', badWord.Length));
                 badWordstart = message.IndexOf(badWord, badWordstart + badWord.Length, StringComparison.OrdinalIgnoreCase);
             }
         }

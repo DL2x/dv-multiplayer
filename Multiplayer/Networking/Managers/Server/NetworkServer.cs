@@ -62,27 +62,20 @@ public class NetworkServer : NetworkManager
 
     private static ITransportPeer SelfPeer => NetworkLifecycle.Instance.Client?.SelfPeer;
     public static byte SelfId => (byte)SelfPeer.Id;
-    private readonly ModInfo[] serverMods;
 
     public readonly IDifficulty Difficulty;
     private bool IsLoaded;
 
-    private readonly ChatManager _chatManager = new(); 
+    private readonly ChatManager _chatManager = new();
     public ChatManager ChatManager => _chatManager;
-
-    //we don't care if the client doesn't have these mods
-    public static string[] modWhiteList = ["RuntimeUnityEditor", "BookletOrganizer", "RemoteDispatch"];
 
     public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData) : base(settings)
     {
-        Log(()=>$"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
+        Log(() => $"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
 
         IsSinglePlayer = singlePlayer;
         ServerData = serverData;
         Difficulty = difficulty;
-
-        serverMods = ModInfo.FromModEntries(UnityModManager.modEntries)
-                            .Where(mod => !modWhiteList.Contains(mod.Id)).ToArray();
     }
 
     public override bool Start(int port)
@@ -97,7 +90,7 @@ public class NetworkServer : NetworkManager
         if (IPAddress.TryParse(LobbyServerManager.GetStaticIPv6Address(), out IPAddress ipv6Address))
         {
             //start the connection, IPv4 messages can come from anywhere, IPv6 messages need to specifically come from the static IPv6
-            return base.Start(IPAddress.Any, ipv6Address,port);
+            return base.Start(IPAddress.Any, ipv6Address, port);
 
         }
 
@@ -116,7 +109,7 @@ public class NetworkServer : NetworkManager
         }
 
         //Alert all clients (except host)
-        var packet =  WritePacket(new ClientboundDisconnectPacket());
+        var packet = WritePacket(new ClientboundDisconnectPacket());
         foreach (var peer in peers.Values)
         {
             if (peer != SelfPeer)
@@ -351,7 +344,7 @@ public class NetworkServer : NetworkManager
     {
         var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
 
-        if(excludePeer == null)
+        if (excludePeer == null)
             SendPacketToAll(packet, deliveryMethod);
         else
             SendPacketToAll(packet, deliveryMethod, excludePeer);
@@ -450,7 +443,7 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        var packet = new ClientboundDestroyTrainCarPacket{ NetId = netTrainCar.NetId };
+        var packet = new ClientboundDestroyTrainCarPacket { NetId = netTrainCar.NetId };
 
         if (peer == null)
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
@@ -625,7 +618,7 @@ public class NetworkServer : NetworkManager
 
         var packet = ClientboundJobsCreatePacket.FromNetworkedJobs(networkedStation, jobs);
 
-        if (peer ==null)
+        if (peer == null)
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
         else
             SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
@@ -723,7 +716,6 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        if (packet.BuildMajorVersion != BuildInfo.BUILD_VERSION_MAJOR)
         if (packet.BuildVersion != Multiplayer.LocalBuildInfo)
         {
             LogWarning($"Denied login to incorrect game version! Got: {packet.BuildVersion}, expected: {Multiplayer.LocalBuildInfo}");
@@ -752,6 +744,28 @@ public class NetworkServer : NetworkManager
         {
 
             LogWarning($"Denied login due to mod mismatch! {validation.Missing.Count} missing, {validation.Extra} extra");
+            LogDebug(() =>
+            {
+                StringBuilder sb = new("Mod mis-match:");
+                sb.AppendLine("Server Mods:");
+                foreach (ModInfo mod in ModCompatibilityManager.Instance.GetLocalMods())
+                    sb.AppendLine($"\t{mod.Id} {mod.Version}, Status: {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
+
+                sb.AppendLine("\r\nClient Mods:");
+                foreach (ModInfo mod in packet.Mods)
+                    sb.AppendLine($"\t{mod.Id} {mod.Version}, Status (if known): {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
+
+                sb.AppendLine("\r\nMissing Mods:");
+                foreach (ModInfo mod in validation.Missing)
+                    sb.AppendLine($"\t{mod.Id} {mod.Version}, Status: {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
+
+                sb.AppendLine("\r\nExtra Mods:");
+                foreach (ModInfo mod in validation.Extra)
+                    sb.AppendLine($"\t{mod.Id} {mod.Version}, Status (if known): {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
+
+                return sb.ToString();
+            });
+
             ClientboundLoginResponsePacket denyPacket = new()
             {
                 ReasonKey = Locale.DISCONN_REASON__MODS_KEY,
@@ -960,16 +974,16 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonCouplerInteractionPacket(CommonCouplerInteractionPacket packet, ITransportPeer peer)
     {
-        if(!peerToPlayer.TryGetValue(peer, out var player))
+        if (!peerToPlayer.TryGetValue(peer, out var player))
         {
             LogWarning($"Received Coupler Interaction from {peer.GetType()}, peerId: {peer.Id}, but could not find matching player.");
             return;
         }
 
         //todo: add validation that to ensure the client is near the coupler - this packet may also be used for remote operations and may need to factor that in in the future
-        if(NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
+        if (NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
         {
-            if(netTrainCar.Server_ValidateCouplerInteraction(packet, player))
+            if (netTrainCar.Server_ValidateCouplerInteraction(packet, player))
             {
                 //passed validation, send to all but the originator
                 SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
@@ -981,12 +995,12 @@ public class NetworkServer : NetworkManager
                 SendPacket(
                             peer,
                             new CommonCouplerInteractionPacket
-                                {
-                                    NetId = packet.NetId,
-                                    Flags = (ushort)CouplerInteractionType.NoAction,
-                                    IsFrontCoupler = packet.IsFrontCoupler,
-                                }
-                            ,DeliveryMethod.ReliableOrdered
+                            {
+                                NetId = packet.NetId,
+                                Flags = (ushort)CouplerInteractionType.NoAction,
+                                IsFrontCoupler = packet.IsFrontCoupler,
+                            }
+                            , DeliveryMethod.ReliableOrdered
                           );
             }
         }
@@ -996,7 +1010,7 @@ public class NetworkServer : NetworkManager
             //Car doesn't exist, tell client to delete it
             SendDestroyTrainCar(netTrainCar, peer);
         }
-        
+
     }
     //private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet, ITransportPeer peer)
     //{
