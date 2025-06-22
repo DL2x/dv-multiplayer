@@ -25,6 +25,9 @@ public class ModCompatibilityManager : SingletonBehaviour<ModCompatibilityManage
 
         DontDestroyOnLoad(this);
 
+        //Register ourselves
+        RegisterCompatibility("Multiplayer", MultiplayerCompatibility.All);
+
         //we don't care if the client does/doesn't have these mods
         RegisterCompatibility("RuntimeUnityEditor", MultiplayerCompatibility.Client);
         RegisterCompatibility("BookletOrganizer", MultiplayerCompatibility.Client);
