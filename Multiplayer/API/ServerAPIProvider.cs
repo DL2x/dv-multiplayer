@@ -52,8 +52,7 @@ public class ServerAPIProvider : IServer
         if (excludePlayer != null)
             peer = GetPeerFromPlayer(excludePlayer, $"SendPacketToAll<{typeof(T).Name}>");
 
-        if (peer != null)
-            server.SendExternalPacketToAll(packet, reliable, peer);
+        server.SendExternalPacketToAll(packet, reliable, peer);
     }
 
     public void SendSerializablePacketToAll<T>(T packet, bool reliable = true, IPlayer excludePlayer = null) where T : class, ISerializablePacket, new()
