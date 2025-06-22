@@ -56,7 +56,7 @@ public class CashRegisterWithModulesPatch
     private static bool Cancel(CashRegisterWithModules __instance)
     {
 
-        Multiplayer.LogDebug(()=>$"CashRegisterWithModules.Cancel({__instance.GetObjectPath()})\r\n{Environment.StackTrace}");
+        //Multiplayer.LogDebug(()=>$"CashRegisterWithModules.Cancel({__instance.GetObjectPath()})\r\n{Environment.StackTrace}");
 
         if (NetworkLifecycle.Instance.IsHost())
             return true;
