@@ -50,7 +50,7 @@ public static class MultiplayerAPITest
     {
         //Mod loading order can't be guaranteed, so we should wait for all mods to load prior to checking for multiplayer.
         //Alternatively, set 'Multiplayer' in the 'LoadAfter' parameter in your 'info.json'
-        Log($"MultiplayerAPITest.LateUpdate() Multiplayer Mod is loaded: {MultiplayerAPI.IsMultiplayerLoaded}");
+        Log($"MultiplayerAPITest.LateUpdate() Multiplayer Mod is loaded: {MultiplayerAPI.IsMultiplayerLoaded}, API Version: {MultiplayerAPI.Instance.Version} ");
         if (MultiplayerAPI.IsMultiplayerLoaded)
         {
             //Register that this mod needs to be installed on both server and client

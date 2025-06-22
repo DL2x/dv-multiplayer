@@ -1,15 +1,33 @@
+using MPAPI;
 using MPAPI.Interfaces;
 using MPAPI.Types;
 using Multiplayer.Components.Networking;
 using System;
+using System.Linq;
+using System.Reflection;
 
 
 namespace Multiplayer.API
 {
     public class APIProvider : IMultiplayerAPI
     {
+        public string Version
+        {
+            get
+            {
+                AssemblyInformationalVersionAttribute info = (AssemblyInformationalVersionAttribute)typeof(MultiplayerAPI).Assembly.
+                                                                GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false)
+                                                                .FirstOrDefault();
+
+                if (info == null)
+                    return "";
+
+                return info.InformationalVersion.Split('+')[0];
+            }
+        }
+
         public bool IsMultiplayerLoaded => true;
-        
+
         public bool IsConnected => NetworkLifecycle.Instance.IsClientRunning || NetworkLifecycle.Instance.IsServerRunning;
 
         public bool IsHost => NetworkLifecycle.Instance.IsHost();

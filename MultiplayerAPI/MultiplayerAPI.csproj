@@ -4,25 +4,34 @@
         <TargetFramework>net48</TargetFramework>
         <LangVersion>latest</LangVersion>
         <RootNamespace>MPAPI</RootNamespace>
-        <InformationalVersion>0.0.0.0</InformationalVersion>
+        <InformationalVersion>0.1.0</InformationalVersion>
+        <Version>0.1.0</Version>
+
+        <!-- NuGet Package Configuration -->
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageId>DVMultiplayerAPI</PackageId>
+        <Title>Derail Valley Multiplayer API</Title>
         <Authors>Macka</Authors>
-        <Description>API for interfacing with DV Multiplayer mod</Description>
+        <Description>API for interfacing with DV Multiplayer mod. Provides events and interfaces for server/client interactions in Derail Valley multiplayer scenarios.</Description>
+        <PackageTags>derail-valley;multiplayer;gaming;api;mod</PackageTags>
+        <PackageProjectUrl>https://github.com/AMacro/dv-multiplayer</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/AMacro/dv-multiplayer</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReleaseNotes>Initial release of DV Multiplayer API</PackageReleaseNotes>
+        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+
+        <!-- Documentation -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     </PropertyGroup>
 
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>Multiplayer</_Parameter1>
         </AssemblyAttribute>
-    </ItemGroup>
-
-    <ItemGroup>
-        <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <Publicize Include="Assembly-CSharp" IncludeCompilerGeneratedMembers="false" />
     </ItemGroup>
 
     <!-- Derail Valley References -->
