@@ -581,7 +581,7 @@ public class NetworkServer : NetworkManager
         }
     }
 
-    public void SendPitStopBulkDataPacket(ushort netId, int carCount, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData , ITransportPeer peer = null)
+    public void SendPitStopBulkDataPacket(ushort netId, int carCount, int carIndex, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData , ITransportPeer peer = null)
     {
         LogDebug(() => $"SendPitStopBulkDataPacket({netId}, {stationData.Count()}, {plugData.Count()}, {peer?.Id})");
 
@@ -589,6 +589,7 @@ public class NetworkServer : NetworkManager
         {
             NetId = netId,
             CarCount = carCount,
+            CarSelection = carIndex,
             ResourceData = stationData,
             PlugData = plugData,
         };
@@ -1244,13 +1245,14 @@ public class NetworkServer : NetworkManager
             if (plug.ValidateInteraction(packet, player))
             {
                 //passed validation, send to all but the originator
+                //todo: refactor for culling
                 packet.PlayerId = player.Id;
-                SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
+                SendNetSerializablePacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
             }
             else
             {
                 //Failed to validate, player needs to rollback interaction
-                SendPacket(peer, new CommonPitStopPlugInteractionPacket
+                SendNetSerializablePacket(peer, new CommonPitStopPlugInteractionPacket
                 {
                     NetId = packet.NetId,
                     InteractionType = (byte)PitStopStationInteractionType.Reject

@@ -1417,7 +1417,7 @@ public class NetworkClient : NetworkManager
     {
         LogDebug(()=>$"SendPitStopInteractionPacket({netId}, {interaction}, {position}, {rotation}, {trainCarNetId}, {isConnectedLeft})");
 
-        SendPacketToServer(new CommonPitStopPlugInteractionPacket
+        SendNetSerializablePacketToServer(new CommonPitStopPlugInteractionPacket
         {
             NetId = netId,
             InteractionType = interaction,

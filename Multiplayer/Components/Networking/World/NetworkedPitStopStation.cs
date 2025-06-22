@@ -299,6 +299,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
                         if (Station.pitstop.IsCarInPitStop())
                         {
+                            // Ensure all resource data exists
+                            InitialiseData();
+
                             // One struct per module type
                             var resourceCount = Station.locoResourceModules.resourceModules.Count();
                             LocoResourceModuleData[] stateData = new LocoResourceModuleData[resourceCount];
@@ -307,6 +310,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                             {
                                 stateData[i] = LocoResourceModuleData.From(Station.locoResourceModules.resourceModules[i]);
                             }
+
+                            // Car selection and lever states
+                            int carIndex = Station.pitstop.SelectedIndex;
 
                             PitStopPlugData[] plugData = new PitStopPlugData[resourceToPluggableObject.Count];
 
@@ -318,7 +324,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                             }
 
                             // Send current state
-                            NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, stateData, plugData, peer);
+                            NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, stateData, plugData, peer);
                         }
                     }
                 }
@@ -559,13 +565,16 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                 || (Time.time - time) > LOADING_TIMEOUT
         );
 
-        if ((Time.time - time) < LOADING_TIMEOUT)
+        yield return new WaitForEndOfFrame();
+        yield return new WaitForEndOfFrame();
+
+        if ((Time.time - time) <= LOADING_TIMEOUT)
         {
             ProcessBulkUpdate(packet);
         }
         else
         {
-            Multiplayer.LogWarning($"PitStop [{StationName}] timed out waiting for load. PitStop Initialised: {initialised}, Car Count Matched: {packet.CarCount == Station.pitstop?.carList?.Count}");
+            Multiplayer.LogWarning($"PitStop [{StationName}] timed out waiting for load. PitStop Initialised: {initialised}, Packet Car Count: {packet.CarCount}, Station Car Count: {Station.pitstop?.carList?.Count}, Car Count Matched: {packet.CarCount == Station.pitstop?.carList?.Count}");
             if (initialised)
                 Refreshed = true; //lets hope the car sync is just a little slow
         }
@@ -760,6 +769,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             return;
         }
 
+        Multiplayer.LogDebug(() => $"ProcessBulkUpdate() car count: {packet.CarCount}, resource data count: {packet.ResourceData.Count()}, resource data: [{string.Join(", ", packet.ResourceData.Select(x => $"{x.ResourceType}: {{{string.Join(", ", x.Values)}}}"))}]");
         // Make sure the data elements exist prior to attempting to load them
         InitialiseData();
 
@@ -769,24 +779,72 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         foreach (var resource in packet.ResourceData)
         {
             if (!resourceTypeToLocoResourceModule.TryGetValue(resource.ResourceType, out var module))
+            {
+                Multiplayer.LogDebug(() => $"ProcessBulkUpdate() Failed to find resource module for type {resource.ResourceType}");
                 continue;
+            }
 
             if (module != null)
+            {
                 if (module.resourceData.Count == resource.Values.Count())
+                {
                     for (int i = 0; i < module.resourceData.Count; i++)
+                    {
                         module.resourceData[i].unitsToBuy = resource.Values[i];
+                    }
+
+                }
                 else
+                {
+
                     Multiplayer.LogWarning($"PitStop bulk data count mismatch post-force: {module.resourceData.Count} != {resource.Values.Count()}");
+                }
+
+            }
             else
                 Multiplayer.LogWarning($"PitStop module not found for resource type: {resource.ResourceType}");
+
+            //set the grab state
+            bool grabbed = (resource.FillingState != LocoResourceModuleFillingState.None);
+            bool isLocallyGrabbed = isResourceGrabbedDict.TryGetValue(resource.ResourceType, out var localGrabbed) && localGrabbed;
+
+            leverLookup.TryGetValue(resource.ResourceType, out LeverNonVR lever);
+            grabbedHandlerLookup.TryGetValue(resource.ResourceType, out GrabHandlerHingeJoint grab);
+
+            if (!isLocallyGrabbed)
+            {
+                lever?.BlockControl(grabbed);
+                grab?.SetMovingDisabled(grabbed);
+
+                if (grabbed)
+                    grab?.ForceEndInteraction();
+            }
+
+            int valvePos = resource.FillingState switch
+            {
+                LocoResourceModuleFillingState.Filling => -1,
+                LocoResourceModuleFillingState.Draining => 1,
+                _ => 0
+            };
+
+            module.OnValvePositionChange(valvePos);
+
+            // Update remote grab state
+            isResourceRemoteGrabbedDict[resource.ResourceType] = grabbed;
         }
 
-        Multiplayer.LogDebug(() => $"PitStop bulk data Plugs");
+        Multiplayer.LogDebug(() => $"PitStop bulk data Car Index: {packet.CarSelection}");
+        SetCarSelection(packet.CarSelection);
+
+
+        Multiplayer.LogDebug(() => $"PitStop bulk data Plugs {packet.PlugData.Count()}");
 
         //sync plugs
         foreach (var plug in packet.PlugData)
         {
-            NetworkedPluggableObject.Get(plug.NetId, out var netPlug);
+            var result = NetworkedPluggableObject.Get(plug.NetId, out var netPlug);
+            Multiplayer.LogDebug(() => $"PitStop bulk data Plugs netId: {plug.NetId}, found: {result}");
+
             netPlug?.ProcessBulkUpdate(plug);
         }
 
@@ -805,6 +863,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         GrabHandlerHingeJoint grab = null;
         RotaryAmplitudeChecker amplitudeChecker = null;
         LeverNonVR lever = null;
+        LocoResourceModule resourceModule = null;
 
         // Validate interaction type
         if (!Enum.IsDefined(typeof(PitStopStationInteractionType), packet.InteractionType))
@@ -815,8 +874,16 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         PitStopStationInteractionType interactionType = (PitStopStationInteractionType)packet.InteractionType;
 
-        // Validate resource type
-        if (!Enum.IsDefined(typeof(ResourceType), packet.ResourceType))
+        bool isCarSelection = interactionType switch
+        {
+            PitStopStationInteractionType.CarSelectorGrab => true,
+            PitStopStationInteractionType.CarSelectorUngrab => true,
+            PitStopStationInteractionType.CarSelection => true,
+            _ => false,
+        };
+
+        // Validate resource type (no resource type for car selectors
+        if (!isCarSelection && !Enum.IsDefined(typeof(ResourceType), packet.ResourceType))
         {
             Multiplayer.LogWarning($"Received invalid ResourceType \"{packet.ResourceType}\" at Pit Stop station {StationName}");
             return;
@@ -827,7 +894,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}");
 
         // Validate resource module exists
-        if (!resourceTypeToLocoResourceModule.TryGetValue(resourceType, out LocoResourceModule resourceModule))
+        if (!isCarSelection && !resourceTypeToLocoResourceModule.TryGetValue(resourceType, out resourceModule))
         {
             Multiplayer.LogWarning($"Could not find LocoResourceModule for ResourceType \"{resourceType}\" at Pit Stop station {StationName}");
             return;
