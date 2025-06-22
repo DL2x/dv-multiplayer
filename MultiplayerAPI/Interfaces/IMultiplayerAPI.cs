@@ -1,4 +1,5 @@
 using MPAPI.Types;
+using System;
 
 namespace MPAPI.Interfaces;
 
@@ -37,6 +38,28 @@ public interface IMultiplayerAPI
     /// Gets whether this current session is single player
     /// </summary>
     bool IsSinglePlayer { get; }
+
+    /// <summary>
+    /// Event fired when a game/network tick occurs
+    /// Ticks occur at a fixed interval (TICK_INTERVAL = 1/TICK_RATE) and are useful for synchronisation, batching, and processing changes.
+    ///
+    /// The tick parameter can be used to determine if non-reliable packets have been dropped and to sequence actions for rollbacks or preventing stale data from being processed.
+    /// 
+    /// Example: In Multiplayer's TrainCar simulation sync, small changes are cached when they occur but sent as a single packet per TrainCar when OnTick fires, reducing network overhead.
+    /// </summary>
+    /// <param name="tick">The current game tick number, incremented each tick cycle</param>
+    event Action<uint> OnTick;
+
+    /// <summary>
+    /// The number of ticks per second (currently 24).
+    /// Used to calculate the fixed tick interval: TICK_INTERVAL = 1.0f / TICK_RATE.
+    /// </summary>
+    uint TICK_RATE { get; }
+
+    /// <summary>
+    /// The current game tick.
+    /// </summary>
+    uint CurrentTick { get; }
 
     /// <summary>
     // Gets the NetId for an object

@@ -1,6 +1,7 @@
 using MPAPI.Interfaces;
 using MPAPI.Types;
 using Multiplayer.Components.Networking;
+using System;
 
 
 namespace Multiplayer.API
@@ -17,6 +18,10 @@ namespace Multiplayer.API
 
         public bool IsSinglePlayer => NetworkLifecycle.Instance.IsServerRunning && (NetworkLifecycle.Instance?.Server.IsSinglePlayer ?? false);
 
+        public event Action<uint> OnTick;
+        public uint TICK_RATE => NetworkLifecycle.TICK_RATE;
+        public uint CurrentTick => NetworkLifecycle.Instance.Tick;
+
         public bool TryGetNetId<T>(T obj, out ushort netId) where T : class
         {
             return NetIdProvider.Instance.TryGetNetId<T>(obj, out netId);
@@ -31,5 +36,24 @@ namespace Multiplayer.API
         {
             ModCompatibilityManager.Instance.RegisterCompatibility(modId, compatibility);
         }
+
+        #region Class Helpers
+
+        internal APIProvider()
+        {
+            NetworkLifecycle.Instance.OnTick += OnTickInternal;
+        }
+
+        internal void Dispose()
+        {
+            NetworkLifecycle.Instance.OnTick -= OnTickInternal;
+        }
+
+        private void OnTickInternal(uint tick)
+        {
+            OnTick?.Invoke(tick);
+        }
+
+        #endregion
     }
 }

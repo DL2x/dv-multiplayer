@@ -16,12 +16,18 @@ internal class ServerTest : MonoBehaviour
 {
     const string LogPrefix = "ServerTest";
     const string MESSAGE_COLOUR_SERVER = "9CDCFE";
+    const int DELAY_INTERVAL = 10; // 10 seconds
+
+    uint lastLogTick = 0;
 
     IServer server;
 
     protected void Awake()
     {
         server = MultiplayerAPI.Server;
+
+        // Subscribe to game tick events
+        MultiplayerAPI.Instance.OnTick += OnTick;
 
         // Subscribe to player events
         server.OnPlayerConnected += OnPlayerConnected;
@@ -38,6 +44,9 @@ internal class ServerTest : MonoBehaviour
 
     protected void OnDestroy()
     {
+        // Unsubscribe from game tick events
+        MultiplayerAPI.Instance.OnTick -= OnTick;
+
         // Unsubscribe from player events
         server.OnPlayerConnected -= OnPlayerConnected;
         server.OnPlayerDisconnected -= OnPlayerDisconnected;
@@ -60,6 +69,28 @@ internal class ServerTest : MonoBehaviour
         // Subscribe to chat filters
         server.RegisterChatFilter(OnChatMessage);
     }
+
+    #region Example Tick Event
+    private void OnTick(uint tick)
+    {
+        // This event is called every tick
+        // This code is purely for testing purposes, not a recommened use case; normally it would be used for synchronising
+        // and batching changes or to track how long since an update has been received for a specific object.
+
+        // The TICK_RATE is fixed at both client and server; currently the rate is 24 ticks/second
+        if ((tick - lastLogTick) > MultiplayerAPI.Instance.TICK_RATE * DELAY_INTERVAL)
+        {
+            //DELAY_INTERVAL (10 seconds) passed, log the ping for all players
+            StringBuilder sb = new($"Player pings at {tick}:");
+            foreach (IPlayer player in server.Players)
+                sb.AppendLine($"\"{player?.Id}\" {player.Ping} ms");
+
+            Log(sb.ToString());
+
+            lastLogTick = tick;
+        }
+    }
+    #endregion
 
     #region Player Events
     private void OnPlayerConnected(IPlayer player)
@@ -424,7 +455,7 @@ internal class ServerTest : MonoBehaviour
 
     public void LogDebug(Func<object> resolver)
     {
-        MultiplayerAPITest.LogDebug(() => $"{LogPrefix} {resolver.Invoke()}");
+        MultiplayerAPITest.LogDebug(() => $"{LogPrefix} {resolver?.Invoke()}");
     }
 
     public void Log(object msg)

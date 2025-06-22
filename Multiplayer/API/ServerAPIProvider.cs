@@ -170,7 +170,7 @@ public class ServerAPIProvider : IServer
             return null;
 
         if (player is ServerPlayerWrapper wrapper)
-            return wrapper._serverPlayer; // You'll need to make this internal accessible
+            return wrapper._serverPlayer;
 
         server.LogWarning($"GetServerPlayerFromIPlayer: Player '{player.Username}' is not a ServerPlayerWrapper (got {player.GetType().Name})");
         return null;

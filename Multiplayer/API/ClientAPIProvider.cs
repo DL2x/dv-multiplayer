@@ -2,13 +2,10 @@ using MPAPI.Interfaces;
 using MPAPI.Interfaces.Packets;
 using MPAPI.Types;
 using Multiplayer.Components.Networking.Player;
-using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Managers.Client;
-using Multiplayer.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
 
 namespace Multiplayer.API
 {
@@ -44,7 +41,6 @@ namespace Multiplayer.API
         {
             client.RegisterExternalSerializablePacket<T>(handler);
         }
-
 
         public void SendPacketToServer<T>(T packet, bool reliable = true) where T : class, IPacket, new()
         {
