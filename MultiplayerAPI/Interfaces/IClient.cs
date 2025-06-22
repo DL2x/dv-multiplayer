@@ -5,6 +5,9 @@ using System.Collections.Generic;
 
 namespace MPAPI.Interfaces;
 
+/// <summary>
+/// Interface for interacting with Multiplayer mod client instances
+/// </summary>
 public interface IClient
 {
     /// <summary>

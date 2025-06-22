@@ -13,7 +13,6 @@ public interface IMultiplayerAPI
     /// </summary>
     bool IsMultiplayerLoaded { get; }
 
-
     /// <summary>Sets the mod's compatibility requirements</summary>
     /// <param name="modId">String representing the your mod's Id (`ModEntry.Info.Id`)</param>
     /// <param name="compatibility">ModCompatibility flags representing installation host/client requirements</param>
@@ -62,15 +61,19 @@ public interface IMultiplayerAPI
     uint CurrentTick { get; }
 
     /// <summary>
-    // Gets the NetId for an object
-    // returns true if the object has a NetId
+    /// Gets the NetId for an object
     /// </summary>
+    /// <param name="obj">The object you want the NetId for</param>
+    /// <param name="netId">When this method returns, contains the NetId associated with the specified object, if found; otherwise, 0</param>
+    /// <returns>True if a NetId for the object was found; otherwise, false</returns>
     bool TryGetNetId<T>(T obj, out ushort netId) where T : class;
 
     /// <summary>
-    // Gets the object for an NetId
-    // returns true if the object was found
+    /// Gets the object for a NetId
     /// </summary>
+    /// <param name="netId">The non-zero NetId for the object</param>
+    /// <param name="obj">When this method returns, contains the object associated with the NetId, if found; otherwise null</param>
+    /// <returns>True if the object was found; otherwise, false</returns>
     bool TryGetObjectFromNetId<T>(ushort netId, out T obj) where T : class;
 
 }

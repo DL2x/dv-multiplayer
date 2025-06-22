@@ -4,31 +4,63 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-
 namespace MPAPI.Interfaces;
 
+/// <summary>
+/// Represents the method that will handle chat command execution
+/// </summary>
+/// <param name="message">The message content without the command prefix (e.g. '/command parameter1 parameter2' becomes 'parameter1 parameter2')</param>
+/// <param name="sender">The player who executed the command</param>
 public delegate void ChatCommandCallback(string message, IPlayer sender);
+
+/// <summary>
+/// Represents the method that will handle chat message filtering
+/// </summary>
+/// <param name="message">The message content that can be modified by reference</param>
+/// <param name="sender">The player who sent the message</param>
+/// <returns>True to pass the message to the next filter or send to players; false to block the message from further processing</returns>
 public delegate bool ChatFilterDelegate(ref string message, IPlayer sender);
+
+/// <summary>
+/// Interface for interacting with Multiplayer mod server instances
+/// </summary>
 public interface IServer
 {
+
+    /// <summary>
+    /// Event fired when a player connects and is authenticated, but before the player receives game state information
+    /// </summary>
     event Action<IPlayer> OnPlayerConnected;
+
+    /// <summary>
+    /// Event fired when a player disconnects, but before the IPlayer object is destroyed
+    /// </summary>
     event Action<IPlayer> OnPlayerDisconnected;
+
+    /// <summary>
+    /// Event fired when a player has signalled they are ready for game state information
+    /// This event occurs after the server has sent the game state, it does not guarantee the player has finished generating all cars, jobs, etc.
+    /// </summary>
     event Action<IPlayer> OnPlayerReady;
 
     #region Server Properties
-
     /// <summary>
     /// Gets number of players currently connected to the server
     /// </summary>
-    /// <returns>Positive integer representing the number of connected players</param>
+    /// <returns>Positive integer representing the number of connected players</returns>
     int PlayerCount { get; }
 
     /// <summary>
     /// Gets IPlayer objects for all players connected to the server
     /// </summary>
-    /// <returns>Read-only collection of IPlayer objects</param>
+    /// <returns>Read-only collection of IPlayer objects</returns>
     public IReadOnlyCollection<IPlayer> Players { get; }
 
+    /// <summary>
+    /// Gets IPlayer for player by Id
+    /// </summary>
+    /// <param name="id">Id for the player</param>
+    /// <returns>IPlayer object if found, otherwise null</returns>
     IPlayer GetPlayer(byte id);
 
     #endregion
@@ -122,7 +154,7 @@ public interface IServer
     /// </summary>
     /// <param name="commandLong">Command to be filtered for, without a leading '/' e.g. 'server'</param>
     /// <param name="commandShort">Optional short command to be filtered for, without a leading '/' e.g. 's'</param>
-    /// <param name="helpMessage">Optional callback for a help message e.g. "Send a message as the server (host only)\r\n\t\t/server <message>\r\n\t\t/s <message>" It is recommended to provide localisation/translation for this string</param>
+    /// <param name="helpMessage">Optional callback for a help message e.g. <![CDATA["Send a message as the server (host only)\r\n\t\t/server <message>\r\n\t\t/s <message>"]]>. It is recommended to provide localisation/translation for this string</param>
     /// <param name="callback">Action to execute when the command is triggered. First parameter contains message without the command e.g. '/command parameter1 parameter2' will become 'parameter1 parameter2', second parameter is the player who executed the command.</param>
     /// <returns>True if the command was successfully registered, false if registration failed (e.g. command already exists).</returns>
     bool RegisterChatCommand(string commandLong, string commandShort, Func<string> helpMessage, ChatCommandCallback callback);
