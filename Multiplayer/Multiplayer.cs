@@ -166,10 +166,20 @@ public static class Multiplayer
                     if (update == null)
                         return;
 
+                    /*
                     update.labelTMPro.text = "Multiplayer Mod Update Available!\r\n\r\n"+
                                                 $"<align=left>Latest version:\t\t{ModEntry.NewestVersion}\r\n" +
                                                 $"Installed version:\t\t<color=\"red\">{ModEntry.Version}</color>\r\n\r\n" +
                                                 "Run Unity Mod Manager Installer to apply the update.</align>";
+                    */
+
+                    var latestVer = Locale.Get(Locale.MAIN_MENU__UPDATE_LATEST_KEY, $"\t\t{ModEntry.NewestVersion}");
+                    var installedVer = Locale.Get(Locale.MAIN_MENU__UPDATE_INSTALLED_KEY, $"\t\t<color=\"red\">{ModEntry.Version}</color>");
+
+                    update.labelTMPro.text = Locale.MAIN_MENU__UPDATE_TITLE +
+                                             $"\r\n\r\n<align=left>{latestVer}" +
+                                             $"\r\n{installedVer}\r\n\r\n" +
+                                             $"{Locale.MAIN_MENU__UPDATE_ACTION}</align>";
 
                     Vector3 currPos = update.labelTMPro.transform.localPosition;
                     Vector2 size = update.labelTMPro.rectTransform.sizeDelta;
