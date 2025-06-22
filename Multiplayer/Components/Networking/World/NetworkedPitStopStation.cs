@@ -319,7 +319,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                             i = 0;
                             foreach (var plug in resourceToPluggableObject)
                             {
-                                plugData[i] = PitStopPlugData.From(plug.Value);
+                                plugData[i] = PitStopPlugData.From(plug.Value, true);
                                 i++;
                             }
 

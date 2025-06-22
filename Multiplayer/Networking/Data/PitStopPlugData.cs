@@ -16,18 +16,18 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
     public readonly Vector3 Position = pos;
     public readonly Quaternion Rotation = rot;
 
-    public static PitStopPlugData From(NetworkedPluggableObject plugData)
+    public static PitStopPlugData From(NetworkedPluggableObject plugData, bool bulk = false)
     {
         return new PitStopPlugData
-            (
-                plugData.NetId,
-                plugData.CurrentInteraction,
-                plugData.HeldBy?.Id ?? 0,
-                plugData.TrainCarNetId,
-                plugData.IsConnectedLeft,
-                plugData.transform.GetWorldAbsolutePosition(),
-                plugData.transform.rotation
-            );
+                (
+                    plugData.NetId,
+                    GetInteractionType(plugData, bulk),
+                    plugData.HeldBy?.Id ?? 0,
+                    plugData.TrainCarNetId,
+                    plugData.IsConnectedLeft,
+                    plugData.transform.GetWorldAbsolutePosition(),
+                    plugData.transform.rotation
+                );
     }
 
     public static void Serialize(NetDataWriter writer, PitStopPlugData data)
@@ -98,5 +98,22 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
                 pos,
                 rot
             );
+    }
+
+    private static PlugInteractionType GetInteractionType(NetworkedPluggableObject plugData, bool bulk)
+    {
+        if (!bulk)
+            return plugData.CurrentInteraction;
+
+        if (plugData.HeldBy != null)
+            return PlugInteractionType.PickedUp;
+
+        if (plugData.TrainCarNetId != 0)
+            return PlugInteractionType.DockSocket;
+
+        if (plugData.PluggableObject.Socket == plugData.PluggableObject.startAttachedTo)
+            return PlugInteractionType.DockHome;
+
+        return PlugInteractionType.Dropped;
     }
 }

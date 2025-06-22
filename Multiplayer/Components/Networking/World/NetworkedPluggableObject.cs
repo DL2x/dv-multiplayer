@@ -26,7 +26,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     protected override bool IsIdServerAuthoritative => false;
 
     #region Server Variables
-    public PlugInteractionType CurrentInteraction {  get; set; }
+    public PlugInteractionType CurrentInteraction { get; set; }
     public ServerPlayer HeldBy { get; private set; }
     public ushort TrainCarNetId { get; private set; }
     public bool IsConnectedLeft { get; private set; }
@@ -52,7 +52,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
         PluggableObject = GetComponent<PluggableObject>();
         //Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Awake() {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
-        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Awake() {this.GetObjectPath()}, netId: {NetId}");
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Awake() {this.GetObjectPath()}, netId: {NetId}, PluggableObject found: {PluggableObject != null}");
 
         if (NetworkLifecycle.Instance.IsHost())
             Refreshed = true;
@@ -145,12 +145,15 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
     public void ProcessBulkUpdate(PitStopPlugData data)
     {
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.ProcessBulkUpdate() netId: {NetId}");
         CoroutineManager.Instance.StartCoroutine(WaitForInit(data));
     }
 
     private IEnumerator WaitForInit(PitStopPlugData data)
     {
-        yield return new WaitUntil(()=> PluggableObject != null && PluggableObject.initialized);
+        yield return new WaitUntil(() => PluggableObject != null && PluggableObject.initialized);
+
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.WaitForInit() netId: {NetId} Complete");
 
         var interaction = data.State;
         ProcessInteraction(interaction, data.PlayerId, data.TrainCarNetId, data.IsLeftSide, data.Position, data.Rotation);
@@ -160,6 +163,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     public void ProcessInteraction(PlugInteractionType interaction, byte playerId, ushort trainNetId, bool isLeftSide, Vector3? newPosition, Quaternion? newRotation)
     {
         bool result;
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.ProcessInteraction({interaction}, {playerId}, {trainNetId}, {isLeftSide}, {newPosition?.ToString()}, {newRotation?.ToString()}) netId: {NetId}");
 
         NetworkedPlayer player = null;
 
@@ -247,7 +251,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
                     if (NetworkLifecycle.Instance.IsClientRunning &&
                     NetworkLifecycle.Instance.Client.ClientPlayerManager.TryGetPlayer(playerHolding, out player))
                     {
-                        player.DropItem();
+                        player?.DropItem();
                     }
                 }
 
@@ -299,7 +303,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
         if (NetId == 0)
             base.Awake();
 
-        if(plugToStation.TryGetValue(this, out _))
+        if (plugToStation.TryGetValue(this, out _))
         {
             Multiplayer.LogWarning($"Lookup cache 'plugToStation' already contains NetworkedPitStopStation \"{netPitStop?.StationName}\", skipping Init");
             return;
@@ -361,9 +365,9 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
         else
         {
             var trainCar = TrainCar.Resolve(socket.gameObject);
-            if(trainCar != null)
+            if (trainCar != null)
             {
-                if(!NetworkedTrainCar.TryGetFromTrainCar(trainCar, out var netTrainCar))
+                if (!NetworkedTrainCar.TryGetFromTrainCar(trainCar, out var netTrainCar))
                 {
                     Multiplayer.LogDebug(() => $"NetworkedPluggableObject.OnPlugged() NetworkedTrainCar: {trainCar?.ID} Not Found! Socket: {socket.GetObjectPath()}");
                     return;

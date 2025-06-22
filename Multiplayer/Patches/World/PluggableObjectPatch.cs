@@ -17,4 +17,11 @@ public static class PluggableObjectPatch
         __instance.CheckInitialization();
         return false;
     }
+
+    [HarmonyPatch(nameof(PluggableObject.InstantSnapTo))]
+    [HarmonyPrefix]
+    public static bool InstantSnapTo(PluggableObject __instance)
+    {
+        return false;
+    }
 }
