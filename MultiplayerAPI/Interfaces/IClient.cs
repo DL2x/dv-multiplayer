@@ -10,32 +10,32 @@ public interface IClient
     /// <summary>
     /// Event fired when a player connects.
     /// </summary>
-    /// <returns>IPlayer object for the connected player</param>
+    /// <returns>IPlayer object for the connected player</returns>
     event Action<IPlayer> OnPlayerConnected;
 
     /// <summary>
     /// Event fired when a player disconnects, but before the IPlayer object is destroyed
     /// </summary>
-    /// <returns>IPlayer object for the disconnected player</param>
+    /// <returns>IPlayer object for the disconnected player</returns>
     event Action<IPlayer> OnPlayerDisconnected;
 
 
     /// <summary>
     /// Gets IPlayer objects for all players connected to the server
     /// </summary>
-    /// <returns>Read-only collection of IPlayer objects</param>
+    /// <returns>Read-only collection of IPlayer objects</returns>
     IReadOnlyCollection<IPlayer> Players { get; }
 
     /// <summary>
     /// Gets number of players currently connected to the server
     /// </summary>
-    /// <returns>Positive integer representing the number of connected players</param>
+    /// <returns>Positive integer representing the number of connected players</returns>
     int PlayerCount { get; }
 
     /// <summary>
     /// Gets IPlayer for player by Id
     /// </summary>
-    /// <returns>IPlayer object if found, otherwise null</param>
+    /// <returns>IPlayer object if found, otherwise null</returns>
     IPlayer GetPlayer(byte id);
 
     /// <summary>
