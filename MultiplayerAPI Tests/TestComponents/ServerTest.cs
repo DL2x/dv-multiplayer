@@ -16,7 +16,7 @@ internal class ServerTest : MonoBehaviour
 {
     const string LogPrefix = "ServerTest";
     const string MESSAGE_COLOUR_SERVER = "9CDCFE";
-    const int DELAY_INTERVAL = 10; // 10 seconds
+    const int DELAY_INTERVAL = 20; // seconds
 
     uint lastLogTick = 0;
 
@@ -80,8 +80,13 @@ internal class ServerTest : MonoBehaviour
         // The TICK_RATE is fixed at both client and server; currently the rate is 24 ticks/second
         if ((tick - lastLogTick) > MultiplayerAPI.Instance.TICK_RATE * DELAY_INTERVAL)
         {
-            //DELAY_INTERVAL (10 seconds) passed, log the ping for all players
-            StringBuilder sb = new($"Player pings at {tick}:");
+            //Log the ping for all players
+            if (server.PlayerCount == 0)
+            {
+                Log($"Tick {tick}.\r\nThere are no players connected");
+            }
+
+            StringBuilder sb = new($"Tick {tick}.\r\nThere are {server.PlayerCount} players, their pings are:");
             foreach (IPlayer player in server.Players)
                 sb.AppendLine($"\"{player?.Id}\" {player.Ping} ms");
 
@@ -98,7 +103,7 @@ internal class ServerTest : MonoBehaviour
         // Send mod settings, parameters, etc.
         // Note: This event occurs when the player is authenticated and before the player receives game state info
 
-        Log($"Player \"{player?.Id}\" has connected. (Is Loaded: {player?.IsLoaded})");
+        Log($"Player {player?.Id} (\"{player?.Username}\") has connected. (Is Loaded: {player?.IsLoaded})");
     }
 
     private void OnPlayerReady(IPlayer player)
@@ -202,44 +207,54 @@ internal class ServerTest : MonoBehaviour
             return;
         }
 
+        if (string.IsNullOrEmpty(args[0]))
+        {
+            LogWarning($"Received 'SendPacket' chat command from player \"{sender.Username}\", but the first argument is empty. Command: {message}");
+            whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>Not enough arguments supplied. Type /? for help.</color>";
+            server.SendWhisperChatMessage(whisper, sender);
+            return;
+        }
+
         if (string.IsNullOrEmpty(args[1]))
         {
             LogWarning($"Received 'SendPacket' chat command from player \"{sender.Username}\", but the second argument is empty. Command: {message}");
         }
 
-        var tc = GetTrainCarFromID(args[1]);
+        LogDebug(() => $"OnChatCommandSendPacket({message}, {sender?.Username}) post-args checks");
+
+        var tc = GetTrainCarFromID(args[1].ToUpper());
+
+        if (tc == null)
+        {
+            // Send a whisper back to the player who sent the command
+            whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>TrainCar '{args[1]}' not found</color>";
+            server.SendWhisperChatMessage(whisper, sender);
+            return;
+        }
+
         var pos = tc.transform.position - WorldMover.currentMove;
 
         switch (args[0].ToLower())
         {
             case "simple": //send a simple packet
-
-                if (tc)
-                {
-                    // Send a simple packet to all players using TrainCar id as a string, TrainCar position and a random wheel arrangement
-                    SendSimplePacketToAll(args[1], pos, GetRandomWheelArrangement());
-                }
-                else
-                {
-                    // Send a whisper back to the player who sent the command
-                    whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>TrainCar '{args[1]}' not found</color>";
-                    server.SendWhisperChatMessage(whisper, sender);
-                }
+                // Send a simple packet to all players using TrainCar id as a string, TrainCar position and a random wheel arrangement
+                SendSimplePacketToAll(args[1], pos, GetRandomWheelArrangement());
+                whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>Sending simple packet for '{args[1]}'</color>";
                 break;
 
             case "net": //send a simple packet using a netId
 
-                if (tc && MultiplayerAPI.Instance.TryGetNetId(tc, out ushort netId))
+                if (MultiplayerAPI.Instance.TryGetNetId(tc, out ushort netId))
                 {
                     // Send a simple packet to all players using TrainCar NetId, TrainCar position and a random wheel arrangement
                     SendSimplePacketWithNetIdToAll(netId, pos, GetRandomWheelArrangement());
+                    whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>Sending net packet for '{args[1]}'</color>";
                 }
                 else
                 {
-                    // Send a whisper back to the player who sent the command
-                    whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>TrainCar '{args[1]}' not found</color>";
-                    server.SendWhisperChatMessage(whisper, sender);
+                    whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>NetId not found for TrainCar '{args[1]}'</color>";
                 }
+
                 break;
 
             default:
@@ -247,10 +262,11 @@ internal class ServerTest : MonoBehaviour
 
                 // Send a whisper back to the player who sent the command
                 whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>Packet type '{args[0].ToLower()}' was not recognised</color>";
-                server.SendWhisperChatMessage(whisper, sender);
 
                 break;
         }
+
+        server.SendWhisperChatMessage(whisper, sender);
     }
 
     // Called when a player uses the chat command '/locopos' or '/lp'
@@ -274,6 +290,9 @@ internal class ServerTest : MonoBehaviour
 
         if (carMap.Count > 0)
             SendComplexPacket(carMap);
+
+        var whisper = $"<color=#{MESSAGE_COLOUR_SERVER}>Loco Position packet sent</color>";
+        server.SendWhisperChatMessage(whisper, sender);
     }
 
     private void OnChatCommandClosestPlayer(string message, IPlayer sender)
