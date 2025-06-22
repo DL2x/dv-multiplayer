@@ -71,7 +71,7 @@ public class NetworkServer : NetworkManager
 
     public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData) : base(settings)
     {
-        Log(() => $"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
+        Log($"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
 
         IsSinglePlayer = singlePlayer;
         ServerData = serverData;
@@ -790,6 +790,8 @@ public class NetworkServer : NetworkManager
         serverPlayers.Add(serverPlayer.Id, serverPlayer);
         peerToPlayer.Add(peer, serverPlayer);
 
+        PlayerConnected?.Invoke(serverPlayer);
+
         ClientboundLoginResponsePacket acceptPacket = new()
         {
             Accepted = true,
@@ -855,6 +857,8 @@ public class NetworkServer : NetworkManager
         if (NetworkLifecycle.Instance.IsHost(peer))
         {
             SendPacket(peer, new ClientboundRemoveLoadingScreenPacket(), DeliveryMethod.ReliableOrdered);
+            serverPlayer.IsLoaded = true;
+            PlayerReady?.Invoke(serverPlayer);
             return;
         }
 
@@ -929,6 +933,7 @@ public class NetworkServer : NetworkManager
 
         serverPlayer.IsLoaded = true;
 
+        PlayerReady?.Invoke(serverPlayer);
     }
 
     private void OnServerboundPlayerPositionPacket(ServerboundPlayerPositionPacket packet, ITransportPeer peer)
