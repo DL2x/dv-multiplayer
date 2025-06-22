@@ -7,16 +7,45 @@ namespace MPAPI.Interfaces;
 
 public interface IClient
 {
-
+    /// <summary>
+    /// Event fired when a player connects.
+    /// </summary>
+    /// <returns>IPlayer object for the connected player</param>
     event Action<IPlayer> OnPlayerConnected;
+
+    /// <summary>
+    /// Event fired when a player disconnects, but before the IPlayer object is destroyed
+    /// </summary>
+    /// <returns>IPlayer object for the disconnected player</param>
     event Action<IPlayer> OnPlayerDisconnected;
 
-    // Player access
+
+    /// <summary>
+    /// Gets IPlayer objects for all players connected to the server
+    /// </summary>
+    /// <returns>Read-only collection of IPlayer objects</param>
     IReadOnlyCollection<IPlayer> Players { get; }
+
+    /// <summary>
+    /// Gets number of players currently connected to the server
+    /// </summary>
+    /// <returns>Positive integer representing the number of connected players</param>
+    int PlayerCount { get; }
+
+    /// <summary>
+    /// Gets IPlayer for player by Id
+    /// </summary>
+    /// <returns>IPlayer object if found, otherwise null</param>
     IPlayer GetPlayer(byte id);
 
-    // Client info
+    /// <summary>
+    /// Gets connection state for the client
+    /// </summary>
     bool IsConnected { get; }
+
+    /// <summary>
+    /// Gets ping for the client
+    /// </summary>
     int Ping { get; }
 
     #region Packet API

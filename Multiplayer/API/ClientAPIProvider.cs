@@ -19,6 +19,7 @@ namespace Multiplayer.API
 
         #region Client Properties
         public IReadOnlyCollection<IPlayer> Players => client.ClientPlayerManager.Players.Select(GetWrapper).ToList().AsReadOnly();
+        public int PlayerCount => client.ClientPlayerManager.Players.Count + 1; // add 1 for local player
 
         public IPlayer GetPlayer(byte id)
         {

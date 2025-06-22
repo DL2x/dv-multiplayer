@@ -35,13 +35,16 @@ internal class ClientTest : MonoBehaviour
         // e.g. Clients should not generate jobs
         if (MultiplayerAPI.Instance.IsHost)
         {
-            var gameType = MultiplayerAPI.Instance.IsSinglePlayer ? "single player" : "multiplayer";
-            Log($"We are in a {gameType} self-hosted game");
-        }
-        else if (MultiplayerAPI.Instance.IsDedicatedServer)
-        {
-            //Dedicated servers have not been implemented yet, IsDedicatedServer will always return false
-            Log("We are a dedicated server");
+            if (MultiplayerAPI.Instance.IsDedicatedServer)
+            {
+                //Dedicated servers have not been implemented yet, IsDedicatedServer will always return false
+                Log("We are a dedicated server");
+            }
+            else
+            {
+                var gameType = MultiplayerAPI.Instance.IsSinglePlayer ? "single player" : "multiplayer";
+                Log($"We are in a {gameType} self-hosted game");
+            }
         }
         else
         {
@@ -86,12 +89,15 @@ internal class ClientTest : MonoBehaviour
             //log my ping
             Log($"My current ping is {client.Ping} ms");
 
-            //log the ping for all players
-            StringBuilder sb = new($"Player pings at {tick}:");
-            foreach (IPlayer player in client.Players)
-                sb.AppendLine($"\"{player?.Id}\" {player.Ping} ms");
+            //Log the ping for all players
+            if (client.PlayerCount > 1)
+            {
+                StringBuilder sb = new($"Tick {tick}.\r\nThere are {client.PlayerCount} players, their pings are:");
+                foreach (IPlayer player in client.Players)
+                    sb.AppendLine($"\"{player?.Id}\" {player.Ping} ms");
 
-            Log(sb.ToString());
+                Log(sb.ToString());
+            }
 
             lastLogTick = tick;
         }
@@ -136,7 +142,7 @@ internal class ClientTest : MonoBehaviour
             return;
         }
 
-        if(!MultiplayerAPI.Instance.TryGetObjectFromNetId(packet.CarNetId, out TrainCar car))
+        if (!MultiplayerAPI.Instance.TryGetObjectFromNetId(packet.CarNetId, out TrainCar car))
         {
             LogWarning($"Received SimplePacketWithNetId with a CarNetId of {packet.CarNetId}, but TrainCar was not found!");
             return;
