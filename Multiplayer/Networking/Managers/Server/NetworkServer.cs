@@ -151,10 +151,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, ITransportPeer>(OnCommonTrainPortsPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, ITransportPeer>(OnCommonTrainFusesPacket);
         netPacketProcessor.SubscribeReusable<ServerboundJobValidateRequestPacket, ITransportPeer>(OnServerboundJobValidateRequestPacket);
-<<<<<<< Updated upstream
-=======
         netPacketProcessor.SubscribeReusable<ServerboundWarehouseMachineControllerRequestPacket, ITransportPeer>(OnServerboundWarehouseMachineControllerRequestPacket);
->>>>>>> Stashed changes
         netPacketProcessor.SubscribeReusable<CommonChatPacket, ITransportPeer>(OnCommonChatPacket);
         netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, ITransportPeer>(OnCommonItemChangePacket);
@@ -887,11 +884,6 @@ public class NetworkServer : NetworkManager
             //Car doesn't exist, tell client to delete it
             SendDestroyTrainCar(netTrainCar, peer);
         }
-<<<<<<< Updated upstream
-        
-=======
-
->>>>>>> Stashed changes
     }
     //private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet, ITransportPeer peer)
     //{
@@ -1111,11 +1103,6 @@ public class NetworkServer : NetworkManager
         else
             LicenseManager.Instance.AcquireGeneralLicense(generalLicense);
     }
-
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes
     private void OnServerboundJobValidateRequestPacket(ServerboundJobValidateRequestPacket packet, ITransportPeer peer)
     {
         Log($"OnServerboundJobValidateRequestPacket(): {packet.JobNetId}");
@@ -1156,8 +1143,6 @@ public class NetworkServer : NetworkManager
         //SendPacket(peer, new ClientboundJobValidateResponsePacket { JobNetId = packet.JobNetId, Invalid = false }, DeliveryMethod.ReliableUnordered);
     }
 
-<<<<<<< Updated upstream
-=======
     private void OnServerboundWarehouseMachineControllerRequestPacket(ServerboundWarehouseMachineControllerRequestPacket packet, ITransportPeer peer)
     {
         Log($"OnServerboundWarehouseMachineControllerRequestPacket(): {packet.WarehouseMachineID}");
@@ -1191,7 +1176,6 @@ public class NetworkServer : NetworkManager
         }
     }
 
->>>>>>> Stashed changes
     private void OnCommonChatPacket(CommonChatPacket packet, ITransportPeer peer)
     {
         ChatManager.ProcessMessage(packet.message, peer);
