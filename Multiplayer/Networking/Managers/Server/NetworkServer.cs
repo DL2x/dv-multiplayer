@@ -151,6 +151,10 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, ITransportPeer>(OnCommonTrainPortsPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, ITransportPeer>(OnCommonTrainFusesPacket);
         netPacketProcessor.SubscribeReusable<ServerboundJobValidateRequestPacket, ITransportPeer>(OnServerboundJobValidateRequestPacket);
+<<<<<<< Updated upstream
+=======
+        netPacketProcessor.SubscribeReusable<ServerboundWarehouseMachineControllerRequestPacket, ITransportPeer>(OnServerboundWarehouseMachineControllerRequestPacket);
+>>>>>>> Stashed changes
         netPacketProcessor.SubscribeReusable<CommonChatPacket, ITransportPeer>(OnCommonChatPacket);
         netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, ITransportPeer>(OnCommonItemChangePacket);
@@ -883,7 +887,11 @@ public class NetworkServer : NetworkManager
             //Car doesn't exist, tell client to delete it
             SendDestroyTrainCar(netTrainCar, peer);
         }
+<<<<<<< Updated upstream
         
+=======
+
+>>>>>>> Stashed changes
     }
     //private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet, ITransportPeer peer)
     //{
@@ -1104,7 +1112,10 @@ public class NetworkServer : NetworkManager
             LicenseManager.Instance.AcquireGeneralLicense(generalLicense);
     }
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
     private void OnServerboundJobValidateRequestPacket(ServerboundJobValidateRequestPacket packet, ITransportPeer peer)
     {
         Log($"OnServerboundJobValidateRequestPacket(): {packet.JobNetId}");
@@ -1145,6 +1156,42 @@ public class NetworkServer : NetworkManager
         //SendPacket(peer, new ClientboundJobValidateResponsePacket { JobNetId = packet.JobNetId, Invalid = false }, DeliveryMethod.ReliableUnordered);
     }
 
+<<<<<<< Updated upstream
+=======
+    private void OnServerboundWarehouseMachineControllerRequestPacket(ServerboundWarehouseMachineControllerRequestPacket packet, ITransportPeer peer)
+    {
+        Log($"OnServerboundWarehouseMachineControllerRequestPacket(): {packet.WarehouseMachineID}");
+
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
+        {
+            LogWarning($"OnServerboundWarehouseMachineControllerRequestPacket() ServerPlayer not found: {peer.Id}");
+            return;
+        }
+
+        //Find the warehouse
+        WarehouseMachineController targetWarehouse = NetworkedWarehouseMachineController.FindFomID(packet.WarehouseMachineID);
+
+
+        if (targetWarehouse == null)
+        {
+            LogWarning($"OnServerboundWarehouseMachineControllerRequestPacket() WarehouseMachineController not found. WarehouseMachineControllerID: {packet.WarehouseMachineID}");
+            return;
+        }
+
+        LogDebug(() => $"OnServerboundWarehouseMachineControllerRequestPacket() {packet.WarehouseMachineID}, Action Type: {packet.warehouseAction}");
+        switch (packet.warehouseAction)
+        {
+            case WarehouseAction.Load:
+                targetWarehouse.StartLoadSequence();
+                break;
+
+            case WarehouseAction.Unload:
+                targetWarehouse.StartUnloadSequence();
+                break;
+        }
+    }
+
+>>>>>>> Stashed changes
     private void OnCommonChatPacket(CommonChatPacket packet, ITransportPeer peer)
     {
         ChatManager.ProcessMessage(packet.message, peer);

@@ -224,9 +224,15 @@ public class NetworkClient : NetworkManager
 
     #endregion
 
+<<<<<<< Updated upstream
 
     #region Listeners 
 
+=======
+
+    #region Listeners
+
+>>>>>>> Stashed changes
     private void OnClientboundLoginResponsePacket(ClientboundLoginResponsePacket packet)
     {
 
@@ -1316,12 +1322,28 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableUnordered);
     }
 
+<<<<<<< Updated upstream
+=======
+    public void SendWarehouseRequest(WarehouseAction action, string track)
+    {
+        SendPacketToServer(new ServerboundWarehouseMachineControllerRequestPacket
+        {
+            warehouseAction = action,
+            WarehouseMachineID = track
+        }, DeliveryMethod.ReliableUnordered);
+    }
+
+>>>>>>> Stashed changes
     public void SendChat(string message)
     {
         SendPacketToServer(new CommonChatPacket
         {
             message = message
+<<<<<<< Updated upstream
         }, DeliveryMethod.ReliableUnordered);
+=======
+        }, DeliveryMethod.Unreliable);
+>>>>>>> Stashed changes
     }
 
     public void SendItemsChangePacket(List<ItemUpdateData> items)
