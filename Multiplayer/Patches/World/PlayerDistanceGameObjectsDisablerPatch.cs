@@ -122,15 +122,33 @@ public static class PlayerDistanceGameObjectsDisablerPatch
 
     public static float CustomCalcSqrMagnitude(Vector3 vecA, Vector3 vecB, PlayerDistanceGameObjectsDisabler instance)
     {
-        //At present we only need to target instsances of `PlayerDistanceGameObjectsDisabler`
-        //that are on the 'RefillStations' game object, as this is managing Pit Stop stations
-        //we need these to be active on the host when any player is nearby.
-        if (instance.gameObject.name == "RefillStations" && NetworkLifecycle.Instance.IsHost())
+        //Ensure we are only using the custom calc for certain instances and we are the host
+        if (ShouldUseCustomCalc(instance) && NetworkLifecycle.Instance.IsHost())
         {
             //Multiplayer.LogDebug(() =>$"CustomCalcSqrMagnitude({instance?.gameObject?.name}, {vecA}, {vecB}) Camera pos: {PlayerManager.ActiveCamera.transform.position}");
             return vecA.AnyPlayerSqrMag();
         }
 
         return (vecA - vecB).sqrMagnitude;
+    }
+
+    private static bool ShouldUseCustomCalc(PlayerDistanceGameObjectsDisabler instance)
+    {
+        var go = instance.gameObject;
+
+        //At present we only need to target certain instances of `PlayerDistanceGameObjectsDisabler`
+        //we need these to be active on the host when any player is nearby.
+
+        //Ensure refill stations are enabled
+        if (go.name == "RefillStations")
+            return true;
+
+        //Ensure warehouse machines are enabled
+        var parent = go.transform.parent;
+        if (parent != null && parent.name.EndsWith("_office_anchor"))
+            return true;
+
+        //Ignore all other instances
+        return false;
     }
 }
