@@ -1,21 +1,23 @@
-﻿using System.Collections;
+using DV.Logic.Job;
+using DV.ThingTypes;
+using HarmonyLib;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
+using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
-using UnityEngine;
+using static WarehouseMachineController;
 
 namespace Multiplayer.Patches.Jobs;
-
-using HarmonyLib;
 
 [HarmonyPatch(typeof(WarehouseMachineController))]
 public class WarehouseMachineControllerPatch
 {
     [HarmonyPrefix]
-    [HarmonyPatch("StartUnloadSequence")]
-    public static void StartUnloadSequence_Prefix(WarehouseMachineController __instance)
+    [HarmonyPatch(nameof(WarehouseMachineController.Awake))]
+    public static void Awake(WarehouseMachineController __instance)
     {
-        __instance.displayTrainInRangeText.text = __instance.warehouseMachine.ID;
+        __instance.gameObject.AddComponent<NetworkedWarehouseMachineController>();
+    }
 
         if (!NetworkLifecycle.Instance.IsHost())
         {

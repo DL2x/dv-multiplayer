@@ -1145,35 +1145,26 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundWarehouseMachineControllerRequestPacket(ServerboundWarehouseMachineControllerRequestPacket packet, ITransportPeer peer)
     {
-        Log($"OnServerboundWarehouseMachineControllerRequestPacket(): {packet.WarehouseMachineID}");
+        LogDebug(()=>$"ServerboundWarehouseMachineControllerRequestPacket(): {packet.NetId}");
 
         if (!TryGetServerPlayer(peer, out ServerPlayer player))
         {
-            LogWarning($"OnServerboundWarehouseMachineControllerRequestPacket() ServerPlayer not found: {peer.Id}");
+            LogWarning($"ServerboundWarehouseMachineControllerRequestPacket() ServerPlayer not found: {peer.Id}");
             return;
         }
+
+        //Todo: add check for player authorisation to use loading/uloading machines
 
         //Find the warehouse
-        WarehouseMachineController targetWarehouse = NetworkedWarehouseMachineController.FindFomID(packet.WarehouseMachineID);
-
-
-        if (targetWarehouse == null)
+        if(!NetworkedWarehouseMachineController.Get(packet.NetId, out var targetWarehouse))
         {
-            LogWarning($"OnServerboundWarehouseMachineControllerRequestPacket() WarehouseMachineController not found. WarehouseMachineControllerID: {packet.WarehouseMachineID}");
-            return;
+            LogWarning($"ServerboundWarehouseMachineControllerRequestPacket() WarehouseMachineController not found. NetId: {packet.NetId}");
+            return; 
         }
 
-        LogDebug(() => $"OnServerboundWarehouseMachineControllerRequestPacket() {packet.WarehouseMachineID}, Action Type: {packet.warehouseAction}");
-        switch (packet.warehouseAction)
-        {
-            case WarehouseAction.Load:
-                targetWarehouse.StartLoadSequence();
-                break;
+        //Todo: add check for player distance from machine
 
-            case WarehouseAction.Unload:
-                targetWarehouse.StartUnloadSequence();
-                break;
-        }
+        targetWarehouse.ServerProcessWarehouseAction(packet.WarehouseAction);
     }
 
     private void OnCommonChatPacket(CommonChatPacket packet, ITransportPeer peer)
