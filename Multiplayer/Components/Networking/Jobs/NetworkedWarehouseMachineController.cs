@@ -99,4 +99,71 @@ public class NetworkedWarehouseMachineController : IdMonoBehaviour<ushort, Netwo
                 break;
         }
     }
+
+    public void ClientProcessUpdate(ClientboundWarehouseControllerUpdatePacket packet)
+    {
+        TextPreset preset = (TextPreset)packet.Preset;
+        bool isLoading = packet.IsLoading;
+        string jobId = null;
+        Car car = null;
+        CargoType_v2 cargoType_V2 = null;
+        string extra = null;
+
+        if (WarehouseMachineController == null)
+            return;
+
+        if (packet.CarNetId != 0)
+        {
+            if (!NetworkedTrainCar.Get(packet.CarNetId, out var networkedCar))
+            {
+                Multiplayer.LogWarning($"NetworkedWarehouseMachineController failed to find TrainCar with NetId: {packet.NetId}");
+                return;
+            }
+
+            car = networkedCar.TrainCar.logicCar;
+        }
+
+        if (packet.JobNetId != 0)
+        {
+            if (!NetworkedJob.Get(packet.JobNetId, out var networkedJob))
+            {
+                Multiplayer.LogWarning($"NetworkedWarehouseMachineController failed to find Job with NetId: {packet.JobNetId}");
+                return;
+            }
+
+            jobId = networkedJob.Job.ID;
+        }
+
+        if (car != null && jobId != null)
+        {
+            cargoType_V2 = ((CargoType)packet.CargoType).ToV2();
+        }
+
+        WarehouseMachineController?.SetScreen(preset, isLoading, jobId, car, cargoType_V2, extra);
+
+        //special case for car updated - remove task from machine
+        if (preset == TextPreset.CarUpdated && WarehouseMachine != null)
+        {
+            CleanupTask(isLoading, car);
+        }
+
+        //special case for clearing - play sound
+        if (preset == TextPreset.ClearDesc)
+            WarehouseMachineController?.machineSound?.Play(WarehouseMachineController.transform.position, 1f, 1f, 0f, 1f, 500f, default, null, base.transform, false, 0f, null);
+
+    }
+
+    private void CleanupTask(bool isLoading, Car car)
+    {
+        List<WarehouseMachine.WarehouseLoadUnloadDataPerJob> currentLoadUnloadData = WarehouseMachine.GetCurrentLoadUnloadData(isLoading ? WarehouseTaskType.Loading : WarehouseTaskType.Unloading);
+
+        foreach (var data in currentLoadUnloadData)
+        {
+            if (data.tasksAvailableToProcess == null)
+                continue;
+
+            foreach (var task in data.tasksAvailableToProcess)
+                WarehouseMachine.RemoveWarehouseTask(task);
+        }
+    }
 }

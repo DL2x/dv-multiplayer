@@ -417,6 +417,22 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 
+    public void SendWarehouseControllerUpdate(ushort netId, bool isLoading, ushort jobNetId, ushort carNetId, CargoType cargoType, WarehouseMachineController.TextPreset preset)
+    {
+        LogDebug(() =>$"SendWarehouseControllerUpdate({netId}, {isLoading}, {jobNetId}, {carNetId}, {cargoType}, {preset})");
+
+        SendPacketToAll(new ClientboundWarehouseControllerUpdatePacket()
+        {
+            NetId = netId,
+            IsLoading = isLoading,
+            JobNetId = jobNetId,
+            CarNetId = carNetId,
+            CargoType = (ushort)cargoType,
+            Preset = (ushort)preset,
+        },
+        DeliveryMethod.Sequenced, SelfPeer);
+    }
+
     public void SendCargoHealthUpdate(ushort netId, float currentHealth)
     {
         SendPacketToAll(new ClientboundCargoHealthUpdatePacket

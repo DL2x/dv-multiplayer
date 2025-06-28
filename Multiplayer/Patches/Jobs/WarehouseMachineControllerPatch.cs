@@ -19,11 +19,73 @@ public class WarehouseMachineControllerPatch
         __instance.gameObject.AddComponent<NetworkedWarehouseMachineController>();
     }
 
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(WarehouseMachineController.SetScreen))]
+    public static bool SetScreen(WarehouseMachineController __instance, TextPreset preset, bool isLoading, string jobId, Car car, CargoType_v2 cargoType)
+    {
         if (!NetworkLifecycle.Instance.IsHost())
+            return true;
+
+        Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() is host");
+
+        bool skip = preset switch
         {
-            SendValidationRequest(__instance, WarehouseAction.Unload);
+            TextPreset.Idle => true,
+            TextPreset.TrainInRange => true,
+            TextPreset.ClearTrainInRange => true,
+            _ => false
+        };
+
+        Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() skipping: {skip}");
+        if (skip)
+            return true;
+
+        var netMachine = NetworkedWarehouseMachineController.GetFromWarehouseMachineController(__instance);
+        if (netMachine == null)
+        {
+            Multiplayer.LogError($"WarehouseMachineControllerPatch.SetScreen(): Failed to get NetworkedWarehouseMachineController for {__instance.warehouseTrackName}");
+            return true;
         }
 
+        Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetMachine found");
+
+        //obtain serialisable info
+        ushort carNetId = 0;
+        ushort jobNetId = 0;
+        CargoType cargoTypeV1 = CargoType.None;
+
+        if (car != null)
+        {
+            Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() car not null");
+            var tc = car.TrainCar();
+            if (tc == null || !NetworkedTrainCar.TryGetFromTrainCar(tc, out var netTC))
+            {
+                Multiplayer.LogWarning($"WarehouseMachineControllerPatch.SetScreen() Failed to get NetworkedTrainCar for {car?.ID}");
+                return true;
+            }
+
+            Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetCar found");
+            carNetId = netTC.NetId;
+        }
+
+        if (!string.IsNullOrEmpty(jobId))
+        {
+            if(!NetworkedJob.TryGetFromJobId(jobId, out var netJob))
+            {
+                Multiplayer.LogWarning($"WarehouseMachineControllerPatch.SetScreen() Failed to get NetworkedJob for {jobId}");
+                return true;
+            }
+
+            Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetJob found");
+            jobNetId = netJob.NetId;
+        }
+
+        if (cargoType != null)
+                cargoTypeV1 = cargoType.v1;
+
+        NetworkLifecycle.Instance.Server.SendWarehouseControllerUpdate(netMachine.NetId, isLoading, jobNetId, carNetId, cargoTypeV1, preset);
+
+        return false;
     }
 
     [HarmonyPrefix]
