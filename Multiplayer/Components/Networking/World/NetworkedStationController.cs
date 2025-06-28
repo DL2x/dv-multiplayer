@@ -248,7 +248,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
 
     private void AddJob(JobData jobData)
     {
-        Job newJob = CreateJobFromJobData(jobData);
+        Job newJob = JobData.ToJob(jobData);
         var carNetIds = jobData.GetCars();
 
         NetworkedJob networkedJob = CreateNetworkedJob(newJob, jobData.NetID, carNetIds);
@@ -281,22 +281,6 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         StartCoroutine(UpdateCarPlates(carNetIds, newJob.ID));
 
         Multiplayer.Log($"Added NetworkedJob {newJob.ID} to NetworkedStationController {StationController.logicStation.ID}");
-    }
-
-    private Job CreateJobFromJobData(JobData jobData)
-    {
-
-        List<Task> tasks = jobData.Tasks.Select(taskData => taskData.ToTask()).ToList();
-        StationsChainData chainData = new(jobData.ChainData.ChainOriginYardId, jobData.ChainData.ChainDestinationYardId);
-
-        Job newJob = new(tasks, jobData.JobType, jobData.TimeLimit, jobData.InitialWage, chainData, jobData.ID, jobData.RequiredLicenses)
-        {
-            startTime = jobData.StartTime,
-            finishTime = jobData.FinishTime,
-            State = jobData.State
-        };
-
-        return newJob;
     }
 
     private IEnumerator DelayCreateJob(JobData jobData)

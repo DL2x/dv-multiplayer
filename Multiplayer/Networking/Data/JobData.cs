@@ -79,6 +79,21 @@ public class JobData
         };
     }
 
+    public static Job ToJob(JobData jobData)
+    {
+        List<Task> tasks = jobData.Tasks.Select(taskData => taskData.ToTask()).ToList();
+        StationsChainData chainData = new(jobData.ChainData.ChainOriginYardId, jobData.ChainData.ChainDestinationYardId);
+
+        Job newJob = new(tasks, jobData.JobType, jobData.TimeLimit, jobData.InitialWage, chainData, jobData.ID, jobData.RequiredLicenses)
+        {
+            startTime = jobData.StartTime,
+            finishTime = jobData.FinishTime,
+            State = jobData.State,
+        };
+
+        return newJob;
+    }
+
     public static void Serialize(NetDataWriter writer, JobData data)
     {
         //NetworkLifecycle.Instance.Server.Log($"JobData.Serialize({data.ID}) NetID {data.NetID}");
