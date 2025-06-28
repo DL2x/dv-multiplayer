@@ -26,7 +26,7 @@ public class WarehouseMachineControllerPatch
         if (!NetworkLifecycle.Instance.IsHost())
             return true;
 
-        Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() is host");
+        //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() is host");
 
         bool skip = preset switch
         {
@@ -36,7 +36,7 @@ public class WarehouseMachineControllerPatch
             _ => false
         };
 
-        Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() skipping: {skip}");
+        //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() skipping: {skip}");
         if (skip)
             return true;
 
@@ -47,7 +47,7 @@ public class WarehouseMachineControllerPatch
             return true;
         }
 
-        Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetMachine found");
+        //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetMachine found");
 
         //obtain serialisable info
         ushort carNetId = 0;
@@ -56,15 +56,15 @@ public class WarehouseMachineControllerPatch
 
         if (car != null)
         {
-            Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() car not null");
+            //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() car not null");
             var tc = car.TrainCar();
             if (tc == null || !NetworkedTrainCar.TryGetFromTrainCar(tc, out var netTC))
             {
-                Multiplayer.LogWarning($"WarehouseMachineControllerPatch.SetScreen() Failed to get NetworkedTrainCar for {car?.ID}");
+                //Multiplayer.LogWarning($"WarehouseMachineControllerPatch.SetScreen() Failed to get NetworkedTrainCar for {car?.ID}");
                 return true;
             }
 
-            Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetCar found");
+            //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetCar found");
             carNetId = netTC.NetId;
         }
 
@@ -76,7 +76,7 @@ public class WarehouseMachineControllerPatch
                 return true;
             }
 
-            Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetJob found");
+            //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetJob found");
             jobNetId = netJob.NetId;
         }
 
