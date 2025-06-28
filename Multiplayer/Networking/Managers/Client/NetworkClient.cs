@@ -1,6 +1,6 @@
-using System;
-using System.Collections.Generic;
 using DV;
+using DV.Common;
+using DV.Customization.Paint;
 using DV.Damage;
 using DV.InventorySystem;
 using DV.Logic.Job;
@@ -8,8 +8,10 @@ using DV.MultipleUnit;
 using DV.ServicePenalty.UI;
 using DV.ThingTypes;
 using DV.UI;
+using DV.UserManagement;
 using DV.WeatherSystem;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
@@ -19,6 +21,7 @@ using Multiplayer.Components.Networking.UI;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Components.SaveGame;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
@@ -27,20 +30,18 @@ using Multiplayer.Networking.Packets.Clientbound.World;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Networking.Packets.Common.Train;
 using Multiplayer.Networking.Packets.Serverbound;
-using Multiplayer.Networking.Data.Train;
+using Multiplayer.Networking.Packets.Serverbound.Jobs;
+using Multiplayer.Networking.Packets.Serverbound.Train;
+using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Patches.SaveGame;
 using Multiplayer.Utils;
 using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityModManagerNet;
 using Object = UnityEngine.Object;
-using Multiplayer.Networking.Packets.Serverbound.Train;
-using System.Linq;
-using LiteNetLib.Utils;
-using DV.UserManagement;
-using DV.Common;
-using DV.Customization.Paint;
-using Multiplayer.Networking.TransportLayers;
 
 namespace Multiplayer.Networking.Managers.Client;
 
@@ -150,9 +151,12 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket>(OnCommonTrainFusesPacket);
         netPacketProcessor.SubscribeReusable<ClientboundBrakeStateUpdatePacket>(OnClientboundBrakeStateUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundFireboxStatePacket>(OnClientboundFireboxStatePacket);
+
         netPacketProcessor.SubscribeReusable<ClientboundCargoStatePacket>(OnClientboundCargoStatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundCargoHealthUpdatePacket>(OnClientboundCargoHealthUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundCarHealthUpdatePacket>(OnClientboundCarHealthUpdatePacket);
+        netPacketProcessor.SubscribeReusable<ClientboundWarehouseControllerUpdatePacket>(OnClientboundWarehouseControllerUpdatePacket);
+
         netPacketProcessor.SubscribeReusable<ClientboundRerailTrainPacket>(OnClientboundRerailTrainPacket);
         netPacketProcessor.SubscribeReusable<ClientboundWindowsBrokenPacket>(OnClientboundWindowsBrokenPacket);
         netPacketProcessor.SubscribeReusable<ClientboundWindowsRepairedPacket>(OnClientboundWindowsRepairedPacket);
@@ -224,8 +228,7 @@ public class NetworkClient : NetworkManager
 
     #endregion
 
-
-    #region Listeners 
+    #region Listeners
 
     private void OnClientboundLoginResponsePacket(ClientboundLoginResponsePacket packet)
     {
@@ -825,6 +828,18 @@ public class NetworkClient : NetworkManager
         packet.Health.LoadTo(trainCar);
     }
 
+    private void OnClientboundWarehouseControllerUpdatePacket(ClientboundWarehouseControllerUpdatePacket packet)
+    {
+        LogDebug(() => $"OnClientboundWarehouseControllerUpdatePacket() NetId: {packet.NetId}, IsLoading: {packet.IsLoading}, JobNetId: {packet.JobNetId}, CarNetId: {packet.CarNetId}, CargoType: {packet.CargoType}, Preset: [{(WarehouseMachineController.TextPreset) packet.Preset}, {packet.Preset}]");
+        if (!NetworkedWarehouseMachineController.Get(packet.NetId, out NetworkedWarehouseMachineController networkedWarehouseMachineController))
+        {
+            LogWarning($"OnClientboundWarehouseControllerUpdatePacket() Failed to find networked warehouse machine controller for [{packet.NetId}]");
+            return;
+        }
+
+        networkedWarehouseMachineController.ClientProcessUpdate(packet);
+    }
+
     private void OnClientboundRerailTrainPacket(ClientboundRerailTrainPacket packet)
     {
 
@@ -1316,12 +1331,23 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableUnordered);
     }
 
+    public void SendWarehouseRequest(WarehouseAction action, ushort netId)
+    {
+        SendPacketToServer(new ServerboundWarehouseMachineControllerRequestPacket
+        {
+            NetId = netId,
+            WarehouseAction = action,
+        }, DeliveryMethod.ReliableUnordered);
+    }
+
+
     public void SendChat(string message)
     {
         SendPacketToServer(new CommonChatPacket
         {
             message = message
         }, DeliveryMethod.ReliableUnordered);
+
     }
 
     public void SendItemsChangePacket(List<ItemUpdateData> items)
