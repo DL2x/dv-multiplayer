@@ -27,31 +27,44 @@ public class WarehouseMachineControllerPatch
     }
 
     [HarmonyPrefix]
-    [HarmonyPatch("StartLoadSequence")]
-    public static void StartLoadSequence_Prefix(WarehouseMachineController __instance)
+    [HarmonyPatch("StartUnloadSequence")]
+    public static bool StartUnloadSequence_Prefix(WarehouseMachineController __instance)
     {
-        __instance.displayTrainInRangeText.text = __instance.warehouseMachine.ID;
+        if (NetworkLifecycle.Instance.IsHost())
+            return true;
 
-        if (!NetworkLifecycle.Instance.IsHost())
-        {
-            SendValidationRequest(__instance, WarehouseAction.Load);
-        }
-
+        SendValidationRequest(__instance, WarehouseAction.Unload);
+        return false;
     }
 
-    private static void SendValidationRequest(WarehouseMachineController machine,WarehouseAction action)
+    [HarmonyPrefix]
+    [HarmonyPatch("StartLoadSequence")]
+    public static bool StartLoadSequence_Prefix(WarehouseMachineController __instance)
     {
-        //find the current station we're at
-        if (!string.IsNullOrEmpty(machine.warehouseTrackName))
-        {
-            string id = machine.warehouseMachine.ID;
+        if (NetworkLifecycle.Instance.IsHost())
+            return true;
 
-            NetworkLifecycle.Instance.Client.SendWarehouseRequest(action, id);
-            //CoroutineManager.Instance.StartCoroutine(AwaitResponse(machine, action));
-        }
-        else
+        SendValidationRequest(__instance, WarehouseAction.Load);
+        return false;
+    }
+
+    private static void SendValidationRequest(WarehouseMachineController machine, WarehouseAction action)
+    {
+        string id = machine?.warehouseMachine?.ID;
+        var netController =  NetworkedWarehouseMachineController.GetFromWarehouseMachineController(machine);
+
+        if (string.IsNullOrEmpty(id))
         {
-            NetworkLifecycle.Instance.Client.LogError($"Failed to validate {action} for {machine.warehouseMachine.ID}. Warehouse not found!");
+            NetworkLifecycle.Instance.Client.LogError($"Failed to validate {action} for {machine?.name} at {machine?.warehouseTrackName}. Warehouse not found!");
+            return;
         }
+
+        if (netController == null)
+        {
+            NetworkLifecycle.Instance.Client.LogError($"Failed to find NetworkedWarehouseMachineController {machine?.warehouseTrackName}. Warehouse not found!");
+            return;
+        }
+
+        NetworkLifecycle.Instance.Client.SendWarehouseRequest(action, netController.NetId);
     }
 }

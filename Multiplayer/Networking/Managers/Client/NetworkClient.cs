@@ -1315,12 +1315,12 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableUnordered);
     }
 
-    public void SendWarehouseRequest(WarehouseAction action, string track)
+    public void SendWarehouseRequest(WarehouseAction action, ushort netId)
     {
         SendPacketToServer(new ServerboundWarehouseMachineControllerRequestPacket
         {
-            warehouseAction = action,
-            WarehouseMachineID = track
+            NetId = netId,
+            WarehouseAction = action,
         }, DeliveryMethod.ReliableUnordered);
     }
 
