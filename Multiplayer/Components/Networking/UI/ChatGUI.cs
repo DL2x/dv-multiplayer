@@ -653,25 +653,32 @@ public class ChatGUI : MonoBehaviour
 
     private void BlockInput(bool block)
     {
-        //player.Locomotion.inputEnabled = !block;
-        //hotbarController.enabled = !block;
         if (block)
         {
             denied = GameFeatureFlags.DeniedFlags;
 
-            GameFeatureFlags.Deny(GameFeatureFlags.Flag.ALL);
+            GameFeatureFlags.Deny(GameFeatureFlags.Flag.Movement);
+            GameFeatureFlags.Deny(GameFeatureFlags.Flag.Look);
+            GameFeatureFlags.Deny(GameFeatureFlags.Flag.Hotbar);
+            GameFeatureFlags.Deny(GameFeatureFlags.Flag.Inventory);
+            GameFeatureFlags.Deny(GameFeatureFlags.Flag.ItemGrab);
+            GameFeatureFlags.Deny(GameFeatureFlags.Flag.WorldInteraction);
+            GameFeatureFlags.Deny(GameFeatureFlags.Flag.MouseMode);
+            GameFeatureFlags.Deny(GameFeatureFlags.Flag.KeyboardDriving);
+
             CursorManager.Instance.RequestCursor(this, true);
+
             //InputFocusManager.Instance.TakeKeyboardFocus();
         }
         else
         {
             GameFeatureFlags.Allow(GameFeatureFlags.Flag.ALL);
             GameFeatureFlags.Deny(denied);
+
             CursorManager.Instance.RequestCursor(this, false);
 
-            //InputFocusManager.Instance.ReleaseKeyboardFocus();
+            //InputFocusManager.Instance.ReleaseKeyboardFocus(); 
         }
     }
-
     #endregion
 }
