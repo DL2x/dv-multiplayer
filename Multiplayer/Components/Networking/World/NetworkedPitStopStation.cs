@@ -69,7 +69,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     const float MAX_DELTA = 0.2f;
     const float MIN_UPDATE_TIME = 0.1f;
-    const float LOADING_TIMEOUT = 5f;
+    const float LOADING_TIMEOUT = 10f;
     const float ROTATION_SMOOTH_SPEED = 5f;
     const float FAUCET_SNAP_THRESHOLD = 0.005f;
 
@@ -80,6 +80,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     #region Server variables
     private Dictionary<byte, float> playerToLastNearbyTime;
     private float disablerSqrDistance = DEFAULT_DISABLER_SQR_DISTANCE;
+    private float EnablerSqrDistance => disablerSqrDistance / 2;
     private float disablerCheckInterval = DEFAULT_DISABLER_INTERVAL;
 
     private readonly Dictionary<LocoResourceModule, (Action FillStart, Action FillStop, Action DrainStart, Action DrainStop)> resourceStartStopDelegates = [];
@@ -109,7 +110,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     private readonly Dictionary<ResourceType, bool> isResourceGrabbedDict = [];
     private readonly Dictionary<ResourceType, bool> isResourceRemoteGrabbedDict = [];
     private readonly Dictionary<ResourceType, float> lastRemoteValueDict = [];
- 
+
     private bool isFaucetGrabbed = false;
     private float lastFaucetUpdateTime = 0.0f;
     private float lastFaucetSent = 0.0f;
@@ -289,11 +290,13 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                         continue;
                     }
 
-                    //player nearby recently, update time
-                    playerToLastNearbyTime[player.Id] = Time.time;
-
+                    //if not initialised
                     if (!initialised)
                     {
+                        //make sure they are close by before we add them to the nearby list
+                        if (sqrDistance > EnablerSqrDistance)
+                            continue;
+
                         if (!NetworkLifecycle.Instance.Server.TryGetPeer(player.Id, out var peer))
                             continue;
 
@@ -327,6 +330,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                             NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, stateData, plugData, peer);
                         }
                     }
+
+                    //player nearby recently, update time
+                    playerToLastNearbyTime[player.Id] = Time.time;
                 }
             }
         }
@@ -391,7 +397,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
             var module = kvp.Key;
 
-           SendResourceUpdate(module);
+            SendResourceUpdate(module);
         }
     }
 
@@ -521,7 +527,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                     leverStateLookup[resourceModule.resourceType] = (checker, resourceModule, LeverStatehandler);
                     grabbedHandlerLookup[resourceModule.resourceType] = grab;
 
-                    if(lever != null)
+                    if (lever != null)
                         leverLookup[resourceModule.resourceType] = lever;
 
                     //sb.AppendLine($"\t{resourceModule.resourceType}, Grab Handler found: {grab != null}, Name: {grab.name}");
@@ -561,9 +567,19 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         yield return new WaitUntil
         (
             () =>
-                (initialised && Station?.pitstop?.carList != null && packet.CarCount == Station.pitstop.carList.Count)
-                || (Time.time - time) > LOADING_TIMEOUT
+            {
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.WaitForLoad() PitStop [{StationName}] PitStop Initialised: {initialised}, Packet Car Count: {packet.CarCount}, Station Car Count: {Station.pitstop?.carList?.Count}, Car Count Matched: {packet.CarCount == Station.pitstop?.carList?.Count}, time elapsed: {(Time.time - time)}");
+
+                //try to trigger colliders manually
+                if (initialised && Station?.pitstop?.carList != null && packet.CarCount != Station.pitstop.carList.Count)
+                    Station?.pitstop?.RefreshPitStopCarPresence();
+
+                return (initialised && Station?.pitstop?.carList != null && packet.CarCount == Station.pitstop.carList.Count)
+                || (Time.time - time) > LOADING_TIMEOUT;
+
+            }
         );
+
 
         yield return new WaitForEndOfFrame();
         yield return new WaitForEndOfFrame();
