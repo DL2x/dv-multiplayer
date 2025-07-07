@@ -998,9 +998,9 @@ public class NetworkClient : NetworkManager
             return;
         }
 
-        Log($"Pit Stop Plug Interaction received for {netPlug}");
+        Log($"Pit Stop Plug Interaction received for {netPlug.NetId}");
 
-        LogDebug(() => $"OnCommonPitStopPlugInteractionPacket() [{netPlug?.transform?.parent?.name}, {packet.NetId}], interaction: [{(PlugInteractionType)packet.InteractionType}]");
+        LogDebug(() => $"OnCommonPitStopPlugInteractionPacket() [{netPlug?.transform?.name}, {packet.NetId}], interaction: [{(PlugInteractionType)packet.InteractionType}]");
         netPlug.ProcessPacket(packet);
     }
 

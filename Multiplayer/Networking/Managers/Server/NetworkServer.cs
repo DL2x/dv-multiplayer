@@ -618,11 +618,11 @@ public class NetworkServer : NetworkManager
             SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
-    public void SendPitStopInteractionPacket(ITransportPeer peer, CommonPitStopInteractionPacket packet)
+    public void SendPitStopInteractionPacket(ServerPlayer player, CommonPitStopInteractionPacket packet)
     {
-        LogDebug(() => $"SendPitStopInteractionPacket({peer.Id}, {packet.NetId})");
+        LogDebug(() => $"SendPitStopInteractionPacket({player.Username}, {packet.NetId})");
 
-        SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
+        SendPacket(player.Peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
     public void SendPitStopPlugInteractionPacket(ServerPlayer player, CommonPitStopPlugInteractionPacket packet)
@@ -1272,37 +1272,36 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonPitStopInteractionPacket(CommonPitStopInteractionPacket packet, ITransportPeer peer)
     {
-
-        if (NetworkedPitStopStation.Get(packet.NetId, out NetworkedPitStopStation controller))
-            controller.ProcessInteractionPacketAsHost(packet, peer);
+        bool foundPlayer = TryGetServerPlayer(peer, out var player);
+        if (!foundPlayer)
+        {
+            LogWarning($"Received Pit Stop Plug Interaction, but player was not found");
+        }
         else
-            LogWarning($"OnCommonPitStopInteractionPacket() Failed to find PitStopStation with netId: {packet.NetId}");
+        {
+            if (NetworkedPitStopStation.Get(packet.NetId, out NetworkedPitStopStation controller))
+                controller.ProcessInteractionPacketAsHost(packet, player);
+            else
+                LogWarning($"OnCommonPitStopInteractionPacket() Failed to find PitStopStation with netId: {packet.NetId}");
+        }
     }
 
     private void OnCommonPitStopPlugInteractionPacket(CommonPitStopPlugInteractionPacket packet, ITransportPeer peer)
     {
         bool foundPlayer = TryGetServerPlayer(peer, out var player);
         if (!foundPlayer)
+        {
             LogWarning($"Received Pit Stop Plug Interaction, but player was not found");
+            SendNetSerializablePacket(peer, new CommonPitStopPlugInteractionPacket
+            {
+                NetId = packet.NetId,
+                InteractionType = (byte)PitStopStationInteractionType.Reject
+            }, DeliveryMethod.ReliableOrdered);
+        }
 
         if(NetworkedPluggableObject.Get(packet.NetId, out NetworkedPluggableObject plug) && foundPlayer)
         {
-            if (plug.ValidateInteraction(packet, player))
-            {
-                //passed validation, send to all but the originator
-                //todo: refactor for culling
-                packet.PlayerId = player.Id;
-                SendNetSerializablePacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
-            }
-            else
-            {
-                //Failed to validate, player needs to rollback interaction
-                SendNetSerializablePacket(peer, new CommonPitStopPlugInteractionPacket
-                {
-                    NetId = packet.NetId,
-                    InteractionType = (byte)PitStopStationInteractionType.Reject
-                }, DeliveryMethod.ReliableOrdered);
-            }
+            plug.ProcessInteractionPacketAsHost(packet, player);
         }
         else
         {

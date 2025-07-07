@@ -70,7 +70,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     const float MAX_DELTA = 0.2f;
     const float MIN_UPDATE_TIME = 0.1f;
-    const float LOADING_TIMEOUT = 10f;
+    const float LOADING_TIMEOUT = 5f;
     const float ROTATION_SMOOTH_SPEED = 5f;
     const float FAUCET_SNAP_THRESHOLD = 0.005f;
 
@@ -146,6 +146,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             CullingManager.PlayerEnteredCullingRegion += OnPlayerEnteredCullingRegion;
 
             NetworkLifecycle.Instance.OnTick += OnTick;
+
+            NetworkLifecycle.Instance.Server.PlayerDisconnect += OnPlayerDisconnect;
+
             //ensure host can interact
             Refreshed = true;
         }
@@ -182,6 +185,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             }
 
             NetworkLifecycle.Instance.OnTick -= OnTick;
+
+            NetworkLifecycle.Instance.Server.PlayerDisconnect -= OnPlayerDisconnect;
         }
 
         if (carSelectorGrab != null)
@@ -259,13 +264,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         return keyValuePairs;
     }
 
-    public bool ValidateInteraction(CommonPitStopInteractionPacket packet, ITransportPeer peer)
+    public bool ValidateInteraction(CommonPitStopInteractionPacket packet, ServerPlayer player)
     {
         //todo: implement validation code (player distance, player interacting, etc.)
         return true;
     }
 
-    public void OnPlayerDisconnect(ITransportPeer peer)
+    //todo: update when merged with ModAPI branch
+    public void OnPlayerDisconnect(uint playerId)
     {
         //todo: when a player disconnects, if they are interacting with a lever, cancel the interaction
         //Multiplayer.LogWarning($"OnPlayerDisconnect()");
