@@ -6,25 +6,28 @@ using UnityEngine;
 
 namespace Multiplayer.Networking.Data;
 
-public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, byte playerId, ushort trainCarNetId, bool isLeft, Vector3 pos, Quaternion rot)
+public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, byte playerId, ushort trainCarNetId, sbyte socketIndex, Vector3 pos, Quaternion rot)
 {
     public readonly ushort NetId = netId;
     public readonly byte PlayerId = playerId;
     public readonly PlugInteractionType State = state;
     public readonly ushort TrainCarNetId = trainCarNetId;
-    public readonly bool IsLeftSide = isLeft;
+    public readonly sbyte SocketIndex = socketIndex;
     public readonly Vector3 Position = pos;
     public readonly Quaternion Rotation = rot;
 
     public static PitStopPlugData From(NetworkedPluggableObject plugData, bool bulk = false)
     {
+        var interaction = GetInteractionType(plugData, bulk);
+
+        Multiplayer.LogDebug(() => $"PitStopPlugData.From() NetId: {plugData.NetId}, Interaction: {interaction}");
         return new PitStopPlugData
                 (
                     plugData.NetId,
-                    GetInteractionType(plugData, bulk),
+                    interaction,
                     plugData.HeldBy?.Id ?? 0,
                     plugData.TrainCarNetId,
-                    plugData.IsConnectedLeft,
+                    plugData.SocketIndex,
                     plugData.transform.GetWorldAbsolutePosition(),
                     plugData.transform.rotation
                 );
@@ -52,7 +55,7 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
                 break;
             case PlugInteractionType.DockSocket:
                 writer.Put(data.TrainCarNetId);
-                writer.Put(data.IsLeftSide);
+                writer.Put(data.SocketIndex);
                 break;
         }
     }
@@ -63,7 +66,7 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
         PlugInteractionType state = (PlugInteractionType)reader.GetByte();
         byte playerId = 0;
         ushort trainCarNetId = 0;
-        bool isLeft = false;
+        sbyte socketIndex = -1;
         Vector3 pos = Vector3.zero;
         Quaternion rot = Quaternion.identity;
 
@@ -84,7 +87,7 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
                 break;
             case PlugInteractionType.DockSocket:
                 trainCarNetId = reader.GetUShort();
-                isLeft = reader.GetBool();
+                socketIndex = reader.GetSByte();
                 break;
         }
 
@@ -94,26 +97,30 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
                 state,
                 playerId,
                 trainCarNetId,
-                isLeft,
+                socketIndex,
                 pos,
                 rot
             );
     }
 
-    private static PlugInteractionType GetInteractionType(NetworkedPluggableObject plugData, bool bulk)
+    private static PlugInteractionType GetInteractionType(NetworkedPluggableObject netPlug, bool bulk)
     {
-        if (!bulk)
-            return plugData.CurrentInteraction;
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.GetInteractionType() netId: {netPlug.NetId} bulk: {bulk}, Heldby:{netPlug.HeldBy}, TrainCarNetId: {netPlug.TrainCarNetId} socket not null: {netPlug.PluggableObject.Socket != null}, socket path: {netPlug.PluggableObject.Socket?.GetObjectPath()}, start attached to not null: {netPlug.PluggableObject.startAttachedTo != null}, start attached to path: {netPlug.PluggableObject.startAttachedTo?.GetObjectPath()}");
+        //if (!bulk)
+        //    return plugData.CurrentInteraction;
 
-        if (plugData.HeldBy != null)
+        if (netPlug.HeldBy != null)
             return PlugInteractionType.PickedUp;
 
-        if (plugData.TrainCarNetId != 0)
-            return PlugInteractionType.DockSocket;
+        if (netPlug.PluggableObject.Socket == null)
+            return PlugInteractionType.Dropped;
 
-        if (plugData.PluggableObject.Socket == plugData.PluggableObject.startAttachedTo)
+        if (netPlug.PluggableObject.Socket == netPlug.PluggableObject.startAttachedTo)
             return PlugInteractionType.DockHome;
 
-        return PlugInteractionType.Dropped;
+        if (netPlug.TrainCarNetId != 0)
+            return PlugInteractionType.DockSocket;
+
+        return PlugInteractionType.Rejected;
     }
 }

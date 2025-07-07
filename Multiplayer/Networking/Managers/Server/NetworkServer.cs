@@ -625,6 +625,12 @@ public class NetworkServer : NetworkManager
         SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
+    public void SendPitStopPlugInteractionPacket(ServerPlayer player, CommonPitStopPlugInteractionPacket packet)
+    {
+        LogDebug(() => $"SendPitStopPlugInteractionPacket({packet.NetId}, {packet.InteractionType}, {packet.PlayerId}, {packet.Position}, {packet.Rotation}, {packet.TrainCarNetId}, {packet.SocketIndex}, {packet.YankForce}, {packet.YankMode})");
+        SendNetSerializablePacket(player.Peer, packet, DeliveryMethod.ReliableOrdered);
+    }
+
     public void SendCashRegisterAction(CommonCashRegisterWithModulesActionPacket packet, ITransportPeer peer = null)
     {
         if (peer == null)

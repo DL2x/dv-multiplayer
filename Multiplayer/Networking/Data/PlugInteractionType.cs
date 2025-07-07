@@ -6,6 +6,7 @@ namespace Multiplayer.Networking.Data
         Rejected,
         PickedUp,
         Dropped,
+        Yanked,
         DockHome,
         DockSocket
     }

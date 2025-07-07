@@ -1438,16 +1438,24 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableOrdered);
     }
 
-    public void SendPitStopPlugInteractionPacket(ushort netId, PlugInteractionType interaction, Vector3? position = null, Quaternion? rotation = null, ushort trainCarNetId = 0, bool isConnectedLeft = false)
+    public void SendPitStopPlugInteractionPacket
+    (
+        ushort netId,
+        PlugInteractionType interaction,
+        Vector3? position = null,
+        Quaternion? rotation = null,
+        ushort trainCarNetId = 0,
+        sbyte socketIndex = -1
+    )
     {
-        LogDebug(()=>$"SendPitStopInteractionPacket({netId}, {interaction}, {position}, {rotation}, {trainCarNetId}, {isConnectedLeft})");
+        LogDebug(()=>$"SendPitStopInteractionPacket({netId}, {interaction}, pos: {position}, rot: {rotation}, trainNetId: {trainCarNetId}, socketIndex: {socketIndex})");
 
         SendNetSerializablePacketToServer(new CommonPitStopPlugInteractionPacket
         {
             NetId = netId,
             InteractionType = interaction,
             TrainCarNetId = trainCarNetId,
-            IsLeftSide = isConnectedLeft,
+            SocketIndex = socketIndex,
             Position = position,
             Rotation = rotation,
 

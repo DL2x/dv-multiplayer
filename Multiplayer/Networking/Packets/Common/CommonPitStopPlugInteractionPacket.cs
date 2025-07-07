@@ -12,9 +12,11 @@ public class CommonPitStopPlugInteractionPacket : INetSerializable
     public PlugInteractionType InteractionType { get; set; }
     public byte PlayerId { get; set; }
     public ushort TrainCarNetId { get; set; }
-    public bool IsLeftSide { get; set; }
+    public sbyte SocketIndex { get; set; }
     public Vector3? Position { get; set; }
     public Quaternion? Rotation { get; set; }
+    public Vector3? YankForce { get; set; }
+    public ForceMode YankMode { get; set; }
 
     public void Deserialize(NetDataReader reader)
     {
@@ -35,12 +37,20 @@ public class CommonPitStopPlugInteractionPacket : INetSerializable
                 Rotation = QuaternionSerializer.Deserialize(reader);
                 break;
 
+            case PlugInteractionType.Yanked:
+                Position = Vector3Serializer.Deserialize(reader);
+                Rotation = QuaternionSerializer.Deserialize(reader);
+
+                YankForce = Vector3Serializer.Deserialize(reader);
+                YankMode = (ForceMode)reader.GetByte();
+                break;
+
             case PlugInteractionType.DockHome:
                 break;
 
             case PlugInteractionType.DockSocket:
                 TrainCarNetId = reader.GetUShort();
-                IsLeftSide = reader.GetBool();
+                SocketIndex = reader.GetSByte();
                 break;
         }
     }
@@ -64,12 +74,20 @@ public class CommonPitStopPlugInteractionPacket : INetSerializable
                 QuaternionSerializer.Serialize(writer, Rotation ?? Quaternion.identity);
                 break;
 
+            case PlugInteractionType.Yanked:
+                Vector3Serializer.Serialize(writer, Position ?? Vector3.zero);
+                QuaternionSerializer.Serialize(writer, Rotation ?? Quaternion.identity);
+
+                Vector3Serializer.Serialize(writer, YankForce ?? Vector3.zero);
+                writer.Put((byte)YankMode);
+                break;
+
             case PlugInteractionType.DockHome:
                 break;
 
             case PlugInteractionType.DockSocket:
                 writer.Put(TrainCarNetId);
-                writer.Put(IsLeftSide);
+                writer.Put(SocketIndex);
                 break;
         }
     }
