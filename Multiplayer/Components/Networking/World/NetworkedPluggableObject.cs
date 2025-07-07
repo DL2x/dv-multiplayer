@@ -50,7 +50,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     public PropHose Hose { get; private set; }
     public NetworkedPitStopStation Station { get; private set; }
     public bool IsConnecting { get; set; } = false;
-    
+
     public bool IsHeld => playerHolding != 0 || HeldBy != null || PluggableObject.controlGrabbed;
 
     private GrabHandlerGizmoItem grabHandler;
@@ -147,7 +147,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
         if (currentInteraction == PlugInteractionType.Rejected)
             return;
 
-        Multiplayer.LogDebug(()=>$"NetworkedPluggableObject.LateUpdate()station: {Station?.StationName}, processing: {NetworkLifecycle.Instance.IsProcessingPacket}, processing as Host: {processingAsHost}, refreshed: {Refreshed}, isConnecting: {IsConnecting}");
+        Multiplayer.LogDebug(() => $"NetworkedPluggableObject.LateUpdate()station: {Station?.StationName}, processing: {NetworkLifecycle.Instance.IsProcessingPacket}, processing as Host: {processingAsHost}, refreshed: {Refreshed}, isConnecting: {IsConnecting}");
         if (!processingAsHost)
         {
             NetworkLifecycle.Instance.Client?.SendPitStopPlugInteractionPacket(NetId, currentInteraction, transform.position - WorldMover.currentMove, transform.rotation, TrainCarNetId, SocketIndex);
@@ -530,7 +530,8 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
                 DropPlug();
 
-                result = PluggableObject.InstantSnapTo(PluggableObject.startAttachedTo);
+                //result = PluggableObject.InstantSnapTo(PluggableObject.startAttachedTo);
+                result = PluggableObject.StartSnappingTo(PluggableObject.startAttachedTo, true);
                 Multiplayer.LogDebug(() => $"ProcessPacket() NetId: {NetId}, DockHome, result: {result}");
                 break;
 
@@ -633,7 +634,8 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
                 return;
             }
 
-            bool result = PluggableObject.InstantSnapTo(socket);
+            //bool result = PluggableObject.InstantSnapTo(socket);
+            bool result = PluggableObject.StartSnappingTo(socket, true);
 
             if (result)
             {
@@ -665,12 +667,12 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
     private IEnumerator WaitForYankSettle()
     {
-        Multiplayer.LogDebug(()=>$"WaitForYankSettle() PluggableObject.yankOutOfHand: {PluggableObject.yankOutOfHand}, velocity: {PlugRB.velocity.sqrMagnitude}");
+        Multiplayer.LogDebug(() => $"WaitForYankSettle() PluggableObject.yankOutOfHand: {PluggableObject.yankOutOfHand}, velocity: {PlugRB.velocity.sqrMagnitude}");
         PluggableObject.yankOutOfHand = false; //block docking
 
         //allow force to be applied
         yield return new WaitForFixedUpdate();
-        Multiplayer.LogDebug(()=>$"WaitForYankSettle() post-WaitForFixed, PluggableObject.yankOutOfHand: {PluggableObject.yankOutOfHand}, velocity: {PlugRB.velocity.sqrMagnitude}");
+        Multiplayer.LogDebug(() => $"WaitForYankSettle() post-WaitForFixed, PluggableObject.yankOutOfHand: {PluggableObject.yankOutOfHand}, velocity: {PlugRB.velocity.sqrMagnitude}");
 
         float time = Time.time;
 
