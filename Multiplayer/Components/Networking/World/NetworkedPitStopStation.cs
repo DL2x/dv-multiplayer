@@ -2,6 +2,7 @@ using DV.CabControls.NonVR;
 using DV.Interaction;
 using DV.ThingTypes;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Networking.Packets.Clientbound.World;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Networking.TransportLayers;
@@ -78,10 +79,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     const float NEARBY_REMOVAL_DELAY = 3f;
 
     #region Server variables
-    private Dictionary<byte, float> playerToLastNearbyTime;
-    private float disablerSqrDistance = DEFAULT_DISABLER_SQR_DISTANCE;
-    private float EnablerSqrDistance => disablerSqrDistance / 2;
-    private float disablerCheckInterval = DEFAULT_DISABLER_INTERVAL;
+    public CullingManager CullingManager { get; private set; }
 
     private readonly Dictionary<LocoResourceModule, (Action FillStart, Action FillStop, Action DrainStart, Action DrainStop)> resourceStartStopDelegates = [];
     private readonly Dictionary<LocoResourceModule, bool> resourceFlowing = [];
@@ -130,16 +128,22 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         if (NetworkLifecycle.Instance.IsHost())
         {
-            playerToLastNearbyTime = [];
-
             var disabler = GetComponentInParent<PlayerDistanceGameObjectsDisabler>();
+
+            var cullingSqrDistance = DEFAULT_DISABLER_SQR_DISTANCE;
+            var cullingCheckInterval = DEFAULT_DISABLER_INTERVAL;
+
             if (disabler != null)
             {
-                disablerSqrDistance = disabler.disableSqrDistance;
-                disablerCheckInterval = disabler.checkPeriodPerGO;
+                cullingSqrDistance = disabler.disableSqrDistance;
+                cullingCheckInterval = disabler.checkPeriodPerGO;
             }
 
-            StartCoroutine(PlayerDistanceChecker());
+            var activationSqrDistance = cullingSqrDistance / 2;
+
+            CullingManager = new(cullingCheckInterval, cullingSqrDistance, activationSqrDistance, NEARBY_REMOVAL_DELAY, gameObject);
+            CullingManager.PlayerEnteredActivationRegion += OnPlayerEnteredActivationRegion;
+            CullingManager.PlayerEnteredCullingRegion += OnPlayerEnteredCullingRegion;
 
             NetworkLifecycle.Instance.OnTick += OnTick;
             //ensure host can interact
@@ -159,8 +163,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         if (NetworkLifecycle.Instance.IsHost())
         {
-            StopCoroutine(PlayerDistanceChecker());
-
             foreach (var kvp in resourceStartStopDelegates)
             {
                 var (fillStart, fillStop, drainStart, drainStop) = kvp.Value;
@@ -171,6 +173,15 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             }
 
             resourceStartStopDelegates.Clear();
+
+            if (CullingManager != null)
+            {
+                CullingManager.PlayerEnteredActivationRegion -= OnPlayerEnteredActivationRegion;
+                CullingManager.PlayerEnteredCullingRegion -= OnPlayerEnteredCullingRegion;
+                CullingManager.Dispose();
+            }
+
+            NetworkLifecycle.Instance.OnTick -= OnTick;
         }
 
         if (carSelectorGrab != null)
@@ -260,114 +271,77 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         //Multiplayer.LogWarning($"OnPlayerDisconnect()");
     }
 
-    private IEnumerator PlayerDistanceChecker()
+    public void OnPlayerEnteredActivationRegion(ServerPlayer player)
     {
-        //wait for game to finish loading
-        yield return new WaitForSeconds(1f);
-
-        while (true)
+        if (Station.pitstop.IsCarInPitStop())
         {
-            yield return new WaitForSeconds(disablerCheckInterval);
+            // Ensure all resource data exists
+            InitialiseData();
 
-            //if not active then there is no one close by
-            if (gameObject != null && gameObject.activeInHierarchy && Station != null && Station.pitstop != null)
+            // One struct per module type
+            var resourceCount = Station.locoResourceModules.resourceModules.Count();
+            LocoResourceModuleData[] stateData = new LocoResourceModuleData[resourceCount];
+
+            int i;
+            for (i = 0; i < resourceCount; i++)
             {
-                foreach (var player in NetworkLifecycle.Instance.Server.ServerPlayers)
-                {
-                    if (player.Id == NetworkLifecycle.Instance.Server.SelfId || !player.IsLoaded)
-                        continue;
-
-                    float sqrDistance = (player.WorldPosition - transform.position).sqrMagnitude;
-
-                    bool initialised = playerToLastNearbyTime.TryGetValue(player.Id, out float lastVisit);
-
-                    if (sqrDistance > disablerSqrDistance)
-                    {
-                        // Too far away for too long, stop tracking
-                        if ((Time.time - lastVisit) > NEARBY_REMOVAL_DELAY)
-                            playerToLastNearbyTime.Remove(player.Id);
-
-                        continue;
-                    }
-
-                    //if not initialised
-                    if (!initialised)
-                    {
-                        //make sure they are close by before we add them to the nearby list
-                        if (sqrDistance > EnablerSqrDistance)
-                            continue;
-
-                        if (!NetworkLifecycle.Instance.Server.TryGetPeer(player.Id, out var peer))
-                            continue;
-
-                        if (Station.pitstop.IsCarInPitStop())
-                        {
-                            // Ensure all resource data exists
-                            InitialiseData();
-
-                            // One struct per module type
-                            var resourceCount = Station.locoResourceModules.resourceModules.Count();
-                            LocoResourceModuleData[] stateData = new LocoResourceModuleData[resourceCount];
-                            int i;
-                            for (i = 0; i < resourceCount; i++)
-                            {
-                                stateData[i] = LocoResourceModuleData.From(Station.locoResourceModules.resourceModules[i]);
-                            }
-
-                            // Car selection and lever states
-                            int carIndex = Station.pitstop.SelectedIndex;
-
-                            PitStopPlugData[] plugData = new PitStopPlugData[resourceToPluggableObject.Count];
-
-                            i = 0;
-                            foreach (var plug in resourceToPluggableObject)
-                            {
-                                plugData[i] = PitStopPlugData.From(plug.Value, true);
-                                i++;
-                            }
-
-                            // Send current state
-                            NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, stateData, plugData, peer);
-                        }
-                    }
-
-                    //player nearby recently, update time
-                    playerToLastNearbyTime[player.Id] = Time.time;
-                }
+                stateData[i] = LocoResourceModuleData.From(Station.locoResourceModules.resourceModules[i]);
             }
+
+            // Car selection and lever states
+            int carIndex = Station.pitstop.SelectedIndex;
+
+            PitStopPlugData[] plugData = new PitStopPlugData[resourceToPluggableObject.Count];
+
+            i = 0;
+            foreach (var plug in resourceToPluggableObject)
+            {
+                plugData[i] = PitStopPlugData.From(plug.Value, true);
+                i++;
+            }
+
+            // Send current state
+            NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, stateData, plugData, player.Peer);
         }
     }
 
-    public void ProcessInteractionPacketAsHost(CommonPitStopInteractionPacket packet, ITransportPeer peer)
+    public void OnPlayerEnteredCullingRegion(ServerPlayer player)
     {
-        Multiplayer.LogDebug(() => $"ProcessInteractionPacketAsHost() from peer: {peer.Id}, selfpeer: {NetworkLifecycle.Instance.Server.SelfId}");
+        //todo: when a player leaves the region cancel any interactions
+        //Multiplayer.LogWarning($"OnPlayerDisconnect()");
+    }
 
-        if (ValidateInteraction(packet, peer))
+    public void ProcessInteractionPacketAsHost(CommonPitStopInteractionPacket packet, ServerPlayer senderPlayer)
+    {
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessInteractionPacketAsHost() from: {senderPlayer.Username}, id: {senderPlayer.Id}, selfpeer: {NetworkLifecycle.Instance.Server.SelfId}");
+
+        if (ValidateInteraction(packet, senderPlayer))
         {
 
             processingAsHost = true;
-            if (peer.Id != NetworkLifecycle.Instance.Server.SelfPeer.Id)
+            if (senderPlayer.Id != NetworkLifecycle.Instance.Server.SelfId)
             {
-                Multiplayer.LogDebug(() => $"ProcessInteractionPacketAsHost() ProcessPacketAsClient()");
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessInteractionPacketAsHost() ProcessPacketAsClient()");
                 ProcessInteractionPacketAsClient(packet);
             }
             processingAsHost = false;
+
             //Send to all other players
-            foreach (var playerId in playerToLastNearbyTime.Keys)
+            foreach (var player in CullingManager.ActivePlayers)
             {
-                if (NetworkLifecycle.Instance.Server.TryGetPeer(playerId, out var sendPeer) && sendPeer.Id != peer.Id)
+                if (player.Id != senderPlayer.Id)
                 {
-                    Multiplayer.LogDebug(() => $"ProcessInteractionPacketAsHost() sending to peer: {sendPeer.Id}");
-                    NetworkLifecycle.Instance.Server.SendPitStopInteractionPacket(sendPeer, packet);
+                    Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessInteractionPacketAsHost() sending to player: {player.Username}");
+                    NetworkLifecycle.Instance.Server.SendPitStopInteractionPacket(player, packet);
                 }
             }
         }
         else
         {
-            Multiplayer.LogDebug(() => $"ProcessInteractionPacketAsHost() failed validation");
+            Multiplayer.LogDebug(() => $"NetworkedPitStopStationProcessInteractionPacketAsHost() failed validation");
             //Failed to validate, player needs to rollback interaction
             NetworkLifecycle.Instance.Server.SendPitStopInteractionPacket(
-                peer,
+                senderPlayer,
                 new CommonPitStopInteractionPacket
                 {
                     NetId = packet.NetId,
@@ -411,12 +385,12 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             Value = module.Data.unitsToBuy
         };
 
-        foreach (var playerId in playerToLastNearbyTime.Keys)
+        foreach (var player in CullingManager.ActivePlayers)
         {
-            if (NetworkLifecycle.Instance.Server.TryGetPeer(playerId, out var sendPeer))
+            if (player != null)
             {
-                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SendResourceUpdate({module.resourceType}) sending to peer: {sendPeer.Id}, value: {module.Data.unitsToBuy}, flowing: {module.IsFlowing}");
-                NetworkLifecycle.Instance.Server.SendPitStopInteractionPacket(sendPeer, packet);
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SendResourceUpdate({module.resourceType}) sending to peer: {player.Username}, value: {module.Data.unitsToBuy}, flowing: {module.IsFlowing}");
+                NetworkLifecycle.Instance.Server.SendPitStopInteractionPacket(player, packet);
             }
         }
     }
@@ -568,7 +542,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         (
             () =>
             {
-                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.WaitForLoad() PitStop [{StationName}] PitStop Initialised: {initialised}, Packet Car Count: {packet.CarCount}, Station Car Count: {Station.pitstop?.carList?.Count}, Car Count Matched: {packet.CarCount == Station.pitstop?.carList?.Count}, time elapsed: {(Time.time - time)}");
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.WaitForLoad() PitStop [{StationName}] PitStop Initialised: {initialised}, PitStop Active:{Station?.gameObject?.activeInHierarchy}, Packet Car Count: {packet.CarCount}, Station Car Count: {Station.pitstop?.carList?.Count}, Car Count Matched: {packet.CarCount == Station.pitstop?.carList?.Count}, time elapsed: {(Time.time - time)}");
+
+                if (Station?.gameObject?.activeInHierarchy == false)
+                {
+                    //don't time out if we're waiting for the object to be enabled
+                    time = Time.time;
+                    return false;
+                }
 
                 //try to trigger colliders manually
                 if (initialised && Station?.pitstop?.carList != null && packet.CarCount != Station.pitstop.carList.Count)
