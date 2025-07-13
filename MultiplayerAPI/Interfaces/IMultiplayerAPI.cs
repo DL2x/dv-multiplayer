@@ -51,7 +51,7 @@ public interface IMultiplayerAPI
     /// 
     /// Example: In Multiplayer's TrainCar simulation sync, small changes are cached when they occur but sent as a single packet per TrainCar when OnTick fires, reducing network overhead.
     /// </summary>
-    /// <param name="tick">The current game tick number, incremented each tick cycle</param>
+    /// <remarks>The parameter represents the current tick number</remarks>
     event Action<uint> OnTick;
 
     /// <summary>

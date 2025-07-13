@@ -3,12 +3,39 @@ using System;
 
 namespace MPAPI;
 
+/// <summary>
+/// Provides an API interface for accessing Multiplayer Mod functionality and managing server/client instances.
+/// </summary>
+/// <remarks>
+/// This class serves as the main entry point for the Multiplayer API, providing events for server and client lifecycle management,
+/// and access to the current server, client, and API instances.
+/// </remarks>
 public static class MultiplayerAPI
 {
+    /// <summary>
+    /// Event fired when a server instance has been created.
+    /// </summary>
+    /// <remarks>
+    /// This event provides access to the <see cref="IServer"/> instance that was started.
+    /// </remarks>
     public static event Action<IServer> ServerStarted;
+
+    /// <summary>
+    /// Event fired when a client instance has been created.
+    /// </summary>
+    /// <remarks>
+    /// This event provides access to the <see cref="IClient"/> instance that was started.
+    /// </remarks>
     public static event Action<IClient> ClientStarted;
 
+    /// <summary>
+    /// Event fired when a server instance is stopped.
+    /// </summary>
     public static event Action ServerStopped;
+
+    /// <summary>
+    /// Event fired when a client instance is stopped.
+    /// </summary>
     public static event Action ClientStopped;
 
     private static IMultiplayerAPI _instance;
@@ -66,7 +93,7 @@ public static class MultiplayerAPI
     /// <summary>
     /// Internal method for the Multiplayer mod to register a server instance
     /// </summary>
-    /// <param name="apiInstance">The API implementation</param>
+    /// <param name="server">The API implementation</param>
     internal static void RegisterServer(IServer server)
     {
         _server = server;
