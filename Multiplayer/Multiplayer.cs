@@ -173,8 +173,8 @@ public static class Multiplayer
                                                 "Run Unity Mod Manager Installer to apply the update.</align>";
                     */
 
-                    var latestVer = Locale.Get(Locale.MAIN_MENU__UPDATE_LATEST_KEY, $"\t\t{ModEntry.NewestVersion}");
-                    var installedVer = Locale.Get(Locale.MAIN_MENU__UPDATE_INSTALLED_KEY, $"\t\t<color=\"red\">{ModEntry.Version}</color>");
+                    var latestVer = Locale.Get(Locale.MAIN_MENU__UPDATE_LATEST_KEY, [$"\t\t{ModEntry.NewestVersion}"]);
+                    var installedVer = Locale.Get(Locale.MAIN_MENU__UPDATE_INSTALLED_KEY, [$"\t\t<color=\"red\">{ModEntry.Version}</color>"]);
 
                     update.labelTMPro.text = Locale.MAIN_MENU__UPDATE_TITLE +
                                              $"\r\n\r\n<align=left>{latestVer}" +
