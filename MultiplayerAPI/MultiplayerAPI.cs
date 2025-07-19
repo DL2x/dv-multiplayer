@@ -1,5 +1,7 @@
 using MPAPI.Interfaces;
 using System;
+using System.Linq;
+using System.Reflection;
 
 namespace MPAPI;
 
@@ -12,6 +14,41 @@ namespace MPAPI;
 /// </remarks>
 public static class MultiplayerAPI
 {
+    /// <summary>
+    /// Gets the version of the Multiplayer API DLL that is currently loaded.
+    /// </summary>
+    /// <value>The version string of the API DLL.</value>
+    public static string LoadedApiVersion
+    {
+        get
+        {
+            AssemblyInformationalVersionAttribute info = (AssemblyInformationalVersionAttribute)typeof(MultiplayerAPI).Assembly.
+                                                            GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false)
+                                                            .FirstOrDefault();
+
+            if (info == null)
+                return "";
+
+            return info.InformationalVersion.Split('+')[0];
+        }
+    }
+
+    /// <summary>
+    /// Gets the version of the Multiplayer API that the Multiplayer mod supports.
+    /// </summary>
+    /// <value>The supported API version string, or <c>null</c> if multiplayer is not loaded.</value>
+    /// <remarks>
+    /// This indicates the API version that the Multiplayer mod was built against and is compatible with.
+    /// If this differs from <see cref="LoadedApiVersion"/>, there may be compatibility issues.
+    /// </remarks>
+    public static string SupportedApiVersion => _instance?.SupportedApiVersion;
+
+    /// <summary>
+    /// Gets the version of the Multiplayer mod itself.
+    /// </summary>
+    /// <value>The Multiplayer mod version string, or <c>null</c> if multiplayer is not loaded.</value>
+    public static string MultiplayerVersion => _instance?.MultiplayerVersion;
+
     /// <summary>
     /// Event fired when a server instance has been created.
     /// </summary>

@@ -68,11 +68,24 @@ public static class Multiplayer
             var gameVer = BuildInfo.BUILD_VERSION_MAJOR.ToString() +
                 (string.IsNullOrEmpty(BuildInfo.BUILD_VERSION_SUFFIX) ? "" : "." + BuildInfo.BUILD_VERSION_SUFFIX);
 
-            Log($"\r\n\tMultiplayer JSON Version: {ModEntry.Info.Version}, Internal Version: {Ver}\r\n" +
-                $"\tGame version: {gameVer}\r\n" +
-                $"\tBuildbot version: {BuildInfo.BUILDBOT_INFO.ToString()}\r\n" +
-                $"\tLiteNetLib version: {LiteNetLibVer()}\r\n");
+            bool APIcompatible = false;
+            if (Version.TryParse(APIProvider.BUILT_AGAINST_API_VERSION, out var builtVerAPI) && Version.TryParse(MultiplayerAPI.LoadedApiVersion, out var loadedVerAPI))
+            {
+                APIcompatible = loadedVerAPI >= builtVerAPI;
+            }
 
+            Log($"\r\n\r\n" +
+                $"\tMultiplayer JSON Version: {ModEntry.Info.Version}, Internal Version: {Ver}\r\n" +
+                $"\tGame Version: {gameVer}\r\n" +
+                $"\tBuildbot Version: {BuildInfo.BUILDBOT_INFO.ToString()}\r\n" +
+                $"\tLiteNetLib Version: {LiteNetLibVer()}\r\n" +
+                $"\tMultiplayer API Required Version: {APIProvider.BUILT_AGAINST_API_VERSION}, Loaded Version: {MultiplayerAPI.LoadedApiVersion}\r\n" +
+                $"\tMultiplayer API Compatible: {APIcompatible}\r\n");
+
+            if (!APIcompatible)
+            {
+                throw new Exception("Multiplayer API version mismatch! One or more mods are using a newer version of the Multiplayer API, please update Multiplayer Mod or disable these mods.\r\n");
+            }
 
             Log("Patching...");
             harmony = new Harmony(ModEntry.Info.Id);
@@ -85,13 +98,6 @@ public static class Multiplayer
                 Log("Found RemoteDispatch, patching...");
                 RemoteDispatchPatch.Patch(harmony, remoteDispatch.Assembly);
             }
-
-            //UnityModManager.ModEntry passengerJobs = UnityModManager.FindMod("PassengerJobs");
-            //if (passengerJobs?.Enabled == true)
-            //{
-            //    Log("Found PassengerJobs, initialising...");
-            //    PassengerJobsMod.Init();
-            //}
 
             if (!LoadAssets())
                 return false;

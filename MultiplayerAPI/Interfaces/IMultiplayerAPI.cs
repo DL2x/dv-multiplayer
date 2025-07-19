@@ -9,9 +9,14 @@ namespace MPAPI.Interfaces;
 public interface IMultiplayerAPI
 {
     /// <summary>
-    /// Returns the version of the Multiplayer API if multiplayer is loaded, otherwise returns null
+    /// Gets the version of the Multiplayer API that the Multiplayer mod supports.
     /// </summary>
-    public string Version { get; }
+    public string SupportedApiVersion { get; }
+
+    /// <summary>
+    /// Gets the version of the Multiplayer mod itself.
+    /// </summary>
+    public string MultiplayerVersion { get; }
 
     /// <summary>
     /// Gets whether the multiplayer mod is currently loaded and active
