@@ -815,11 +815,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         Multiplayer.LogDebug(() => $"Common_OnPaintThemeChange() target: {paintController.TargetArea}, theme: {paintController.CurrentTheme.name}");
 
-        byte target = (byte)paintController.TargetArea;
-        var theme = PaintThemeLookup.Instance.GetThemeIndex(paintController.CurrentTheme);
+        var themeId = PaintThemeLookup.Instance.GetThemeId(paintController.CurrentTheme);
 
-        Multiplayer.LogDebug(() => $"Common_OnPaintThemeChange() sending [{CurrentID},{NetId}], target: {paintController.TargetArea}, theme: [{paintController.CurrentTheme.name},{theme}]");
-        NetworkLifecycle.Instance?.Client.SendPaintThemeChangePacket(NetId, target, theme);
+        Multiplayer.LogDebug(() => $"Common_OnPaintThemeChange() sending [{CurrentID},{NetId}], target: {paintController.TargetArea}, theme: [{paintController.CurrentTheme.name}, {themeId}]");
+        NetworkLifecycle.Instance?.Client.SendPaintThemeChangePacket(NetId, paintController.TargetArea, themeId);
     }
 
     private void Common_OnFuseUpdated(Fuse fuse)
@@ -1234,7 +1233,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         if (targetPaint == null || !targetPaint.IsSupported(paint))
         {
-            Multiplayer.LogWarning($"Received Paint Theme update for [{CurrentID}, {NetId}], but {paint?.assetName} is not supported");
+            Multiplayer.LogWarning($"Received Paint Theme update for [{CurrentID}, {NetId}], but {paint?.AssetName} is not supported");
             return;
         }
 

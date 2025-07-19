@@ -1008,24 +1008,24 @@ public class NetworkClient : NetworkManager
         if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
             return;
 
-        Log($"Received paint theme change for {netTrainCar?.CurrentID}");
-
         PaintTheme paint = PaintThemeLookup.Instance.GetPaintTheme(packet.PaintThemeId);
 
         if (paint == null)
         {
-            LogWarning($"Paint theme index {packet.PaintThemeId} does not exist!");
+            LogWarning($"Received paint theme change for {netTrainCar?.CurrentID}, but paint theme id '{packet.PaintThemeId}' does not exist.");
             return;
         }
 
-        if (!Enum.IsDefined(typeof(TrainCarPaint.Target), packet.TargetArea))
-        {
-            LogWarning($"TrainCarPaint Target {packet.TargetArea} is not defined!");
-            return;
-        }
+        Log($"Received paint theme change for {netTrainCar?.CurrentID}, theme '{paint.AssetName}'");
 
-        LogDebug(() => $"OnCommonPaintThemePacket() [{netTrainCar?.CurrentID}, {packet.NetId}], area: {(TrainCarPaint.Target)packet.TargetArea}, paint: [{paint?.assetName}, {packet.PaintThemeId}]");
-        netTrainCar?.Common_ReceivePaintThemeUpdate((TrainCarPaint.Target)packet.TargetArea, paint);
+        //if (!Enum.IsDefined(typeof(TrainCarPaint.Target), packet.TargetArea))
+        //{
+        //    LogWarning($"TrainCarPaint Target {packet.TargetArea} is not defined!");
+        //    return;
+        //}
+
+        LogDebug(() => $"OnCommonPaintThemePacket() [{netTrainCar?.CurrentID}, {packet.NetId}], area: {packet.TargetArea}, paint: [{paint?.AssetName}, {packet.PaintThemeId}]");
+        netTrainCar?.Common_ReceivePaintThemeUpdate(packet.TargetArea, paint);
     }
 
     #endregion
@@ -1373,9 +1373,9 @@ public class NetworkClient : NetworkManager
                 DeliveryMethod.ReliableOrdered);
     }
 
-    public void SendPaintThemeChangePacket(ushort netId, byte targetArea, sbyte themeIndex)
+    public void SendPaintThemeChangePacket(ushort netId, TrainCarPaint.Target targetArea, uint themeId)
     {
-        SendPacketToServer(new CommonPaintThemePacket { NetId = netId, TargetArea = targetArea, PaintThemeId = themeIndex }, DeliveryMethod.ReliableUnordered);
+        SendPacketToServer(new CommonPaintThemePacket { NetId = netId, TargetArea = targetArea, PaintThemeId = themeId }, DeliveryMethod.ReliableUnordered);
     }
 
     #endregion
