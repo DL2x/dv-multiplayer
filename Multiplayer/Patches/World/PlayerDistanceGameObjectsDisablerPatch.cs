@@ -1,3 +1,4 @@
+using DV.Optimizers;
 using HarmonyLib;
 using Multiplayer.Components.Networking;
 using Multiplayer.Utils;
@@ -5,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 using UnityEngine;
 
 namespace Multiplayer.Patches.World;
