@@ -11,6 +11,7 @@ public class ClientboundPitStopBulkUpdatePacket
     public ushort NetId { get; set; }
     public int CarCount { get; set; }
     public int CarSelection {  get; set; }
+    public int FaucetNotch { get; set; }
     public LocoResourceModuleData[] ResourceData { get; set; }
     public PitStopPlugData[] PlugData { get; set; }
 }

@@ -14,6 +14,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 using static CashRegisterModule;
+using DV.CabControls;
 
 namespace Multiplayer.Components.Networking.World;
 
@@ -68,12 +69,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     protected override bool IsIdServerAuthoritative => false;
 
-    const float MAX_DELTA = 0.2f;
-    const float MIN_UPDATE_TIME = 0.1f;
     const float LOADING_TIMEOUT = 5f;
-    const float ROTATION_SMOOTH_SPEED = 5f;
-    const float FAUCET_SNAP_THRESHOLD = 0.005f;
-
+    const float ROTATION_SMOOTH_SPEED = 0.5f;
     const float DEFAULT_DISABLER_SQR_DISTANCE = 250000f;
     const float DEFAULT_DISABLER_INTERVAL = 2f;
     const float NEARBY_REMOVAL_DELAY = 3f;
@@ -98,6 +95,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     private GrabHandlerHingeJoint carSelectorGrab;
     private GrabHandlerHingeJoint faucetPositionerGrab;
     private HingeJointAngleFix faucetPositioner;
+    private SteppedJoint faucetCrankSteppedJoint;
 
     private readonly Dictionary<ResourceType, (RotaryAmplitudeChecker amplitudeChecker, LocoResourceModule module, Action<int> leverHandler)> leverStateLookup = [];
     private readonly Dictionary<ResourceType, GrabHandlerHingeJoint> grabbedHandlerLookup = [];
@@ -114,6 +112,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     private float lastFaucetSent = 0.0f;
     private float faucetTargetPercentage = 0.0f;
     private bool faucetTargetReached = true;
+
+    private Coroutine faucetMoveCoroutine;
 
     private bool Refreshed = false;
     #endregion
@@ -206,6 +206,11 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             faucetPositionerGrab.UnGrabbed -= FaucetCrankUnGrabbed;
         }
 
+        if (faucetCrankSteppedJoint != null)
+        {
+            faucetCrankSteppedJoint.PositionChanged -= FaucetCrankPositionChanged;
+        }
+
         foreach (var kvp in leverStateLookup)
         {
             var (leverAmplitudeChecker, _, leverStateHandler) = kvp.Value;
@@ -218,39 +223,39 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         base.OnDestroy();
     }
 
-    protected void Update()
-    {
-        var deltaTime = Time.time - lastFaucetUpdateTime;
+    //protected void Update()
+    //{
+    //    var deltaTime = Time.time - lastFaucetUpdateTime;
 
-        // Handle faucet movement
-        if (faucetPositioner && !faucetTargetReached)
-        {
-            var currentPercentage = faucetPositioner.Percentage;
-            float newPercent = Mathf.Lerp(currentPercentage, faucetTargetPercentage, Time.deltaTime * ROTATION_SMOOTH_SPEED);
+    //    // Handle faucet movement
+    //    if (faucetPositioner && !faucetTargetReached)
+    //    {
+    //        var currentPercentage = faucetPositioner.Percentage;
+    //        float newPercent = Mathf.Lerp(currentPercentage, faucetTargetPercentage, Time.deltaTime * ROTATION_SMOOTH_SPEED);
 
-            //if we're close enough to the target, snap to it
-            if (Mathf.Abs(currentPercentage - faucetTargetPercentage) < FAUCET_SNAP_THRESHOLD)
-                newPercent = faucetTargetPercentage;
+    //        //if we're close enough to the target, snap to it
+    //        if (Mathf.Abs(currentPercentage - faucetTargetPercentage) <= FAUCET_SNAP_THRESHOLD)
+    //            newPercent = faucetTargetPercentage;
 
-            SetFaucetRotation(newPercent);
-            //if we're in snap range we can finalise the rotation
-            faucetTargetReached = Mathf.Abs(newPercent - faucetTargetPercentage) < FAUCET_SNAP_THRESHOLD;
-        }
+    //        SetFaucetRotation(newPercent);
+    //        //if we're in snap range we can finalise the rotation
+    //        faucetTargetReached = Mathf.Abs(newPercent - faucetTargetPercentage) <= FAUCET_SNAP_THRESHOLD;
+    //    }
 
-        if (isFaucetGrabbed && (deltaTime > MIN_UPDATE_TIME) && lastFaucetSent != faucetPositioner.Percentage)
-        {
-            lastFaucetUpdateTime = Time.time;
+    //    if (isFaucetGrabbed && (deltaTime > MIN_UPDATE_TIME) && lastFaucetSent != faucetPositioner.Percentage)
+    //    {
+    //        lastFaucetUpdateTime = Time.time;
 
-            lastFaucetSent = faucetPositioner.Percentage;
-            NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket
-            (
-                NetId,
-                PitStopStationInteractionType.FaucetPosition,
-                null,
-                lastFaucetSent
-            );
-        }
-    }
+    //        lastFaucetSent = faucetPositioner.Percentage;
+    //        NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket
+    //        (
+    //            NetId,
+    //            PitStopStationInteractionType.FaucetPosition,
+    //            null,
+    //            lastFaucetSent
+    //        );
+    //    }
+    //}
     #endregion
 
     #region Server
@@ -306,8 +311,12 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                 i++;
             }
 
+            float faucetPos = 0.0f;
+            if (faucetPositioner != null)
+                faucetPos = faucetPositioner.Percentage;
+
             // Send current state
-            NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, stateData, plugData, player.Peer);
+            NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, faucetPos, stateData, plugData, player.Peer);
         }
     }
 
@@ -439,12 +448,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         var faucetGo = transform.parent.FindChildrenByName("FaucetCrank").FirstOrDefault();
         faucetPositionerGrab = faucetGo?.GetComponentInChildren<GrabHandlerHingeJoint>(true);
         faucetPositioner = faucetGo?.GetComponentInChildren<HingeJointAngleFix>(true);
+        faucetCrankSteppedJoint = faucetGo?.GetComponentInChildren<SteppedJoint>(true);
 
-        if (faucetPositionerGrab != null && faucetPositioner != null)
+        if (faucetPositionerGrab != null && faucetPositioner != null && faucetCrankSteppedJoint != null)
         {
             Multiplayer.LogDebug(() => $"NetworkedPitStopStation.Init() Grab Handler found: {carSelectorGrab != null}, Name: {carSelectorGrab.name}");
             faucetPositionerGrab.Grabbed += FaucetCrankGrabbed;
             faucetPositionerGrab.UnGrabbed += FaucetCrankUnGrabbed;
+            faucetCrankSteppedJoint.PositionChanged += FaucetCrankPositionChanged;
         }
 
         //build dictionaries
@@ -537,6 +548,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         initialised = true;
     }
 
+
     /// <summary>
     /// Waits for all pitstop components to complete loading before processing the bulk update
     /// </summary>
@@ -616,23 +628,57 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     /// <summary>
     /// Sets the rotation of the faucet handle to the specified percentage
     /// </summary>
-    public void SetFaucetRotation(float percentage)
+    public void SetFaucetRotation(int notch)
     {
         if (faucetPositioner == null)
             return;
 
-        float targetAngle = faucetPositioner.angleOffset + (percentage * faucetPositioner.angleRange);
+        if (faucetMoveCoroutine != null)
+            StopCoroutine(faucetMoveCoroutine);
 
-        Vector3 axis = faucetPositioner.joint.axis;
-
-        // Create a rotation around that axis by the target angle
-        Quaternion rotationDelta = Quaternion.AngleAxis(targetAngle, axis);
-
-        // Calculate the final target rotation
-        Quaternion targetRotation = Quaternion.Inverse(faucetPositioner.startRotationInverse) * rotationDelta;
-
-        faucetPositioner.transform.localRotation = targetRotation;
+        faucetMoveCoroutine = StartCoroutine(SmoothMoveToNotch(notch));
     }
+
+    private IEnumerator SmoothMoveToNotch(int targetNotch)
+    {
+        float min = faucetCrankSteppedJoint.joint.limits.min;
+        float max = faucetCrankSteppedJoint.joint.limits.max;
+
+        float startAngle = faucetCrankSteppedJoint.jointAngleFix.Angle;
+        float endAngle = faucetCrankSteppedJoint.AngleForNotch(targetNotch);
+        float elapsed = 0f;
+
+        //Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SmoothMoveToNotch() targetNotch: {targetNotch}, startAngle: {startAngle}, endAngle: {endAngle}");
+
+        targetNotch = Mathf.Clamp(targetNotch, 0, faucetCrankSteppedJoint.notches - 1);
+
+        while (faucetCrankSteppedJoint.currentNotch != targetNotch && elapsed < 2f)
+        {
+            //Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SmoothMoveToNotch() targetNotch: {targetNotch}, currentNotch: {faucetCrankSteppedJoint.currentNotch}");
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / ROTATION_SMOOTH_SPEED);
+            float newAngle = Mathf.Lerp(startAngle, endAngle, t);
+
+            //Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SmoothMoveToNotch() targetNotch: {targetNotch}, startAngle: {startAngle}, endAngle: {endAngle}, newAngleUnclamped: {newAngle}");
+
+            newAngle = Mathf.Clamp(newAngle, min, max);
+
+            //Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SmoothMoveToNotch() targetNotch: {targetNotch}, startAngle: {startAngle}, endAngle: {endAngle}, newAngleClamped: {newAngle}");
+
+            var spring = faucetCrankSteppedJoint.joint.spring;
+            spring.targetPosition = newAngle;
+            faucetCrankSteppedJoint.joint.spring = spring;
+
+            //Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SmoothMoveToNotch()targetNotch: {targetNotch}, newAngle: {newAngle}, t: {t}, elapsed: {elapsed}");
+
+            yield return null;
+        }
+
+        yield return null;
+
+        //Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SmoothMoveToNotch() Finished moving to notch: {targetNotch}, final angle: {faucetCrankSteppedJoint.jointAngleFix.Angle}");
+    }
+
 
     /// <summary>
     /// Set the car selection index
@@ -762,6 +808,18 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket(NetId, PitStopStationInteractionType.FaucetUngrab, null, lastFaucetSent);
     }
 
+    private void FaucetCrankPositionChanged(ValueChangedEventArgs args)
+    {
+        Multiplayer.LogDebug(() => $"FaucetCrankPositionChanged() {StationName}, oldValue: {args.oldValue}, newValue: {args.newValue}, delta: {args.delta}");
+
+        if (NetworkLifecycle.Instance.IsProcessingPacket || (NetworkLifecycle.Instance.IsHost() && processingAsHost))
+            return;
+
+        //Prevent new players/players entering the area from sending packets until initalised
+        if (!Refreshed)
+            return;
+    }
+
     public void ProcessBulkUpdate(ClientboundPitStopBulkUpdatePacket packet)
     {
         if (!initialised || Station?.pitstop?.carList == null || Station.pitstop.carList.Count < packet.CarCount)
@@ -795,14 +853,11 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                     {
                         module.resourceData[i].unitsToBuy = resource.Values[i];
                     }
-
                 }
                 else
                 {
-
                     Multiplayer.LogWarning($"PitStop bulk data count mismatch post-force: {module.resourceData.Count} != {resource.Values.Count()}");
                 }
-
             }
             else
                 Multiplayer.LogWarning($"PitStop module not found for resource type: {resource.ResourceType}");
@@ -851,6 +906,19 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             netPlug?.ProcessBulkUpdate(plug);
         }
 
+        //sync faucet position
+        if (faucetPositioner != null)
+            SetFaucetRotation(packet.FaucetNotch);
+
+        //DV.CabControls.Spec.Lever;
+        //HingeJointDrivenTransformAdjuster;
+        //DV.CabControls.NonVR.LeverNonVR;
+        //DV.CabControls.VRTK.LeverVRTK;
+        //HingeJointAngleFix;
+        //UnityEngine.HingeJoint;
+        //DV.Interaction.GrabHandlerHingeJoint;
+        //SteppedJoint;
+
         // Mark data as refreshed to allow player interactions
         Refreshed = true;
 
@@ -877,16 +945,21 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         PitStopStationInteractionType interactionType = (PitStopStationInteractionType)packet.InteractionType;
 
-        bool isCarSelection = interactionType switch
+        bool isResourceSelection = interactionType switch
         {
-            PitStopStationInteractionType.CarSelectorGrab => true,
-            PitStopStationInteractionType.CarSelectorUngrab => true,
-            PitStopStationInteractionType.CarSelection => true,
-            _ => false,
+            PitStopStationInteractionType.CarSelectorGrab => false,
+            PitStopStationInteractionType.CarSelectorUngrab => false,
+            PitStopStationInteractionType.CarSelection => false,
+
+            PitStopStationInteractionType.FaucetGrab => false,
+            PitStopStationInteractionType.FaucetUngrab => false,
+            PitStopStationInteractionType.FaucetPosition => false,
+
+            _ => true,
         };
 
         // Validate resource type (no resource type for car selectors
-        if (!isCarSelection && !Enum.IsDefined(typeof(ResourceType), packet.ResourceType))
+        if (isResourceSelection && !Enum.IsDefined(typeof(ResourceType), packet.ResourceType))
         {
             Multiplayer.LogWarning($"Received invalid ResourceType \"{packet.ResourceType}\" at Pit Stop station {StationName}");
             return;
@@ -897,7 +970,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}");
 
         // Validate resource module exists
-        if (!isCarSelection && !resourceTypeToLocoResourceModule.TryGetValue(resourceType, out resourceModule))
+        if (isResourceSelection && !resourceTypeToLocoResourceModule.TryGetValue(resourceType, out resourceModule))
         {
             Multiplayer.LogWarning($"Could not find LocoResourceModule for ResourceType \"{resourceType}\" at Pit Stop station {StationName}");
             return;
