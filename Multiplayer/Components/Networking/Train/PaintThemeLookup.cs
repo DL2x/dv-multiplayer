@@ -1,9 +1,9 @@
 using DV.Customization.Paint;
 using DV.Utils;
+using JetBrains.Annotations;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using JetBrains.Annotations;
 
 
 namespace Multiplayer.Components.Networking.Train;
@@ -11,6 +11,7 @@ namespace Multiplayer.Components.Networking.Train;
 public class PaintThemeLookup : SingletonBehaviour<PaintThemeLookup>
 {
     private readonly Dictionary<uint, string> hashToThemeName = [];
+    private readonly Dictionary<uint, string> hashToBaseThemeName = [];
 
     protected override void Awake()
     {
@@ -20,7 +21,11 @@ public class PaintThemeLookup : SingletonBehaviour<PaintThemeLookup>
             .ToArray();
 
         foreach (var themeName in themeNames)
-            RegisterTheme(themeName);
+        {
+            var id = RegisterTheme(themeName);
+            if (id != 0)
+                hashToBaseThemeName[id] = themeName;
+        }
     }
 
     public PaintTheme GetPaintTheme(uint themeId)
@@ -52,6 +57,9 @@ public class PaintThemeLookup : SingletonBehaviour<PaintThemeLookup>
 
     public uint GetThemeId(string themeName)
     {
+        if (string.IsNullOrEmpty(themeName))
+            return 0;
+
         return Fnv1aHash(themeName);
     }
 
@@ -78,6 +86,12 @@ public class PaintThemeLookup : SingletonBehaviour<PaintThemeLookup>
     public void UnregisterTheme(string themeName)
     {
         var hash = GetThemeId(themeName);
+
+        if(hashToBaseThemeName.ContainsKey(hash))
+        {
+            Multiplayer.LogWarning($"Tried to unregister a base-game theme '{themeName}'.");
+            return;
+        }
 
         if (hashToThemeName.TryGetValue(hash, out _))
         {

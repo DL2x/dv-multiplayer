@@ -86,4 +86,20 @@ public interface IMultiplayerAPI
     /// <returns>True if the object was found; otherwise, false</returns>
     bool TryGetObjectFromNetId<T>(ushort netId, out T obj) where T : class;
 
+    /// <summary>
+    /// Registers a PaintTheme and returns its ID
+    /// </summary>
+    /// <param name="assetName">The string representing the `PaintTheme.AssetName`</param>
+    /// <returns>Non-zero, unique Id if the theme was successfully registered, otherwise 0</returns>
+    /// <remarks>PaintThemes must be registered each time the client or server starts, registration is not persistent across sessions.</remarks>
+    uint RegisterPaintTheme(string assetName);
+
+    /// <summary>
+    /// Unregisters a PaintTheme
+    /// </summary>
+    /// <param name="themeId">The Id of the PaintTheme to be unregistered</param>
+    void UnregisterPaintTheme(uint themeId);
+
+    /// <summary>
+    /// Returns 
 }

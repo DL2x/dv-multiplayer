@@ -1,6 +1,7 @@
 using MPAPI.Interfaces;
 using MPAPI.Types;
 using Multiplayer.Components.Networking;
+using Multiplayer.Components.Networking.Train;
 using System;
 
 namespace Multiplayer.API;
@@ -40,6 +41,38 @@ public class APIProvider : IMultiplayerAPI
     public void SetModCompatibility(string modId, MultiplayerCompatibility compatibility)
     {
         ModCompatibilityManager.Instance.RegisterCompatibility(modId, compatibility);
+    }
+
+    public uint RegisterPaintTheme(string assetName)
+    {
+        if (string.IsNullOrEmpty(assetName))
+        {
+            Multiplayer.LogWarning("APIProvider.RegisterPaintTheme() called with empty assetName");
+            return 0;
+        }
+
+        if (!NetworkLifecycle.Instance.IsServerRunning || !NetworkLifecycle.Instance.IsClientRunning)
+        {
+            Multiplayer.LogWarning("APIProvider.RegisterPaintTheme() called when server or client is not running");
+            return 0;
+        }
+
+        return PaintThemeLookup.Instance.RegisterTheme(assetName);
+    }
+
+    public void UnregisterPaintTheme(uint themeId)
+    {
+        if (themeId == 0)
+        {
+            Multiplayer.LogWarning("APIProvider.UnregisterPaintTheme() called with themeId 0");
+            return;
+        }
+
+        if (!NetworkLifecycle.Instance.IsServerRunning || !NetworkLifecycle.Instance.IsClientRunning)
+        {
+            Multiplayer.LogWarning("APIProvider.UnregisterPaintTheme() called when server or client is not running");
+            return;
+        }
     }
 
     #region Class Helpers
