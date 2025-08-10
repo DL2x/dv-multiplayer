@@ -188,6 +188,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             NetworkLifecycle.Instance.OnTick -= OnTick;
 
             NetworkLifecycle.Instance.Server.PlayerDisconnect -= OnPlayerDisconnect;
+
+            // Monitor changes to vehicles in the pit stop
+            Station.pitstop.CarEntered -= OnCarPitStopEntered;
         }
 
         if (carSelectorGrab != null)
@@ -310,6 +313,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         if (ValidateInteraction(packet, senderPlayer))
         {
+            // Ensure colliders for water, coal, etc. are loaded
+            OnCarPitStopEntered();
 
             processingAsHost = true;
             if (senderPlayer.Id != NetworkLifecycle.Instance.Server.SelfId)
@@ -396,6 +401,21 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             }
         }
     }
+
+    private void OnCarPitStopEntered()
+    {
+        foreach (var car in Station.pitstop.carList)
+        {
+            if (car == null)
+                continue;
+
+            if (!car.AreExternalInteractablesLoaded && !car.AreDummyExternalInteractablesLoaded)
+            {
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnCarPitStopEntered() [{StationName}, {NetId}] Loading dummy external interactables for car: {car.ID}");
+                car.LoadDummyExternalInteractables();
+            }
+        }
+    }
     #endregion
 
 
@@ -417,6 +437,16 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         while (Station?.pitstop == null)
             yield return new WaitForEndOfFrame();
+
+        if (NetworkLifecycle.Instance.IsHost())
+        {
+            // Monitor changes to vehicles in the pit stop
+            Station.pitstop.CarEntered += OnCarPitStopEntered;
+
+            // Ensure any cars already in the pit stop have external interactables loaded
+            if (Station.pitstop.carList.Count > 0)
+                OnCarPitStopEntered();
+        }
 
         register = transform.parent.GetComponentInChildren<CashRegisterWithModules>(true);
         if (register == null)
