@@ -1,4 +1,6 @@
+using DV.CabControls;
 using DV.CabControls.NonVR;
+using DV.CashRegister;
 using DV.Interaction;
 using DV.ThingTypes;
 using DV.Optimizers;
@@ -14,7 +16,6 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 using static CashRegisterModule;
-using DV.CabControls;
 
 namespace Multiplayer.Components.Networking.World;
 
@@ -90,6 +91,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     private bool initialised = false;
 
+    private CashRegisterWithModules register;
+
     private ResourceType[] resourceTypes = [];
 
     private GrabHandlerHingeJoint carSelectorGrab;
@@ -107,10 +110,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     private readonly Dictionary<ResourceType, bool> isResourceRemoteGrabbedDict = [];
     private readonly Dictionary<ResourceType, float> lastRemoteValueDict = [];
 
-    private bool isFaucetGrabbed = false;
-    private float lastFaucetUpdateTime = 0.0f;
-    private float lastFaucetSent = 0.0f;
-    private float faucetTargetPercentage = 0.0f;
     private bool faucetTargetReached = true;
 
     private Coroutine faucetMoveCoroutine;
@@ -128,6 +127,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         if (NetworkLifecycle.Instance.IsHost())
         {
+            // Setup culling
             var disabler = GetComponentInParent<PlayerDistanceGameObjectsDisabler>();
 
             var cullingSqrDistance = DEFAULT_DISABLER_SQR_DISTANCE;
@@ -145,11 +145,12 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             CullingManager.PlayerEnteredActivationRegion += OnPlayerEnteredActivationRegion;
             CullingManager.PlayerEnteredCullingRegion += OnPlayerEnteredCullingRegion;
 
+            // Setup network events
             NetworkLifecycle.Instance.OnTick += OnTick;
 
             NetworkLifecycle.Instance.Server.PlayerDisconnect += OnPlayerDisconnect;
 
-            //ensure host can interact
+            // Ensure host can interact
             Refreshed = true;
         }
     }
@@ -222,40 +223,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         leverLookup.Clear();
         base.OnDestroy();
     }
-
-    //protected void Update()
-    //{
-    //    var deltaTime = Time.time - lastFaucetUpdateTime;
-
-    //    // Handle faucet movement
-    //    if (faucetPositioner && !faucetTargetReached)
-    //    {
-    //        var currentPercentage = faucetPositioner.Percentage;
-    //        float newPercent = Mathf.Lerp(currentPercentage, faucetTargetPercentage, Time.deltaTime * ROTATION_SMOOTH_SPEED);
-
-    //        //if we're close enough to the target, snap to it
-    //        if (Mathf.Abs(currentPercentage - faucetTargetPercentage) <= FAUCET_SNAP_THRESHOLD)
-    //            newPercent = faucetTargetPercentage;
-
-    //        SetFaucetRotation(newPercent);
-    //        //if we're in snap range we can finalise the rotation
-    //        faucetTargetReached = Mathf.Abs(newPercent - faucetTargetPercentage) <= FAUCET_SNAP_THRESHOLD;
-    //    }
-
-    //    if (isFaucetGrabbed && (deltaTime > MIN_UPDATE_TIME) && lastFaucetSent != faucetPositioner.Percentage)
-    //    {
-    //        lastFaucetUpdateTime = Time.time;
-
-    //        lastFaucetSent = faucetPositioner.Percentage;
-    //        NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket
-    //        (
-    //            NetId,
-    //            PitStopStationInteractionType.FaucetPosition,
-    //            null,
-    //            lastFaucetSent
-    //        );
-    //    }
-    //}
     #endregion
 
     #region Server
@@ -290,12 +257,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             InitialiseData();
 
             // One struct per module type
-            var resourceCount = Station.locoResourceModules.resourceModules.Count();
+            int resourceCount = Station.locoResourceModules.resourceModules.Length;
             LocoResourceModuleData[] stateData = new LocoResourceModuleData[resourceCount];
 
+            Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnPlayerEnteredActivationRegion() [{StationName}, {NetId}] player: {player.Username}, car count: {Station.pitstop.carList.Count}, resourceCount: {resourceCount}");
             int i;
             for (i = 0; i < resourceCount; i++)
             {
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnPlayerEnteredActivationRegion() [{StationName}, {NetId}] player: {player.Username}, i: {i}, data count: {Station.locoResourceModules.resourceModules[i].resourceData.Count}");
                 stateData[i] = LocoResourceModuleData.From(Station.locoResourceModules.resourceModules[i]);
             }
 
@@ -307,13 +276,22 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             i = 0;
             foreach (var plug in resourceToPluggableObject)
             {
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnPlayerEnteredActivationRegion() [{StationName}, {NetId}] player: {player.Username}, plug: {plug.Key}, plug netId: {plug.Value.NetId}");
                 plugData[i] = PitStopPlugData.From(plug.Value, true);
                 i++;
             }
 
-            float faucetPos = 0.0f;
-            if (faucetPositioner != null)
-                faucetPos = faucetPositioner.Percentage;
+            int faucetPos = -1;
+            if (faucetCrankSteppedJoint != null)
+            {
+                faucetPos = faucetCrankSteppedJoint.currentNotch;
+            }
+            else
+            {
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnPlayerEnteredActivationRegion() [{StationName}] faucetCrankSteppedJoint is null");
+            }
+
+            Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnPlayerEnteredActivationRegion() [{StationName}] faucetPos: {faucetPos}");
 
             // Send current state
             NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, faucetPos, stateData, plugData, player.Peer);
@@ -341,7 +319,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             }
             processingAsHost = false;
 
-            //Send to all other players
+            // Send to all other players
             foreach (var player in CullingManager.ActivePlayers)
             {
                 if (player.Id != senderPlayer.Id)
@@ -354,7 +332,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         else
         {
             Multiplayer.LogDebug(() => $"NetworkedPitStopStationProcessInteractionPacketAsHost() failed validation");
-            //Failed to validate, player needs to rollback interaction
+            // Failed to validate, player needs to rollback interaction
             NetworkLifecycle.Instance.Server.SendPitStopInteractionPacket(
                 senderPlayer,
                 new CommonPitStopInteractionPacket
@@ -368,11 +346,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     private void OnFlowStarted(LocoResourceModule module)
     {
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnFlowStarted() {module.resourceType} [{StationName}, {NetId}]");
         resourceFlowing[module] = true;
     }
 
     private void OnFlowStopped(LocoResourceModule module)
     {
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnFlowStopped() {module.resourceType} [{StationName}, {NetId}]");
+
         resourceFlowing[module] = false;
         SendResourceUpdate(module);
     }
@@ -392,6 +373,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     private void SendResourceUpdate(LocoResourceModule module)
     {
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SendResourceUpdate({module.resourceType}) [{StationName}, {NetId}], active players: {CullingManager.ActivePlayers.Count}");
+
         CommonPitStopInteractionPacket packet = new()
         {
             NetId = this.NetId,
@@ -404,8 +387,12 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         {
             if (player != null)
             {
-                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SendResourceUpdate({module.resourceType}) sending to peer: {player.Username}, value: {module.Data.unitsToBuy}, flowing: {module.IsFlowing}");
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SendResourceUpdate({module.resourceType}) [{StationName}, {NetId}], sending to peer: {player.Username}, value: {module.Data.unitsToBuy}, flowing: {module.IsFlowing}");
                 NetworkLifecycle.Instance.Server.SendPitStopInteractionPacket(player, packet);
+            }
+            else
+            {
+                Multiplayer.LogWarning(() => $"NetworkedPitStopStation.SendResourceUpdate({module.resourceType}) [{StationName}, {NetId}], player is null, skipping send");
             }
         }
     }
@@ -430,6 +417,12 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         while (Station?.pitstop == null)
             yield return new WaitForEndOfFrame();
+
+        register = transform.parent.GetComponentInChildren<CashRegisterWithModules>(true);
+        if (register == null)
+        {
+            Multiplayer.LogWarning($"NetworkedPitStopStation.Init() No CashRegisterWithModules found for station {StationName}");
+        }
 
         //Wait for levers an knobs to load
         yield return new WaitUntil(() => GetComponentInChildren<GrabHandlerHingeJoint>(true) != null);
@@ -476,7 +469,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         }
 
         StringBuilder sb = new();
-        sb.AppendLine($"NetworkedPitStopStation.Awake() {StationName} resources:");
+        sb.AppendLine($"NetworkedPitStopStation.Init() {StationName} resources:");
 
         if (resourceModules != null)
         {
@@ -548,53 +541,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         initialised = true;
     }
 
-
-    /// <summary>
-    /// Waits for all pitstop components to complete loading before processing the bulk update
-    /// </summary>
-    private IEnumerator WaitForLoad(ClientboundPitStopBulkUpdatePacket packet)
-    {
-        float time = Time.time;
-
-        yield return new WaitUntil
-        (
-            () =>
-            {
-                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.WaitForLoad() PitStop [{StationName}] PitStop Initialised: {initialised}, PitStop Active:{Station?.gameObject?.activeInHierarchy}, Packet Car Count: {packet.CarCount}, Station Car Count: {Station.pitstop?.carList?.Count}, Car Count Matched: {packet.CarCount == Station.pitstop?.carList?.Count}, time elapsed: {(Time.time - time)}");
-
-                if (Station?.gameObject?.activeInHierarchy == false)
-                {
-                    //don't time out if we're waiting for the object to be enabled
-                    time = Time.time;
-                    return false;
-                }
-
-                //try to trigger colliders manually
-                if (initialised && Station?.pitstop?.carList != null && packet.CarCount != Station.pitstop.carList.Count)
-                    Station?.pitstop?.RefreshPitStopCarPresence();
-
-                return (initialised && Station?.pitstop?.carList != null && packet.CarCount == Station.pitstop.carList.Count)
-                || (Time.time - time) > LOADING_TIMEOUT;
-
-            }
-        );
-
-
-        yield return new WaitForEndOfFrame();
-        yield return new WaitForEndOfFrame();
-
-        if ((Time.time - time) <= LOADING_TIMEOUT)
-        {
-            ProcessBulkUpdate(packet);
-        }
-        else
-        {
-            Multiplayer.LogWarning($"PitStop [{StationName}] timed out waiting for load. PitStop Initialised: {initialised}, Packet Car Count: {packet.CarCount}, Station Car Count: {Station.pitstop?.carList?.Count}, Car Count Matched: {packet.CarCount == Station.pitstop?.carList?.Count}");
-            if (initialised)
-                Refreshed = true; //lets hope the car sync is just a little slow
-        }
-    }
-
     private void SetUnits(LocoResourceModule rm, float units)
     {
         if (rm == null)
@@ -636,6 +582,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         if (faucetMoveCoroutine != null)
             StopCoroutine(faucetMoveCoroutine);
 
+        faucetTargetReached = false;
+
         faucetMoveCoroutine = StartCoroutine(SmoothMoveToNotch(notch));
     }
 
@@ -676,6 +624,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         yield return null;
 
+        faucetTargetReached = true;
+
         //Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SmoothMoveToNotch() Finished moving to notch: {targetNotch}, final angle: {faucetCrankSteppedJoint.jointAngleFix.Angle}");
     }
 
@@ -685,6 +635,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     /// </summary>
     public void SetCarSelection(int selection)
     {
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SetCarSelection({selection}) [{StationName}, {NetId}] car count: {Station.pitstop.carList.Count}");
         if (selection >= 0 && selection < Station.pitstop.carList.Count)
         {
             Station.pitstop.currentCarIndex = selection;
@@ -736,10 +687,12 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     /// </summary>
     private void CarSelected()
     {
+        Multiplayer.LogDebug(() => $"CarSelected() [{StationName}, {NetId}]  selected: {Station.pitstop.SelectedIndex}");
+
         if (NetworkLifecycle.Instance.IsProcessingPacket || (NetworkLifecycle.Instance.IsHost() && processingAsHost))
             return;
 
-        //Prevent new players/players entering the area from sending packets until initalised
+        // Prevent new players/players entering the area from sending packets until initalised
         if (!Refreshed)
             return;
 
@@ -754,7 +707,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     /// <param name="module">The resource module being grabbed.</param>
     private void OnLeverPositionChange(LocoResourceModule module, int state)
     {
-        //Prevent new players/players entering the area from sending packets until initalised
+        // Prevent new players/players entering the area from sending packets until initalised
         if (!Refreshed)
             return;
 
@@ -786,12 +739,18 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             return;
 
         Multiplayer.LogDebug(() => $"FaucetCrankGrabbed() {StationName}");
-        isFaucetGrabbed = true;
-        NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket(NetId, PitStopStationInteractionType.FaucetGrab, null, 0);
+
+        int notch = -1;
+        if (faucetCrankSteppedJoint != null)
+        {
+            notch = faucetCrankSteppedJoint.currentNotch;
+        }
+
+        NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket(NetId, PitStopStationInteractionType.FaucetGrab, null, notch);
     }
 
     /// <summary>
-    /// Handles end of grab (release) interactions for the car selector knob.
+    /// Handles end of grab (release) interactions for the faucet positioning handle (water towers).
     /// </summary>
     private void FaucetCrankUnGrabbed()
     {
@@ -803,11 +762,17 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             return;
 
         Multiplayer.LogDebug(() => $"FaucetCrankUnGrabbed() {StationName}, percentage: {faucetPositioner.Percentage}");
-        isFaucetGrabbed = false;
-        lastFaucetSent = faucetPositioner.Percentage;
-        NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket(NetId, PitStopStationInteractionType.FaucetUngrab, null, lastFaucetSent);
+
+        int notch = -1;
+        if (faucetCrankSteppedJoint != null)
+            notch = faucetCrankSteppedJoint.currentNotch;
+
+        NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket(NetId, PitStopStationInteractionType.FaucetUngrab, null, notch);
     }
 
+    /// <summary>
+    /// Handles non-grab changes to the faucet positioning handle (water towers), e.g. scrolling.
+    /// </summary>
     private void FaucetCrankPositionChanged(ValueChangedEventArgs args)
     {
         Multiplayer.LogDebug(() => $"FaucetCrankPositionChanged() {StationName}, oldValue: {args.oldValue}, newValue: {args.newValue}, delta: {args.delta}");
@@ -818,36 +783,83 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         //Prevent new players/players entering the area from sending packets until initalised
         if (!Refreshed)
             return;
+
+        if (!faucetTargetReached)
+        {
+            Multiplayer.LogDebug(() => $"FaucetCrankPositionChanged() {StationName} faucet target not reached, ignoring position change");
+            return;
+        }
+
+        int notch = -1;
+        if (faucetCrankSteppedJoint != null)
+        {
+            notch = faucetCrankSteppedJoint.currentNotch;
+        }
+
+        NetworkLifecycle.Instance?.Client.SendPitStopInteractionPacket(NetId, PitStopStationInteractionType.FaucetPosition, null, notch);
     }
 
     public void ProcessBulkUpdate(ClientboundPitStopBulkUpdatePacket packet)
     {
-        if (!initialised || Station?.pitstop?.carList == null || Station.pitstop.carList.Count < packet.CarCount)
-        {
-            // Allow pitstop to complete loading and cars to load in the pitstop
-            Multiplayer.Log($"PitStop [{StationName}] waiting for load");
-            CoroutineManager.Instance.StartCoroutine(WaitForLoad(packet));
-            return;
-        }
+        // Packet is broken up due to SubscribeResusable reusing/overwriting packet data
+        CoroutineManager.Instance.StartCoroutine(ProcessBulkUpdate_Internal(packet.CarCount, packet.CarSelection,packet.FaucetNotch,packet.ResourceData, packet.PlugData));
+    }
 
-        Multiplayer.LogDebug(() => $"ProcessBulkUpdate() car count: {packet.CarCount}, resource data count: {packet.ResourceData.Count()}, resource data: [{string.Join(", ", packet.ResourceData.Select(x => $"{x.ResourceType}: {{{string.Join(", ", x.Values)}}}"))}]");
+    private IEnumerator ProcessBulkUpdate_Internal(int carCount, int carSelection, int faucetNotch, LocoResourceModuleData[] resourceData, PitStopPlugData[] plugData)
+    {
+        float time = Time.time;
+
+        // Allow pit stop to complete loading and cars to load in the pit stop
+        Multiplayer.Log($"ProcessBulkUpdate_Internal() [{StationName}, {NetId}] waiting for load");
+
+        yield return new WaitUntil
+        (
+            () =>
+            {
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessBulkUpdate_Internal() [{StationName}, {NetId}] Initialised: {initialised}, Active:{Station?.gameObject?.activeInHierarchy}, Packet Car Count: {carCount}, Station Car Count: {Station.pitstop?.carList?.Count}, Car Count Matched: {carCount == Station.pitstop?.carList?.Count}, time elapsed: {(Time.time - time)}");
+
+                if (Station?.gameObject?.activeInHierarchy == false)
+                {
+                    // Don't time out if we're waiting for the object to be enabled
+                    time = Time.time;
+                    return false;
+                }
+
+                // Try to trigger colliders manually
+                if (initialised && Station?.pitstop?.carList != null && carCount != Station.pitstop.carList.Count)
+                    Station?.pitstop?.RefreshPitStopCarPresence();
+
+                return (initialised && Station?.pitstop?.carList != null && carCount == Station.pitstop.carList.Count)
+                || (Time.time - time) > LOADING_TIMEOUT;
+
+            }
+        );
+
+
+        yield return new WaitForEndOfFrame();
+        yield return new WaitForEndOfFrame();
+
+        if ((Time.time - time) > LOADING_TIMEOUT)
+            Multiplayer.LogWarning($"PitStop [{StationName}] timed out waiting for load. PitStop Initialised: {initialised}, Packet Car Count: {carCount}, Station Car Count: {Station.pitstop?.carList?.Count}, Car Count Matched: {carCount == Station.pitstop?.carList?.Count}");
+
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessBulkUpdate_Internal() [{StationName}] Car count: {carCount}, resource data count: {resourceData.Count()}, resource data: [{string.Join(", ", resourceData.Select(x => $"{x.ResourceType}: {{{string.Join(", ", x.Values)}}}"))}]");
         // Make sure the data elements exist prior to attempting to load them
         InitialiseData();
 
-        Multiplayer.LogDebug(() => $"PitStop bulk data car count matches. Station module count: {Station?.locoResourceModules?.resourceModules?.Count()}, Packet resource count: {packet?.ResourceData?.Count()}");
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessBulkUpdate_Internal() [{StationName}] PitStop bulk data car count matches. Station module count: {Station?.locoResourceModules?.resourceModules?.Count()}, Packet resource count: {resourceData?.Count()}");
 
         // Load the data for each car and resource module
-        foreach (var resource in packet.ResourceData)
+        foreach (var resource in resourceData)
         {
             if (!resourceTypeToLocoResourceModule.TryGetValue(resource.ResourceType, out var module))
             {
-                Multiplayer.LogDebug(() => $"ProcessBulkUpdate() Failed to find resource module for type {resource.ResourceType}");
+                Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessBulkUpdate_Internal() [{StationName}, {NetId}] Failed to find resource module for type {resource.ResourceType}");
                 continue;
             }
 
             if (module != null)
             {
-                if (module.resourceData.Count == resource.Values.Count())
+                if (module.resourceData.Count == resource.Values.Length)
                 {
                     for (int i = 0; i < module.resourceData.Count; i++)
                     {
@@ -862,7 +874,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             else
                 Multiplayer.LogWarning($"PitStop module not found for resource type: {resource.ResourceType}");
 
-            //set the grab state
+            // Set the grab state
             bool grabbed = (resource.FillingState != LocoResourceModuleFillingState.None);
             bool isLocallyGrabbed = isResourceGrabbedDict.TryGetValue(resource.ResourceType, out var localGrabbed) && localGrabbed;
 
@@ -891,38 +903,39 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             isResourceRemoteGrabbedDict[resource.ResourceType] = grabbed;
         }
 
-        Multiplayer.LogDebug(() => $"PitStop bulk data Car Index: {packet.CarSelection}");
-        SetCarSelection(packet.CarSelection);
+        // Refresh the cash register display
+        register?.OnUnitsToBuyChanged();
+
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessBulkUpdate_Internal() [{StationName}, {NetId}] Car Index: {carSelection}");
+        SetCarSelection(carSelection);
 
 
-        Multiplayer.LogDebug(() => $"PitStop bulk data Plugs {packet.PlugData.Count()}");
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessBulkUpdate_Internal() [{StationName}, {NetId}] bulk data Plugs {plugData.Count()}");
 
-        //sync plugs
-        foreach (var plug in packet.PlugData)
+        // Sync plugs
+        foreach (var plug in plugData)
         {
             var result = NetworkedPluggableObject.Get(plug.NetId, out var netPlug);
-            Multiplayer.LogDebug(() => $"PitStop bulk data Plugs netId: {plug.NetId}, found: {result}");
+            Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessBulkUpdate_Internal() [{StationName}, {NetId}] Plugs netId: {plug.NetId}, found: {result}");
 
             netPlug?.ProcessBulkUpdate(plug);
         }
 
-        //sync faucet position
+        // Sync faucet position
         if (faucetPositioner != null)
-            SetFaucetRotation(packet.FaucetNotch);
+        {
+            Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessBulkUpdate_Internal() [{StationName}, {NetId}] Faucet notch: {faucetNotch}");
 
-        //DV.CabControls.Spec.Lever;
-        //HingeJointDrivenTransformAdjuster;
-        //DV.CabControls.NonVR.LeverNonVR;
-        //DV.CabControls.VRTK.LeverVRTK;
-        //HingeJointAngleFix;
-        //UnityEngine.HingeJoint;
-        //DV.Interaction.GrabHandlerHingeJoint;
-        //SteppedJoint;
+            SetFaucetRotation(faucetNotch);
+
+            while (!faucetTargetReached)
+                yield return null;
+        }
 
         // Mark data as refreshed to allow player interactions
         Refreshed = true;
 
-        Multiplayer.LogDebug(() => $"PitStop bulk data Refreshed");
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessBulkUpdate_Internal() [{StationName}, {NetId}] Bulk data refreshed");
     }
 
     /// <summary>
@@ -1070,26 +1083,15 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             case PitStopStationInteractionType.FaucetUngrab:
                 //allow interaction
                 faucetPositionerGrab?.SetMovingDisabled(false);
+                
+                SetFaucetRotation((int)packet.Value);
 
-                if (packet.Value >= -1 && packet.Value <= 1)
-                {
-                    if (faucetPositioner.Percentage != packet.Value)
-                    {
-                        faucetTargetPercentage = packet.Value;
-                        faucetTargetReached = false;
-                    }
-                }
                 break;
 
             case PitStopStationInteractionType.FaucetPosition:
-                if (packet.Value >= -1 && packet.Value <= 1)
-                {
-                    if (faucetPositioner != null && faucetPositioner.Percentage != packet.Value)
-                    {
-                        faucetTargetPercentage = packet.Value;
-                        faucetTargetReached = false;
-                    }
-                }
+
+                SetFaucetRotation((int)packet.Value);
+
                 break;
         }
     }

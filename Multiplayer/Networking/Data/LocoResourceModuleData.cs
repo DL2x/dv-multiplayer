@@ -40,7 +40,7 @@ public readonly struct LocoResourceModuleData(ResourceType resourceType, float[]
     {
         writer.Put((int)data.ResourceType);
 
-        writer.Put(data.Values.Count());
+        writer.Put(data.Values.Length);
         foreach (var val in data.Values)
             writer.Put(val);
 

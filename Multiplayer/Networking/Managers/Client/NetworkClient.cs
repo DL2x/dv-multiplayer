@@ -1006,6 +1006,8 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundPitStopBulkUpdatePacket(ClientboundPitStopBulkUpdatePacket packet)
     {
+        LogDebug(() => $"OnClientboundPitStopBulkUpdatePacket() NetId: {packet.NetId}, CarCount: {packet.CarCount}, CarSelection: { packet.CarSelection}, FaucetNotch: {packet.FaucetNotch}, ResourceData Count: {packet.ResourceData.Length}, PlugData: {packet.PlugData.Length}");
+
         if (!NetworkedPitStopStation.Get(packet.NetId, out var netPitStop))
         {
             LogWarning($"Pit Stop Bulk Data received for station netId: {packet.NetId}, but pit stop does not exist!");
@@ -1448,7 +1450,7 @@ public class NetworkClient : NetworkManager
         sbyte socketIndex = -1
     )
     {
-        LogDebug(()=>$"SendPitStopInteractionPacket({netId}, {interaction}, pos: {position}, rot: {rotation}, trainNetId: {trainCarNetId}, socketIndex: {socketIndex})");
+        LogDebug(()=>$"SendPitStopPlugInteractionPacket({netId}, {interaction}, pos: {position}, rot: {rotation}, trainNetId: {trainCarNetId}, socketIndex: {socketIndex})");
 
         SendNetSerializablePacketToServer(new CommonPitStopPlugInteractionPacket
         {

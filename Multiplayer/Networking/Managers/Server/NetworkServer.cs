@@ -599,15 +599,16 @@ public class NetworkServer : NetworkManager
         }
     }
 
-    public void SendPitStopBulkDataPacket(ushort netId, int carCount, int carIndex, float faucetPos, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData , ITransportPeer peer = null)
+    public void SendPitStopBulkDataPacket(ushort netId, int carCount, int carIndex, int faucetNotch, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData , ITransportPeer peer = null)
     {
-        LogDebug(() => $"SendPitStopBulkDataPacket({netId}, {stationData.Count()}, {plugData.Count()}, {peer?.Id})");
+        LogDebug(() => $"SendPitStopBulkDataPacket({netId}, {carCount}, {carIndex}, {faucetNotch}, {stationData.Count()}, {plugData.Count()}, {peer?.Id})");
 
         var packet = new ClientboundPitStopBulkUpdatePacket
         {
             NetId = netId,
             CarCount = carCount,
             CarSelection = carIndex,
+            FaucetNotch = faucetNotch,
             ResourceData = stationData,
             PlugData = plugData,
         };
