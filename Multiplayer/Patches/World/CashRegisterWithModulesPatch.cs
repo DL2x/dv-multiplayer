@@ -4,7 +4,6 @@ using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Utils;
-using System;
 
 namespace Multiplayer.Patches.World;
 
@@ -107,49 +106,5 @@ public class CashRegisterWithModulesPatch
             Action = CashRegisterAction.Cancel,
             Amount = __instance.DepositedCash
         });
-    }
-}
-
-[HarmonyPatch(typeof(CashRegisterBase))]
-public class CashRegisterBasePatch
-{
-    [HarmonyPostfix]
-    [HarmonyPatch(nameof(CashRegisterBase.SetCash))]
-    private static void SetCash(CashRegisterBase __instance, double amount)
-    {
-        if (__instance is not CashRegisterWithModules cashRegisterWithModules)
-            return;
-
-        Multiplayer.LogDebug(() => $"SetCash() {__instance.GetObjectPath()}, Deposited: {amount}");
-
-        if (!NetworkedCashRegisterWithModules.TryGet(cashRegisterWithModules, out var netCashRegister))
-            Multiplayer.LogWarning($"CashRegisterWithModules.SetCash({cashRegisterWithModules.GetObjectPath()}) NetworkedCashRegisterWithModules not found!");
-        else
-            netCashRegister.SetCash(amount);
-    }
-
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(CashRegisterBase.OnEnable))]
-    private static bool OnEnable(CashRegisterBase __instance)
-    {
-        //Multiplayer.LogDebug(() => $"CashRegisterBase.OnEnable({__instance.GetObjectPath()}) {__instance.GetType()}");
-        if (__instance is not CashRegisterWithModules)
-            return true;
-
-        // Prevent clients from cancelling/returning cash on cash registers when loading the game or leaving the area
-        return NetworkLifecycle.Instance.IsHost();
-    }
-
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(CashRegisterBase.OnDisable))]
-    private static bool OnDisable(CashRegisterBase __instance)
-    {
-        //Multiplayer.LogDebug(() => $"CashRegisterBase.OnDisable({__instance.GetObjectPath()}) {__instance.GetType()}");
-        if (__instance is not CashRegisterWithModules)
-            return true;
-
-        // Prevent clients from cancelling/returning cash on cash registers when loading the game or leaving the area
-        __instance.StopAllCoroutines();
-        return NetworkLifecycle.Instance.IsHost();
     }
 }
