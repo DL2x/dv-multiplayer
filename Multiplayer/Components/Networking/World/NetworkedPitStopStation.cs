@@ -2,8 +2,8 @@ using DV.CabControls;
 using DV.CabControls.NonVR;
 using DV.CashRegister;
 using DV.Interaction;
-using DV.ThingTypes;
 using DV.Optimizers;
+using DV.ThingTypes;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Networking.Packets.Clientbound.World;
@@ -80,7 +80,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     public CullingManager CullingManager { get; private set; }
 
     private readonly Dictionary<LocoResourceModule, (Action FillStart, Action FillStop, Action DrainStart, Action DrainStop)> resourceStartStopDelegates = [];
-    private readonly Dictionary<LocoResourceModule, bool> resourceFlowing = [];
+    private readonly Dictionary<LocoResourceModule, (bool isFlowing, bool wasFlowing, bool lastUpdate)> resourceFlowing = [];
 
     private bool processingAsHost = false;
     #endregion
@@ -352,27 +352,36 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     private void OnFlowStarted(LocoResourceModule module)
     {
         Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnFlowStarted() {module.resourceType} [{StationName}, {NetId}]");
-        resourceFlowing[module] = true;
+        resourceFlowing[module] = (isFlowing: true, wasFlowing: false, lastUpdate: false);
     }
 
     private void OnFlowStopped(LocoResourceModule module)
     {
         Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnFlowStopped() {module.resourceType} [{StationName}, {NetId}]");
 
-        resourceFlowing[module] = false;
+        resourceFlowing[module] = (isFlowing: false, wasFlowing: true, lastUpdate: false);
         SendResourceUpdate(module);
     }
 
     private void OnTick(uint tick)
     {
-        foreach (var kvp in resourceFlowing)
+        var modules = resourceFlowing.Keys.ToList();
+        foreach (var module in modules)
         {
-            if (!kvp.Value)
-                continue;
+            // Ensure the final value is sent, we need perfect sync for payments to work
+            if (resourceFlowing[module].isFlowing || resourceFlowing[module].wasFlowing)
+            {
+                SendResourceUpdate(module);
 
-            var module = kvp.Key;
-
-            SendResourceUpdate(module);
+                if (!resourceFlowing[module].isFlowing)
+                {
+                    // We want one final update to ensure race conditions between flow stopping and game ticks do not cause sync issues
+                    if (!resourceFlowing[module].lastUpdate)
+                        resourceFlowing[module] = (isFlowing: false, wasFlowing: true, lastUpdate: true);
+                    else
+                        resourceFlowing[module] = (isFlowing: false, wasFlowing: false, lastUpdate: false);
+                }
+            }
         }
     }
 
@@ -387,6 +396,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             ResourceType = (int)module.resourceType,
             Value = module.Data.unitsToBuy
         };
+
+        lastRemoteValueDict[module.resourceType] = module.Data.unitsToBuy;
 
         foreach (var player in CullingManager.ActivePlayers)
         {
@@ -495,7 +506,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         {
             isResourceGrabbedDict[resourceType] = false;
             isResourceRemoteGrabbedDict[resourceType] = false;
-            lastRemoteValueDict[resourceType] = 0.0f;
         }
 
         StringBuilder sb = new();
@@ -571,12 +581,28 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         initialised = true;
     }
 
+    private IEnumerator SetUnitsDelayed(LocoResourceModule rm)
+    {
+        if(rm == null || !isResourceRemoteGrabbedDict.ContainsKey(rm.resourceType))
+            yield break;
+
+        var resourceType = rm.resourceType;
+
+        yield return new WaitUntil(()=> !isResourceRemoteGrabbedDict[resourceType] && !rm.IsFlowing);
+
+        SetUnits(rm, lastRemoteValueDict[resourceType]);
+    }
+
     private void SetUnits(LocoResourceModule rm, float units)
     {
         if (rm == null)
             return;
 
         float clamped = Mathf.Clamp(units, rm.AbsoluteMinValue, rm.AbsoluteMaxValue);
+
+        lastRemoteValueDict[rm.resourceType] = clamped;
+
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.SetUnits({rm.resourceType}, {units}) clamped: {clamped}, flowMultiplier: {rm.flowMultiplier}, flowRate: {rm.flowRate}, isFlowing: {rm.IsFlowing}");
         rm.SetUnitsToBuy(clamped);
     }
 
@@ -840,7 +866,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         float time = Time.time;
 
         // Allow pit stop to complete loading and cars to load in the pit stop
-        Multiplayer.Log($"ProcessBulkUpdate_Internal() [{StationName}, {NetId}] waiting for load");
+        Multiplayer.Log($"Processing bulk update for [{StationName}, {NetId}]");
 
         yield return new WaitUntil
         (
@@ -1068,9 +1094,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
                 resourceModule.OnValvePositionChange((int)packet.Value);
 
-                // Update remote grab state
+                // Update remote grab state and delay set units
+                bool wasRemoteGrabbed = isResourceRemoteGrabbedDict[resourceType];
                 isResourceRemoteGrabbedDict[resourceType] = grabbed;
 
+                if (wasRemoteGrabbed && !grabbed)
+                {
+                    CoroutineManager.Instance.StartCoroutine(SetUnitsDelayed(resourceModule));
+                }
                 break;
 
             case PitStopStationInteractionType.ResourceUpdate:
@@ -1084,8 +1115,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                     return;
                 }
 
-                lastRemoteValueDict[resourceType] = packet.Value;
-                SetUnits(resourceModule, lastRemoteValueDict[resourceType]);
+                SetUnits(resourceModule, packet.Value);
                 Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessPacket() [{StationName}, {NetId}] {interactionType}, resource type: {resourceType}, state: {packet.Value}, flowing: {resourceModule.IsFlowing}");
 
                 break;
