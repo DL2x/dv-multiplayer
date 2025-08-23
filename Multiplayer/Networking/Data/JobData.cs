@@ -1,6 +1,7 @@
 using DV.Logic.Job;
 using DV.ThingTypes;
 using LiteNetLib.Utils;
+using MPAPI.Types;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.World;
@@ -94,13 +95,22 @@ public class JobData
             bw.Write((byte)data.Tasks.Length);
             foreach (var task in data.Tasks)
             {
-                NetDataWriter taskSerialiser = new NetDataWriter();
-
                 bw.Write((byte)task.TaskType);
-                task.Serialize(taskSerialiser);
 
-                bw.Write(taskSerialiser.Data.Length);
-                bw.Write(taskSerialiser.Data);
+                using (MemoryStream taskMemStream = new())
+                using (BinaryWriter taskSerialiser = new(taskMemStream))
+                {
+                    task.Serialize(taskSerialiser);
+
+                    if (taskMemStream.Length > int.MaxValue)
+                    {
+                        Multiplayer.LogError($"Task {task.TaskType} too large: {taskMemStream.Length}");
+                        throw new InvalidOperationException($"Task {task.TaskType} data is too large to serialize.");
+                    }
+
+                    bw.Write((int)taskMemStream.Length);
+                    bw.Write(taskMemStream.ToArray());
+                }
             }
 
             byte[] compressedData = PacketCompression.Compress(ms.ToArray());
@@ -149,10 +159,13 @@ public class JobData
                     TaskType taskType = (TaskType)br.ReadByte();
 
                     int taskLength = br.ReadInt32();
-                    NetDataReader taskReader = new NetDataReader(br.ReadBytes(taskLength));
 
-                    tasks[i] = TaskNetworkDataFactory.ConvertTask(taskType);
-                    tasks[i].Deserialize(taskReader);
+                    using (MemoryStream taskStream = new MemoryStream(br.ReadBytes(taskLength)))
+                    using (BinaryReader taskReader = new BinaryReader(taskStream))
+                    {
+                        tasks[i] = TaskNetworkDataFactory.ConvertTask(taskType);
+                        tasks[i].Deserialize(taskReader);
+                    }
                 }
             }
 

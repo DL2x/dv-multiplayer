@@ -1,78 +1,51 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using DV.Logic.Job;
 using DV.ThingTypes;
-using LiteNetLib.Utils;
+using MPAPI.Types;
+using MPAPI.Util;
 using Multiplayer.Components.Networking.Train;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace Multiplayer.Networking.Data;
-
-#region TaskData Base Class
-public abstract class TaskNetworkData
-{
-    public TaskState State { get; set; }
-    public float TaskStartTime { get; set; }
-    public float TaskFinishTime { get; set; }
-    public bool IsLastTask { get; set; }
-    public float TimeLimit { get; set; }
-    public TaskType TaskType { get; set; }
-
-    public abstract void Serialize(NetDataWriter writer);
-    public abstract void Deserialize(NetDataReader reader);
-    public abstract Task ToTask();
-    public abstract List<ushort> GetCars();
-}
-public abstract class TaskNetworkData<T> : TaskNetworkData where T : TaskNetworkData<T>
-{
-    public abstract T FromTask(Task task);
-
-    protected void SerializeCommon(NetDataWriter writer)
-    {
-        //Multiplayer.Log($"TaskNetworkData.SerializeCommon() State {(byte)State}, {State}");
-        writer.Put((byte)State);
-        //Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskStartTime {TaskStartTime}");
-        writer.Put(TaskStartTime);
-        //Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskFinishTime {TaskFinishTime}");
-        writer.Put(TaskFinishTime);
-        //Multiplayer.Log($"TaskNetworkData.SerializeCommon() IsLastTask {IsLastTask}");
-        writer.Put(IsLastTask);
-        //Multiplayer.Log($"TaskNetworkData.SerializeCommon() TimeLimit {TimeLimit}");
-        writer.Put(TimeLimit);
-        //Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskType {(byte)TaskType}, {TaskType}");
-        writer.Put((byte)TaskType);
-    }
-
-    protected void DeserializeCommon(NetDataReader reader)
-    {
-        State = (TaskState)reader.GetByte();
-        //Multiplayer.Log($"TaskNetworkData.DeserializeCommon() State {State}");
-        TaskStartTime = reader.GetFloat();
-        //Multiplayer.Log($"TaskNetworkData.DeserializeCommon() TaskStartTime {TaskStartTime}");
-        TaskFinishTime = reader.GetFloat();
-        //Multiplayer.Log($"TaskNetworkData.DeserializeCommon() TaskFinishTime {TaskFinishTime}");
-        IsLastTask = reader.GetBool();
-        //Multiplayer.Log($"TaskNetworkData.DeserializeCommon() IsLastTask {IsLastTask}");
-        TimeLimit = reader.GetFloat();
-        //Multiplayer.Log($"TaskNetworkData.DeserializeCommon() TimeLimit {TimeLimit}");
-        TaskType = (TaskType)reader.GetByte();
-        //Multiplayer.Log($"TaskNetworkData.DeserializeCommon() TaskType {TaskType}");
-    }
-}
-
-#endregion
 
 #region Extension of TaskTypes
 public static class TaskNetworkDataFactory
 {
     private static readonly Dictionary<Type, Func<Task, TaskNetworkData>> TypeToTaskNetworkData = [];
     private static readonly Dictionary<TaskType, Func<TaskType, TaskNetworkData>> EnumToEmptyTaskNetworkData = [];
+    internal static readonly List<Type> baseTasks = [];
+    internal static readonly List<TaskType> baseTaskTypes = [];
 
-    public static void RegisterTaskType<TGameTask>(TaskType taskType, Func<TGameTask, TaskNetworkData> converter, Func<TaskType, TaskNetworkData> emptyCreator)
+    public static bool RegisterTaskType<TGameTask>(TaskType taskType, Func<TGameTask, TaskNetworkData> converter, Func<TaskType, TaskNetworkData> emptyCreator)
         where TGameTask : Task
     {
+        if (TypeToTaskNetworkData.Keys.Contains(typeof(TGameTask)) || EnumToEmptyTaskNetworkData.Keys.Contains(taskType))
+        {
+            Multiplayer.LogError($"Task Type {typeof(TGameTask)} already registered!");
+            return false;
+        }
+
         TypeToTaskNetworkData[typeof(TGameTask)] = task => converter((TGameTask)task);
         EnumToEmptyTaskNetworkData[taskType] = emptyCreator;
+
+        return true;
+    }
+
+    public static bool UnRegisterTaskType<TGameTask>(TaskType taskType)
+        where TGameTask : Task
+    {
+        if(baseTasks.Contains(typeof(TGameTask)) || baseTaskTypes.Contains(taskType))
+        {
+            Multiplayer.LogError($"Cannot unregister base task type {typeof(TGameTask)} with TaskType {taskType}");
+            return false;
+        }
+
+        TypeToTaskNetworkData.Remove(typeof(TGameTask));
+        EnumToEmptyTaskNetworkData.Remove(taskType);
+
+        return true;
     }
 
     public static TaskNetworkData ConvertTask(Task task)
@@ -107,24 +80,41 @@ public static class TaskNetworkDataFactory
             task => new WarehouseTaskData { TaskType = TaskType.Warehouse }.FromTask(task),
             type => new WarehouseTaskData { TaskType = type }
         );
+
+        baseTasks.Add(typeof(WarehouseTask));
+        baseTaskTypes.Add(TaskType.Warehouse);
+
         RegisterTaskType<TransportTask>(
             TaskType.Transport,
             task => new TransportTaskData { TaskType = TaskType.Transport }.FromTask(task),
             type => new TransportTaskData { TaskType = type }
         );
+
+        baseTasks.Add(typeof(TransportTask));
+        baseTaskTypes.Add(TaskType.Transport);
+
         RegisterTaskType<SequentialTasks>(
             TaskType.Sequential,
             task => new SequentialTasksData { TaskType = TaskType.Sequential }.FromTask(task),
             type => new SequentialTasksData { TaskType = type }
         );
+
+        baseTasks.Add(typeof(SequentialTasks));
+        baseTaskTypes.Add(TaskType.Sequential);
+
         RegisterTaskType<ParallelTasks>(
             TaskType.Parallel,
             task => new ParallelTasksData { TaskType = TaskType.Parallel }.FromTask(task),
             type => new ParallelTasksData { TaskType = type }
         );
+
+        baseTasks.Add(typeof(ParallelTasks));
+        baseTaskTypes.Add(TaskType.Parallel);
     }
 }
 #endregion
+
+#region Base Task Types
 
 public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
 {
@@ -135,26 +125,26 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
     public float CargoAmount { get; set; }
     public bool ReadyForMachine { get; set; }
 
-    public override void Serialize(NetDataWriter writer)
+    public override void Serialize(BinaryWriter writer)
     {
         SerializeCommon(writer);
-        writer.PutArray(CarNetIDs);
-        writer.Put((byte)WarehouseTaskType);
-        writer.Put(WarehouseMachine);
-        writer.Put((int)CargoType);
-        writer.Put(CargoAmount);
-        writer.Put(ReadyForMachine);
+        writer.WriteUShortArray(CarNetIDs);
+        writer.Write((byte)WarehouseTaskType);
+        writer.Write(WarehouseMachine);
+        writer.Write((int)CargoType);
+        writer.Write(CargoAmount);
+        writer.Write(ReadyForMachine);
     }
 
-    public override void Deserialize(NetDataReader reader)
+    public override void Deserialize(BinaryReader reader)
     {
         DeserializeCommon(reader);
-        CarNetIDs = reader.GetUShortArray();
-        WarehouseTaskType = (WarehouseTaskType)reader.GetByte();
-        WarehouseMachine = reader.GetString();
-        CargoType = (CargoType)reader.GetInt();
-        CargoAmount = reader.GetFloat();
-        ReadyForMachine = reader.GetBool();
+        CarNetIDs = reader.ReadUShortArray();
+        WarehouseTaskType = (WarehouseTaskType)reader.ReadByte();
+        WarehouseMachine = reader.ReadString();
+        CargoType = (CargoType)reader.ReadInt32();
+        CargoAmount = reader.ReadSingle();
+        ReadyForMachine = reader.ReadBoolean();
     }
 
     public override WarehouseTaskData FromTask(Task task)
@@ -182,16 +172,16 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
         List<Car> cars = CarNetIDs
             .Select(netId => NetworkedTrainCar.TryGet(netId, out TrainCar trainCar) ? trainCar : null)
             .Where(car => car != null)
-            .Select(car =>car.logicCar)
+            .Select(car => car.logicCar)
             .ToList();
 
-         WarehouseTask newWareTask = new WarehouseTask(
-            cars,
-            WarehouseTaskType,
-            JobSaveManager.Instance.GetWarehouseMachineWithId(WarehouseMachine),
-            CargoType,
-            CargoAmount
-        );
+        WarehouseTask newWareTask = new WarehouseTask(
+           cars,
+           WarehouseTaskType,
+           JobSaveManager.Instance.GetWarehouseMachineWithId(WarehouseMachine),
+           CargoType,
+           CargoAmount
+       );
 
         newWareTask.readyForMachine = ReadyForMachine;
 
@@ -213,59 +203,59 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
     public bool CouplingRequiredAndNotDone { get; set; }
     public bool AnyHandbrakeRequiredAndNotDone { get; set; }
 
-    public override void Serialize(NetDataWriter writer)
+    public override void Serialize(BinaryWriter writer)
     {
         SerializeCommon(writer);
         //Multiplayer.LogDebug(() => $"TransportTaskData.Serialize() CarNetIDs count: {CarNetIDs.Length}, Values: [{string.Join(", ", CarNetIDs?.Select(id => id.ToString()))}]");
-        writer.PutArray(CarNetIDs);
+        writer.WriteUShortArray(CarNetIDs);
 
         //Multiplayer.LogDebug(() => $"TransportTaskData.Serialize() raw after: [{string.Join(", ", writer.Data?.Select(id => id.ToString()))}]");
 
         //Multiplayer.Log($"TaskNetworkData.Serialize() StartingTrack {StartingTrack}");
-        writer.Put(StartingTrack);
+        writer.Write(StartingTrack);
         //Multiplayer.Log($"TaskNetworkData.Serialize() DestinationTrack {DestinationTrack}");
-        writer.Put(DestinationTrack);
+        writer.Write(DestinationTrack);
 
         //Multiplayer.Log($"TaskNetworkData.Serialize() TransportedCargoPerCar != null {TransportedCargoPerCar != null}");
-        writer.Put(TransportedCargoPerCar != null);
+        writer.Write(TransportedCargoPerCar != null);
 
         if (TransportedCargoPerCar != null)
         {
             //Multiplayer.Log($"TaskNetworkData.Serialize() TransportedCargoPerCar.PutArray() length: {TransportedCargoPerCar.Length}");
-            writer.PutArray(TransportedCargoPerCar.Select(x => (int)x).ToArray());
+            writer.WriteInt32Array(TransportedCargoPerCar.Select(x => (int)x).ToArray());
         }
 
         //Multiplayer.Log($"TaskNetworkData.Serialize() CouplingRequiredAndNotDone {CouplingRequiredAndNotDone}");
-        writer.Put(CouplingRequiredAndNotDone);
+        writer.Write(CouplingRequiredAndNotDone);
         //Multiplayer.Log($"TaskNetworkData.Serialize() AnyHandbrakeRequiredAndNotDone {AnyHandbrakeRequiredAndNotDone}");
-        writer.Put(AnyHandbrakeRequiredAndNotDone);
+        writer.Write(AnyHandbrakeRequiredAndNotDone);
     }
 
-    public override void Deserialize(NetDataReader reader)
+    public override void Deserialize(BinaryReader reader)
     {
         DeserializeCommon(reader);
 
-        CarNetIDs = reader.GetUShortArray();
+        CarNetIDs = reader.ReadUShortArray();
 
         //Multiplayer.LogDebug(() => $"TransportTaskData.Deserialize() CarNetIDs count: {CarNetIDs.Length}, Values: [{string.Join(", ", CarNetIDs?.Select(id => id.ToString()))}]");
 
-        StartingTrack = reader.GetString();
+        StartingTrack = reader.ReadString();
         //Multiplayer.Log($"TaskNetworkData.Deserialize() StartingTrack {StartingTrack}");
-        DestinationTrack = reader.GetString();
+        DestinationTrack = reader.ReadString();
         //Multiplayer.Log($"TaskNetworkData.Deserialize() DestinationTrack {DestinationTrack}");
 
-        if (reader.GetBool())
+        if (reader.ReadBoolean())
         {
             //Multiplayer.Log($"TaskNetworkData.Deserialize() TransportedCargoPerCar != null True");
-            TransportedCargoPerCar = reader.GetIntArray().Select(x => (CargoType)x).ToArray();
+            TransportedCargoPerCar = reader.ReadInt32Array().Select(x => (CargoType)x).ToArray();
         }
         //else
         //{
         //    Multiplayer.LogWarning($"TaskNetworkData.Deserialize() TransportedCargoPerCar != null False");
         //}
-        CouplingRequiredAndNotDone = reader.GetBool();
+        CouplingRequiredAndNotDone = reader.ReadBoolean();
         //Multiplayer.Log($"TaskNetworkData.Deserialize() CouplingRequiredAndNotDone {CouplingRequiredAndNotDone}");
-        AnyHandbrakeRequiredAndNotDone = reader.GetBool();
+        AnyHandbrakeRequiredAndNotDone = reader.ReadBoolean();
         //Multiplayer.Log($"TaskNetworkData.Deserialize() AnyHandbrakeRequiredAndNotDone {AnyHandbrakeRequiredAndNotDone}");
     }
 
@@ -279,7 +269,7 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
             .Select(car => NetworkedTrainCar.GetFromTrainId(car.ID, out var networkedTrainCar)
                 ? networkedTrainCar.NetId
                 : (ushort)0)
-            .ToArray();     
+            .ToArray();
 
         //Multiplayer.LogDebug(() => $"TransportTaskData.FromTask() after CarNetIDs count: {CarNetIDs.Length}, Values: [{string.Join(", ", CarNetIDs.Select(id => id.ToString()))}]");
 
@@ -320,7 +310,7 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
     public TaskNetworkData[] Tasks { get; set; }
     public byte CurrentTaskIndex { get; set; }
 
-    public override void Serialize(NetDataWriter writer)
+    public override void Serialize(BinaryWriter writer)
     {
         //Multiplayer.Log($"SequentialTasksData.Serialize({writer != null})");
 
@@ -328,30 +318,30 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
 
         //Multiplayer.Log($"SequentialTasksData.Serialize() {Tasks.Length}");
 
-        writer.Put((byte)Tasks.Length);
+        writer.Write((byte)Tasks.Length);
         foreach (var task in Tasks)
         {
             //Multiplayer.Log($"SequentialTasksData.Serialize() {task.TaskType} {task.GetType()}");
-            writer.Put((byte)task.TaskType);
+            writer.Write((byte)task.TaskType);
             task.Serialize(writer);
         }
 
-        writer.Put(CurrentTaskIndex);
+        writer.Write(CurrentTaskIndex);
     }
 
-    public override void Deserialize(NetDataReader reader)
+    public override void Deserialize(BinaryReader reader)
     {
         DeserializeCommon(reader);
-        var tasksLength = reader.GetByte();
+        var tasksLength = reader.ReadByte();
         Tasks = new TaskNetworkData[tasksLength];
         for (int i = 0; i < tasksLength; i++)
         {
-            var taskType = (TaskType)reader.GetByte();
+            var taskType = (TaskType)reader.ReadByte();
             Tasks[i] = TaskNetworkDataFactory.ConvertTask(taskType);
             Tasks[i].Deserialize(reader);
         }
 
-        CurrentTaskIndex = reader.GetByte();
+        CurrentTaskIndex = reader.ReadByte();
 
     }
 
@@ -364,12 +354,12 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
 
         Tasks = TaskNetworkDataFactory.ConvertTasks(sequentialTasks.tasks);
 
-        bool found=false;
+        bool found = false;
 
         CurrentTaskIndex = 0;
-        foreach(Task subTask in sequentialTasks.tasks)
+        foreach (Task subTask in sequentialTasks.tasks)
         {
-            if(subTask == sequentialTasks.currentTask.Value)
+            if (subTask == sequentialTasks.currentTask.Value)
             {
                 found = true;
                 break;
@@ -396,9 +386,9 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
 
         SequentialTasks newSeqTask = new SequentialTasks(Tasks.Select(t => t.ToTask()).ToList());
 
-        if(CurrentTaskIndex <= newSeqTask.tasks.Count())
+        if (CurrentTaskIndex <= newSeqTask.tasks.Count())
             newSeqTask.currentTask = new LinkedListNode<Task>(newSeqTask.tasks.ToArray()[CurrentTaskIndex]);
-        
+
         return newSeqTask;
     }
 
@@ -420,25 +410,25 @@ public class ParallelTasksData : TaskNetworkData<ParallelTasksData>
 {
     public TaskNetworkData[] Tasks { get; set; }
 
-    public override void Serialize(NetDataWriter writer)
+    public override void Serialize(BinaryWriter writer)
     {
         SerializeCommon(writer);
-        writer.Put((byte)Tasks.Length);
+        writer.Write((byte)Tasks.Length);
         foreach (var task in Tasks)
         {
-            writer.Put((byte)task.TaskType);
+            writer.Write((byte)task.TaskType);
             task.Serialize(writer);
         }
     }
 
-    public override void Deserialize(NetDataReader reader)
+    public override void Deserialize(BinaryReader reader)
     {
         DeserializeCommon(reader);
-        var tasksLength = reader.GetByte();
+        var tasksLength = reader.ReadByte();
         Tasks = new TaskNetworkData[tasksLength];
         for (int i = 0; i < tasksLength; i++)
         {
-            var taskType = (TaskType)reader.GetByte();
+            var taskType = (TaskType)reader.ReadByte();
             Tasks[i] = TaskNetworkDataFactory.ConvertTask(taskType);
             Tasks[i].Deserialize(reader);
         }
@@ -463,7 +453,7 @@ public class ParallelTasksData : TaskNetworkData<ParallelTasksData>
     {
         List<ushort> result = [];
 
-        foreach(var task in Tasks)
+        foreach (var task in Tasks)
         {
             var cars = task.GetCars();
             result.AddRange(cars);
@@ -472,3 +462,4 @@ public class ParallelTasksData : TaskNetworkData<ParallelTasksData>
         return result;
     }
 }
+#endregion
