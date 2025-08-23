@@ -49,7 +49,7 @@ public static class PlayerDistanceGameObjectsDisablerPatch
 
             //overwrite line 79 with ldloc.1 (pass in 'this' as the final parameter of call to CustomCalcSqrMagnitude())
         79	00EB call    valuetype[UnityEngine.CoreModule] UnityEngine.Vector3[UnityEngine.CoreModule] UnityEngine.Vector3::op_Subtraction(valuetype[UnityEngine.CoreModule] UnityEngine.Vector3, valuetype[UnityEngine.CoreModule] UnityEngine.Vector3)
-            //overwrite with call to CustomCalcSqrMagnitude() (techinically we are inserting the call and skipping thr original)
+            //overwrite with call to CustomCalcSqrMagnitude() (techinically we are inserting the call and skipping the original)
             //Insert 3 NOPs
         80	00F0	stloc.3         //skip 0
         81	00F1	ldloca.s V_3(3) //skip 1

@@ -312,6 +312,7 @@ public class NetworkClient : NetworkManager
         }
         else
         {
+            Log($"Server Shutting Down");
             disconnectMessage = "Server Shutting Down";
         }
     }
