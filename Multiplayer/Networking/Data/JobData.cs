@@ -34,7 +34,7 @@ public class JobData
         ushort itemNetId = 0;
         ItemPositionData itemPos = new();
 
-        //Multiplayer.Log($"JobData.FromJob({netStation.name}, {job.ID}, {networkedJob.Job.State})");
+        //Multiplayer.Log($"JobData.FromJob({netStation.name}, {job.ID}, {networkedJob.Job.Value})");
 
         if (networkedJob.Job.State == JobState.Available)
         {

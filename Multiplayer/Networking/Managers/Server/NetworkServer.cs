@@ -1,40 +1,39 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using DV;
 using DV.InventorySystem;
 using DV.Logic.Job;
 using DV.Scenarios.Common;
 using DV.ServicePenalty;
 using DV.ThingTypes;
 using DV.WeatherSystem;
+using DV;
 using Humanizer;
-using LiteNetLib;
 using LiteNetLib.Utils;
-using Multiplayer.Components.Networking;
+using LiteNetLib;
+using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
-using Multiplayer.Components.Networking.Jobs;
+using Multiplayer.Components.Networking;
+using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.Data;
-using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
 using Multiplayer.Networking.Packets.Clientbound.Train;
 using Multiplayer.Networking.Packets.Clientbound.World;
-using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Common.Train;
+using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Serverbound.Jobs;
+using Multiplayer.Networking.Packets.Serverbound.Train;
 using Multiplayer.Networking.Packets.Serverbound;
+using Multiplayer.Networking.Packets.Unconnected;
+using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System;
 using UnityEngine;
 using UnityModManagerNet;
-using System.Net;
-using Multiplayer.Networking.Packets.Serverbound.Train;
-using Multiplayer.Networking.Packets.Unconnected;
-using System.Text;
-using Multiplayer.Networking.Data.Train;
-using Multiplayer.Networking.TransportLayers;
-using Multiplayer.Networking.Packets.Serverbound.Jobs;
-
 
 namespace Multiplayer.Networking.Managers.Server;
 
@@ -55,8 +54,8 @@ public class NetworkServer : NetworkManager
     public IReadOnlyCollection<ServerPlayer> ServerPlayers => serverPlayers.Values;
     public int PlayerCount => ServerPlayers.Count;
 
-    private static ITransportPeer SelfPeer => NetworkLifecycle.Instance.Client?.SelfPeer;
-    public static byte SelfId => (byte)SelfPeer.Id;
+    public ITransportPeer SelfPeer => NetworkLifecycle.Instance.Client?.SelfPeer;
+    public byte SelfId => (byte)SelfPeer.Id;
     private readonly ModInfo[] serverMods;
 
     public readonly IDifficulty Difficulty;
@@ -67,7 +66,7 @@ public class NetworkServer : NetworkManager
 
     public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData) : base(settings)
     {
-        Log(()=>$"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
+        Log($"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
 
         IsSinglePlayer = singlePlayer;
         ServerData = serverData;
@@ -84,7 +83,7 @@ public class NetworkServer : NetworkManager
 
         WorldStreamingInit.LoadingFinished += OnLoaded;
 
-        Multiplayer.Log($"Starting server...");
+        Log($"Starting server...");
         //Try to get our static IPv6 Address we will need this for IPv6 NAT punching to be reliable
         if (IPAddress.TryParse(LobbyServerManager.GetStaticIPv6Address(), out IPAddress ipv6Address))
         {
@@ -137,7 +136,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonChangeJunctionPacket, ITransportPeer>(OnCommonChangeJunctionPacket);
         netPacketProcessor.SubscribeReusable<CommonRotateTurntablePacket, ITransportPeer>(OnCommonRotateTurntablePacket);
         netPacketProcessor.SubscribeReusable<CommonCouplerInteractionPacket, ITransportPeer>(OnCommonCouplerInteractionPacket);
-        //netPacketProcessor.SubscribeReusable<CommonTrainCouplePacket, ITransportPeer>(OnCommonTrainCouplePacket);
+
         netPacketProcessor.SubscribeReusable<CommonTrainUncouplePacket, ITransportPeer>(OnCommonTrainUncouplePacket);
         netPacketProcessor.SubscribeReusable<CommonHoseConnectedPacket, ITransportPeer>(OnCommonHoseConnectedPacket);
         netPacketProcessor.SubscribeReusable<CommonHoseDisconnectedPacket, ITransportPeer>(OnCommonHoseDisconnectedPacket);
@@ -156,6 +155,11 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonChatPacket, ITransportPeer>(OnCommonChatPacket);
         netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, ITransportPeer>(OnCommonItemChangePacket);
+
+        netPacketProcessor.SubscribeReusable<CommonPitStopInteractionPacket, ITransportPeer>(OnCommonPitStopInteractionPacket);
+        netPacketProcessor.SubscribeNetSerializable<CommonPitStopPlugInteractionPacket, ITransportPeer>(OnCommonPitStopPlugInteractionPacket);
+
+        netPacketProcessor.SubscribeReusable<CommonCashRegisterWithModulesActionPacket, ITransportPeer>(OnCommonCashRegisterWithModulesActionPacket);
     }
 
     private void OnLoaded()
@@ -167,6 +171,10 @@ public class NetworkServer : NetworkManager
 
         Log($"Server loaded, processing {joinQueue.Count} queued players");
         IsLoaded = true;
+
+        //We should initialise object here for dedicated servers, rather than relying on the existance of a client
+        NetworkedPitStopStation.InitialisePitStops();
+        NetworkedCashRegisterWithModules.InitialiseCashRegisters();
 
         while (joinQueue.Count > 0)
         {
@@ -183,6 +191,28 @@ public class NetworkServer : NetworkManager
                 System.Console.WriteLine("Connection is not established.");
             }
         }
+
+        //LogDebug(() =>
+        //{
+        //    StringBuilder sb = new StringBuilder();
+
+        //    var objects = Resources.FindObjectsOfTypeAll<PlayerDistanceGameObjectsDisabler>();
+        //    foreach (var obj in objects)
+        //        sb.AppendLine($"PlayerDistanceGameObjectsDisabler() {obj.gameObject.GetObjectPath()}");
+
+        //    return sb.ToString();
+        //});
+
+        //LogDebug(() =>
+        //{
+        //    StringBuilder sb = new StringBuilder();
+
+        //    var objects = Resources.FindObjectsOfTypeAll<PlayerDistanceMultipleGameObjectsOptimizer>();
+        //    foreach (var obj in objects)
+        //        sb.AppendLine($"PlayerDistanceMultipleGameObjectsOptimizer() {obj.gameObject.GetObjectPath()}");
+
+        //    return sb.ToString();
+        //});
     }
 
     public bool TryGetServerPlayer(ITransportPeer peer, out ServerPlayer player)
@@ -348,7 +378,7 @@ public class NetworkServer : NetworkManager
 
         if (netTrainCar.NetId == 0)
         {
-            Multiplayer.LogWarning($"SendDestroyTrainCar failed. [{netTrainCar.CurrentID} {netTrainCar.NetId}]");
+            LogWarning($"SendDestroyTrainCar failed. [{netTrainCar.CurrentID} {netTrainCar.NetId}]");
             return;
         }
 
@@ -379,7 +409,7 @@ public class NetworkServer : NetworkManager
             Temperature = temperature
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
 
-        //Multiplayer.LogDebug(()=> $"Sending Brake Pressures netId {netId}: {mainReservoirPressure}, {independentPipePressure}, {brakePipePressure}, {brakeCylinderPressure}");
+        //LogDebug(()=> $"Sending Brake Pressures netId {netId}: {mainReservoirPressure}, {independentPipePressure}, {brakePipePressure}, {brakeCylinderPressure}");
     }
 
     public void SendFireboxState(ushort netId, float fireboxContents, bool fireboxOn)
@@ -391,7 +421,7 @@ public class NetworkServer : NetworkManager
             IsOn = fireboxOn
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
 
-        Multiplayer.LogDebug(() => $"Sending Firebox States netId {netId}: {fireboxContents}, {fireboxOn}");
+        LogDebug(() => $"Sending Firebox States netId {netId}: {fireboxContents}, {fireboxOn}");
     }
 
     public void SendCargoState(NetworkedTrainCar netTraincar, bool isLoading, byte cargoModelIndex)
@@ -444,6 +474,9 @@ public class NetworkServer : NetworkManager
 
     public void SendCarHealthUpdate(ushort netId, TrainCarHealthData health)
     {
+
+        //LogDebug(() => $"Sending Car Health Update for netId {netId}: BodyHP: {health.BodyHP}, WheelsHP: {health.WheelsHP}, MechanicalPT: {health.MechanicalPT}, ElectricalPT: {health.ElectricalPT}, WindowsBroken: {health.WindowsBroken}");
+
         SendPacketToAll(new ClientboundCarHealthUpdatePacket
         {
             NetId = netId,
@@ -539,7 +572,7 @@ public class NetworkServer : NetworkManager
 
     public void SendJobsCreatePacket(NetworkedStationController networkedStation, NetworkedJob[] jobs, ITransportPeer peer = null)
     {
-        Multiplayer.Log($"Sending JobsCreatePacket for stationNetId {networkedStation.NetId} with {jobs.Count()} jobs");
+        Log($"Sending JobsCreatePacket for stationNetId {networkedStation.NetId} with {jobs.Count()} jobs");
 
         var packet = ClientboundJobsCreatePacket.FromNetworkedJobs(networkedStation, jobs);
 
@@ -551,19 +584,60 @@ public class NetworkServer : NetworkManager
 
     public void SendJobsUpdatePacket(ushort stationNetId, NetworkedJob[] jobs)
     {
-        Multiplayer.Log($"Sending JobsUpdatePacket for stationNetId {stationNetId} with {jobs.Count()} jobs");
+        Log($"Sending JobsUpdatePacket for stationNetId {stationNetId} with {jobs.Count()} jobs");
         SendPacketToAll(ClientboundJobsUpdatePacket.FromNetworkedJobs(stationNetId, jobs), DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 
     public void SendItemsChangePacket(List<ItemUpdateData> items, ServerPlayer player)
     {
-        Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items to {player.Username}");
+        Log($"Sending SendItemsChangePacket with {items.Count()} items to {player.Username}");
 
         if (Peers.TryGetValue(player.Id, out ITransportPeer peer) && peer != SelfPeer)
         {
             SendNetSerializablePacket(peer, new CommonItemChangePacket { Items = items },
                 DeliveryMethod.ReliableOrdered);
         }
+    }
+
+    public void SendPitStopBulkDataPacket(ushort netId, int carCount, int carIndex, int faucetNotch, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData , ITransportPeer peer = null)
+    {
+        LogDebug(() => $"SendPitStopBulkDataPacket({netId}, {carCount}, {carIndex}, {faucetNotch}, {stationData.Count()}, {plugData.Count()}, {peer?.Id})");
+
+        var packet = new ClientboundPitStopBulkUpdatePacket
+        {
+            NetId = netId,
+            CarCount = carCount,
+            CarSelection = carIndex,
+            FaucetNotch = faucetNotch,
+            ResourceData = stationData,
+            PlugData = plugData,
+        };
+
+        if (peer == null)
+            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered);
+        else
+            SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
+    }
+
+    public void SendPitStopInteractionPacket(ServerPlayer player, CommonPitStopInteractionPacket packet)
+    {
+        LogDebug(() => $"SendPitStopInteractionPacket({player.Username}, {packet.NetId})");
+
+        SendPacket(player.Peer, packet, DeliveryMethod.ReliableOrdered);
+    }
+
+    public void SendPitStopPlugInteractionPacket(ServerPlayer player, CommonPitStopPlugInteractionPacket packet)
+    {
+        LogDebug(() => $"SendPitStopPlugInteractionPacket({packet.NetId}, {packet.InteractionType}, {packet.PlayerId}, {packet.Position}, {packet.Rotation}, {packet.TrainCarNetId}, {packet.SocketIndex}, {packet.YankForce}, {packet.YankMode})");
+        SendNetSerializablePacket(player.Peer, packet, DeliveryMethod.ReliableOrdered);
+    }
+
+    public void SendCashRegisterAction(CommonCashRegisterWithModulesActionPacket packet, ITransportPeer peer = null)
+    {
+        if (peer == null)
+            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
+        else
+            SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
     public void SendChat(string message, ITransportPeer exclude = null)
@@ -683,13 +757,13 @@ public class NetworkServer : NetworkManager
 
         ITransportPeer peer = request.Accept();
 
-        ServerPlayer serverPlayer = new()
-        {
-            Id = (byte)peer.Id,
-            Username = overrideUsername,
-            OriginalUsername = packet.Username,
-            Guid = guid
-        };
+        ServerPlayer serverPlayer = new(
+            peer,
+            (byte)peer.Id,
+            overrideUsername,
+            packet.Username,
+            guid
+        );
 
         serverPlayers.Add(serverPlayer.Id, serverPlayer);
 
@@ -782,7 +856,7 @@ public class NetworkServer : NetworkManager
         }
 
         // Sync Stations (match NetIDs with StationIDs) - we could do this the same as junctions but juntions may need to be upgraded to work this way - future planning for mod integration
-        SendPacket(peer, new ClientBoundStationControllerLookupPacket(NetworkedStationController.GetAll().ToArray()), DeliveryMethod.ReliableOrdered);
+        SendPacket(peer, new ClientboundStationControllerLookupPacket(NetworkedStationController.GetAll().ToArray()), DeliveryMethod.ReliableOrdered);
 
         //send jobs
         foreach (StationController station in StationController.allStations)
@@ -881,7 +955,7 @@ public class NetworkServer : NetworkManager
             }
             else
             {
-                Multiplayer.LogDebug(() => $"OnCommonCouplerInteractionPacket([{packet.Flags}, {netTrainCar.CurrentID}, {packet.NetId}], {peer.Id}) Sending validation failure");
+                LogDebug(() => $"OnCommonCouplerInteractionPacket([{packet.Flags}, {netTrainCar.CurrentID}, {packet.NetId}], {peer.Id}) Sending validation failure");
                 //failed validation notify client
                 SendPacket(
                             peer,
@@ -897,7 +971,7 @@ public class NetworkServer : NetworkManager
         }
         else
         {
-            Multiplayer.LogDebug(() => $"OnCommonCouplerInteractionPacket([{packet.Flags}, {netTrainCar.CurrentID}, {packet.NetId}], {peer.Id}) Sending destroy");
+            LogDebug(() => $"OnCommonCouplerInteractionPacket([{packet.Flags}, {netTrainCar.CurrentID}, {packet.NetId}], {peer.Id}) Sending destroy");
             //Car doesn't exist, tell client to delete it
             SendDestroyTrainCar(netTrainCar, peer);
         }
@@ -1193,8 +1267,47 @@ public class NetworkServer : NetworkManager
     #region Unconnected Packet Handling
     private void OnUnconnectedPingPacket(UnconnectedPingPacket packet, IPEndPoint endPoint)
     {
-        //Multiplayer.Log($"OnUnconnectedPingPacket({endPoint.Address})");
+        //Log($"OnUnconnectedPingPacket({endPoint.Address})");
         //SendUnconnectedPacket(packet, endPoint.Address.ToString(), endPoint.Port);
+    }
+
+    private void OnCommonPitStopInteractionPacket(CommonPitStopInteractionPacket packet, ITransportPeer peer)
+    {
+        bool foundPlayer = TryGetServerPlayer(peer, out var player);
+        if (!foundPlayer)
+        {
+            LogWarning($"Received Pit Stop Plug Interaction, but player was not found");
+        }
+        else
+        {
+            if (NetworkedPitStopStation.Get(packet.NetId, out NetworkedPitStopStation controller))
+                controller.ProcessInteractionPacketAsHost(packet, player);
+            else
+                LogWarning($"OnCommonPitStopInteractionPacket() Failed to find PitStopStation with netId: {packet.NetId}");
+        }
+    }
+
+    private void OnCommonPitStopPlugInteractionPacket(CommonPitStopPlugInteractionPacket packet, ITransportPeer peer)
+    {
+        bool foundPlayer = TryGetServerPlayer(peer, out var player);
+        if (!foundPlayer)
+        {
+            LogWarning($"Received Pit Stop Plug Interaction, but player was not found");
+            SendNetSerializablePacket(peer, new CommonPitStopPlugInteractionPacket
+            {
+                NetId = packet.NetId,
+                InteractionType = (byte)PitStopStationInteractionType.Reject
+            }, DeliveryMethod.ReliableOrdered);
+        }
+
+        if(NetworkedPluggableObject.Get(packet.NetId, out NetworkedPluggableObject plug) && foundPlayer)
+        {
+            plug.ProcessInteractionPacketAsHost(packet, player);
+        }
+        else
+        {
+            LogError($"OnCommonPitStopInteractionPacket() Failed to find PitStopStation with netId: {packet.NetId}");
+        }
     }
 
     private void OnCommonItemChangePacket(CommonItemChangePacket packet, ITransportPeer peer)
@@ -1204,7 +1317,7 @@ public class NetworkServer : NetworkManager
 
         //LogDebug(()=>$"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id} (\"{player.Username}\"))");
 
-        //Multiplayer.LogDebug(() =>
+        //LogDebug(() =>
         //{
         //    string debug = "";
 
@@ -1234,6 +1347,26 @@ public class NetworkServer : NetworkManager
         //);
 
         //NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items, player);
+    }
+
+    private void OnCommonCashRegisterWithModulesActionPacket(CommonCashRegisterWithModulesActionPacket packet, ITransportPeer peer)
+    {
+        if (!TryGetServerPlayer(peer, out var player))
+        {
+            LogWarning($"Cash Register With Modules Action received, but player was not found");
+            return;
+        }
+
+        if (!NetworkedCashRegisterWithModules.Get(packet.NetId, out NetworkedCashRegisterWithModules netCashRegister))
+        {
+            LogWarning($"Cash Register With Modules Action received for netId: {packet.NetId}, but cash register does not exist!");
+            return;
+        }
+
+        Log($"Cash Register With Modules Action received for {netCashRegister.GetObjectPath()}, Action: {packet.Action}, Amount: {packet.Amount}");
+        netCashRegister.Server_ProcessCashRegisterAction(player, packet);
+
+
     }
     #endregion
 }

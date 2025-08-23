@@ -69,7 +69,7 @@ public class NetworkedSaveGameManager : SingletonBehaviour<NetworkedSaveGameMana
 
         foreach (ServerPlayer player in NetworkLifecycle.Instance.Server.ServerPlayers)
         {
-            if (player.Id == NetworkServer.SelfId || !player.IsLoaded)
+            if (player.Id == NetworkLifecycle.Instance.Server.SelfId || !player.IsLoaded)
                 continue;
             JObject playerData = [];
             playerData.SetVector3(SaveGameKeys.Player_position, player.AbsoluteWorldPosition);

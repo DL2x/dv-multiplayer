@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
+using Multiplayer.Networking.TransportLayers;
 using UnityEngine;
 
 namespace Multiplayer.Networking.Data;
 
 public class ServerPlayer
 {
+    public ITransportPeer Peer { get; private set; }
     public byte Id { get; set; }
     public bool IsLoaded { get; set; }
     public string Username { get; set; }
@@ -25,6 +27,15 @@ public class ServerPlayer
 
     private Vector3 _lastWorldPos = Vector3.zero;
     private Vector3 _lastAbsoluteWorldPosition = Vector3.zero;
+
+    public ServerPlayer(ITransportPeer peer, byte id,string username, string originalUsername, Guid guid)
+    {
+        Peer = peer;
+        Id = id;
+        Username = username;
+        OriginalUsername = originalUsername;
+        Guid = guid;
+    }
 
     #region Positioning
     public Vector3 AbsoluteWorldPosition

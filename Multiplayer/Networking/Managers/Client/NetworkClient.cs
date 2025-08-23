@@ -1,4 +1,3 @@
-using DV;
 using DV.Common;
 using DV.Customization.Paint;
 using DV.Damage;
@@ -10,35 +9,36 @@ using DV.ThingTypes;
 using DV.UI;
 using DV.UserManagement;
 using DV.WeatherSystem;
-using LiteNetLib;
+using DV;
 using LiteNetLib.Utils;
+using LiteNetLib;
 using Multiplayer.Components.MainMenu;
-using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Player;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.UI;
 using Multiplayer.Components.Networking.World;
+using Multiplayer.Components.Networking;
 using Multiplayer.Components.SaveGame;
-using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Data.Train;
-using Multiplayer.Networking.Packets.Clientbound;
+using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
 using Multiplayer.Networking.Packets.Clientbound.Train;
 using Multiplayer.Networking.Packets.Clientbound.World;
-using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Common.Train;
-using Multiplayer.Networking.Packets.Serverbound;
+using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Networking.Packets.Serverbound.Jobs;
 using Multiplayer.Networking.Packets.Serverbound.Train;
+using Multiplayer.Networking.Packets.Serverbound;
 using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Patches.SaveGame;
 using Multiplayer.Utils;
 using Newtonsoft.Json.Linq;
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using UnityEngine;
 using UnityModManagerNet;
 using Object = UnityEngine.Object;
@@ -58,6 +58,7 @@ public class NetworkClient : NetworkManager
     // One way ping in milliseconds
     public int Ping { get; private set; }
     private ITransportPeer serverPeer;
+    public float RPC_Timeout => (Ping * 4f) / 1000;
 
     private ChatGUI chatGUI;
     private readonly bool isSinglePlayer;
@@ -69,6 +70,11 @@ public class NetworkClient : NetworkManager
     {
         isSinglePlayer = singlePlayer;
         ClientPlayerManager = new ClientPlayerManager();
+
+        WorldStreamingInit.LoadingFinished += () =>
+        {
+            NetworkedPlayer.CaptureItemAnchorOffset();
+        };
     }
 
     public void Start(string address, int port, string password, bool isSinglePlayer, Action<DisconnectReason, string> onDisconnect)
@@ -111,8 +117,19 @@ public class NetworkClient : NetworkManager
 
     protected override void Subscribe()
     {
+        netPacketProcessor.SubscribeReusable<ClientboundServerLoadingPacket>(OnClientboundServerLoadingPacket);
         netPacketProcessor.SubscribeReusable<ClientboundLoginResponsePacket>(OnClientboundLoginResponsePacket);
         netPacketProcessor.SubscribeReusable<ClientboundDisconnectPacket>(OnClientboundDisconnectPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundRemoveLoadingScreenPacket>(OnClientboundRemoveLoadingScreen);
+
+        netPacketProcessor.SubscribeReusable<ClientboundTickSyncPacket>(OnClientboundTickSyncPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundBeginWorldSyncPacket>(OnClientboundBeginWorldSyncPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundGameParamsPacket>(OnClientboundGameParamsPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundSaveGameDataPacket>(OnClientboundSaveGameDataPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundWeatherPacket>(OnClientboundWeatherPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundRailwayStatePacket>(OnClientboundRailwayStatePacket);
+        netPacketProcessor.SubscribeReusable<ClientboundStationControllerLookupPacket>(OnClientboundStationControllerLookupPacket);
+
 
         netPacketProcessor.SubscribeReusable<ClientboundPlayerJoinedPacket>(OnClientboundPlayerJoinedPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPlayerDisconnectPacket>(OnClientboundPlayerDisconnectPacket);
@@ -120,16 +137,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundPlayerPositionPacket>(OnClientboundPlayerPositionPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPingUpdatePacket>(OnClientboundPingUpdatePacket);
 
-        netPacketProcessor.SubscribeReusable<ClientboundTickSyncPacket>(OnClientboundTickSyncPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundServerLoadingPacket>(OnClientboundServerLoadingPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundBeginWorldSyncPacket>(OnClientboundBeginWorldSyncPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundGameParamsPacket>(OnClientboundGameParamsPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundSaveGameDataPacket>(OnClientboundSaveGameDataPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundWeatherPacket>(OnClientboundWeatherPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundRemoveLoadingScreenPacket>(OnClientboundRemoveLoadingScreen);
         netPacketProcessor.SubscribeReusable<ClientboundTimeAdvancePacket>(OnClientboundTimeAdvancePacket);
-        netPacketProcessor.SubscribeReusable<ClientboundRailwayStatePacket>(OnClientboundRailwayStatePacket);
-        netPacketProcessor.SubscribeReusable<ClientBoundStationControllerLookupPacket>(OnClientBoundStationControllerLookupPacket);
         netPacketProcessor.SubscribeReusable<CommonChangeJunctionPacket>(OnCommonChangeJunctionPacket);
         netPacketProcessor.SubscribeReusable<CommonRotateTurntablePacket>(OnCommonRotateTurntablePacket);
         netPacketProcessor.SubscribeReusable<ClientboundSpawnTrainCarPacket>(OnClientboundSpawnTrainCarPacket);
@@ -169,6 +177,14 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundJobValidateResponsePacket>(OnClientboundJobValidateResponsePacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket>(OnCommonItemChangePacket);
+
+        netPacketProcessor.SubscribeReusable<CommonPitStopInteractionPacket>(OnCommonPitStopInteractionPacket);
+        netPacketProcessor.SubscribeNetSerializable<CommonPitStopPlugInteractionPacket>(OnCommonPitStopPlugInteractionPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundPitStopBulkUpdatePacket>(OnClientboundPitStopBulkUpdatePacket);
+
+        netPacketProcessor.SubscribeReusable<CommonCashRegisterWithModulesActionPacket>(OnCommonCashRegisterWithModulesActionPacket);
+
+        
     }
 
     private void OnLoaded()
@@ -177,6 +193,10 @@ public class NetworkClient : NetworkManager
         NetworkedItemManager.Instance.CheckInstance();
         Log($"WorldStreamingInit.LoadingFinished() CacheWorldItems()");
         NetworkedItemManager.Instance.CacheWorldItems();
+        Log($"WorldStreamingInit.LoadingFinished() InitialisePitStops()");
+        NetworkedPitStopStation.InitialisePitStops();
+        Log($"WorldStreamingInit.LoadingFinished() InitialiseCashRegisters()");
+        NetworkedCashRegisterWithModules.InitialiseCashRegisters();
         Log($"WorldStreamingInit.LoadingFinished() SendReadyPacket()");
         SendReadyPacket();
 
@@ -292,6 +312,7 @@ public class NetworkClient : NetworkManager
         }
         else
         {
+            Log($"Server Shutting Down");
             disconnectMessage = "Server Shutting Down";
         }
     }
@@ -412,7 +433,7 @@ public class NetworkClient : NetworkManager
     }
 
     //Force stations to be mapped to same netId across all clients and server - probably should implement for junctions, etc.
-    private void OnClientBoundStationControllerLookupPacket(ClientBoundStationControllerLookupPacket packet)
+    private void OnClientboundStationControllerLookupPacket(ClientboundStationControllerLookupPacket packet)
     {
 
         if (packet == null)
@@ -426,7 +447,6 @@ public class NetworkClient : NetworkManager
             LogError($"OnClientBoundStationControllerLookupPacket received packet with null arrays: NetID is null: {packet.NetID == null}, StationID is null: {packet.StationID == null}");
             return;
         }
-
 
         for (int i = 0; i < packet.NetID.Length; i++)
         {
@@ -444,7 +464,6 @@ public class NetworkClient : NetworkManager
             }
         }
     }
-
 
     private void OnClientboundRailwayStatePacket(ClientboundRailwayStatePacket packet)
     {
@@ -584,7 +603,7 @@ public class NetworkClient : NetworkManager
             return;
         }
 
-        LogDebug(() => $"OnCommonTrainUncouplePacket() netId: {packet.NetId}, trainCar: {trainCar.ID}, isFront: {packet.IsFrontCoupler}, playAudio: {packet.PlayAudio}, DueToBrokenCouple: {packet.DueToBrokenCouple}, viaChainInteraction: {packet.ViaChainInteraction}");
+        //LogDebug(() => $"OnCommonTrainUncouplePacket() netId: {packet.NetId}, trainCar: {trainCar.ID}, isFront: {packet.IsFrontCoupler}, playAudio: {packet.PlayAudio}, DueToBrokenCouple: {packet.DueToBrokenCouple}, viaChainInteraction: {packet.ViaChainInteraction}");
 
         Coupler coupler = packet.IsFrontCoupler ? trainCar.frontCoupler : trainCar.rearCoupler;
         coupler.Uncouple(packet.PlayAudio, false, packet.DueToBrokenCouple, false/*B99 packet.ViaChainInteraction*/);
@@ -643,7 +662,7 @@ public class NetworkClient : NetworkManager
 
         TrainCar trainCar = netTrainCar.TrainCar;
 
-        LogDebug(() => $"OnCommonHoseDisconnectedPacket() netId: {packet.NetId}, trainCar: {trainCar.ID}, isFront: {packet.IsFront}, playAudio: {packet.PlayAudio}");
+        //LogDebug(() => $"OnCommonHoseDisconnectedPacket() netId: {packet.NetId}, trainCar: {trainCar.ID}, isFront: {packet.IsFront}, playAudio: {packet.PlayAudio}");
 
         Coupler coupler = packet.IsFront ? trainCar.frontCoupler : trainCar.rearCoupler;
 
@@ -745,7 +764,7 @@ public class NetworkClient : NetworkManager
 
         if (logicCar == null)
         {
-            Multiplayer.LogWarning($"OnClientboundCargoStatePacket() Failed to find logic car for [{networkedTrainCar.TrainCar.ID}, {packet.NetId}] is initialised: {networkedTrainCar.Client_Initialized}");
+            LogWarning($"OnClientboundCargoStatePacket() Failed to find logic car for [{networkedTrainCar.TrainCar.ID}, {packet.NetId}] is initialised: {networkedTrainCar.Client_Initialized}");
             return;
         }
 
@@ -814,7 +833,7 @@ public class NetworkClient : NetworkManager
 
         float deltaHealth = cargoDamageModel.currentHealth - packet.CargoHealth;
 
-        LogDebug(() => $"OnClientboundCargoHealthUpdatePacket() {networkedTrainCar.CurrentID}, current health: {cargoDamageModel.currentHealth}, new health: {packet.CargoHealth}, delta: {cargoDamageModel}, applySensitivity: {packet.CargoHealth > 0}");
+        //LogDebug(() => $"OnClientboundCargoHealthUpdatePacket() {networkedTrainCar.CurrentID}, current health: {cargoDamageModel.currentHealth}, new health: {packet.CargoHealth}, delta: {cargoDamageModel}, applySensitivity: {packet.CargoHealth > 0}");
 
         if (deltaHealth > 0)
             cargoDamageModel.ApplyDamageToCargo(deltaHealth, packet.CargoHealth > 0);
@@ -822,6 +841,8 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundCarHealthUpdatePacket(ClientboundCarHealthUpdatePacket packet)
     {
+        //LogDebug(() => $"Received Car Health Update for netId {packet.NetId}: BodyHP: {packet.Health.BodyHP}, WheelsHP: {packet.Health.WheelsHP}, MechanicalPT: {packet.Health.MechanicalPT}, ElectricalPT: {packet.Health.ElectricalPT}, WindowsBroken: {packet.Health.WindowsBroken}");
+
         if (!NetworkedTrainCar.GetTrainCar(packet.NetId, out TrainCar trainCar))
             return;
 
@@ -957,12 +978,55 @@ public class NetworkClient : NetworkManager
         Object.Destroy(networkedJob.gameObject);
     }
 
+    private void OnCommonPitStopInteractionPacket(CommonPitStopInteractionPacket packet)
+    {
+        if (!NetworkedPitStopStation.Get(packet.NetId, out var netPitStop))
+        {
+            LogWarning($"Pit Stop Interaction received for netId: {packet.NetId}, but pit stop does not exist!");
+        }
+
+        Log($"Pit stop interaction received for {netPitStop.StationName}");
+
+        LogDebug(() => $"OnCommonPitStopInteractionPacket() [{netPitStop.StationName}, {packet.NetId}], interaction: [{packet.InteractionType}], resource: {packet?.ResourceType}, State: {packet.Value}");
+        netPitStop.ProcessInteractionPacketAsClient(packet);
+    }
+
+    private void OnCommonPitStopPlugInteractionPacket(CommonPitStopPlugInteractionPacket packet)
+    {
+        if (!NetworkedPluggableObject.Get(packet.NetId, out var netPlug))
+        {
+            LogWarning($"Pit Stop Plug Interaction received for plug netId: {packet.NetId}, but pit stop plug does not exist!");
+            return;
+        }
+
+        Log($"Pit Stop Plug Interaction received for {netPlug.NetId}");
+
+        LogDebug(() => $"OnCommonPitStopPlugInteractionPacket() [{netPlug?.transform?.name}, {packet.NetId}], interaction: [{(PlugInteractionType)packet.InteractionType}]");
+        netPlug.ProcessPacket(packet);
+    }
+
+    private void OnClientboundPitStopBulkUpdatePacket(ClientboundPitStopBulkUpdatePacket packet)
+    {
+        LogDebug(() => $"OnClientboundPitStopBulkUpdatePacket() NetId: {packet.NetId}, CarCount: {packet.CarCount}, CarSelection: { packet.CarSelection}, FaucetNotch: {packet.FaucetNotch}, ResourceData Count: {packet.ResourceData.Length}, PlugData: {packet.PlugData.Length}");
+
+        if (!NetworkedPitStopStation.Get(packet.NetId, out var netPitStop))
+        {
+            LogWarning($"Pit Stop Bulk Data received for station netId: {packet.NetId}, but pit stop does not exist!");
+            return;
+        }
+
+        Log($"Pit Stop Bulk Data received for {netPitStop.StationName}");
+
+        netPitStop.ProcessBulkUpdate(packet);
+    }
+
+
     private void OnCommonItemChangePacket(CommonItemChangePacket packet)
     {
         //LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count})");
 
 
-        //Multiplayer.LogDebug(() =>
+        //LogDebug(() =>
         //{
         //    string debug = "";
 
@@ -1017,6 +1081,19 @@ public class NetworkClient : NetworkManager
 
         LogDebug(() => $"OnCommonPaintThemePacket() [{netTrainCar?.CurrentID}, {packet.NetId}], area: {(TrainCarPaint.Target)packet.TargetArea}, paint: [{paint?.assetName}, {packet.PaintThemeId}]");
         netTrainCar?.Common_ReceivePaintThemeUpdate((TrainCarPaint.Target)packet.TargetArea, paint);
+    }
+
+    private void OnCommonCashRegisterWithModulesActionPacket(CommonCashRegisterWithModulesActionPacket packet)
+    {
+        if (!NetworkedCashRegisterWithModules.Get(packet.NetId, out NetworkedCashRegisterWithModules netCashRegister))
+        {
+            LogWarning($"Cash Register With Modules Action received for netId: {packet.NetId}, but cash register does not exist!");
+            return;
+        }
+
+        Log($"Cash Register With Modules Action received for {netCashRegister.GetObjectPath()}, Action: {packet.Action}, Amount: {packet.Amount}");
+
+        netCashRegister.Client_ProcessCashRegisterAction(packet.Action, packet.Amount);
     }
 
     #endregion
@@ -1131,7 +1208,7 @@ public class NetworkClient : NetworkManager
     //    {
     //        NetId = couplerNetId, //coupler.train.GetNetId(),
     //        IsFrontCoupler = coupler.isFrontCoupler,
-    //        State = (byte)coupler.state,
+    //        Value = (byte)coupler.state,
     //        OtherNetId = otherCouplerNetId, //otherCoupler.train.GetNetId(),
     //        OtherState = (byte)otherCoupler.state,
     //        OtherCarIsFrontCoupler = otherCoupler.isFrontCoupler,
@@ -1350,9 +1427,47 @@ public class NetworkClient : NetworkManager
 
     }
 
+    public void SendPitStopInteractionPacket(ushort netId, PitStopStationInteractionType interaction, ResourceType? resource, float state)
+    {
+        LogDebug(()=>$"SendPitStopInteractionPacket({netId}, [{interaction}], {resource}, {state})");
+
+        int res = resource == null ? 0 : (int)resource;
+        SendPacketToServer(new CommonPitStopInteractionPacket
+        {
+            NetId = netId,
+            InteractionType = (byte)interaction,
+            ResourceType = res,
+            Value = state
+        }, DeliveryMethod.ReliableOrdered);
+    }
+
+    public void SendPitStopPlugInteractionPacket
+    (
+        ushort netId,
+        PlugInteractionType interaction,
+        Vector3? position = null,
+        Quaternion? rotation = null,
+        ushort trainCarNetId = 0,
+        sbyte socketIndex = -1
+    )
+    {
+        LogDebug(()=>$"SendPitStopPlugInteractionPacket({netId}, {interaction}, pos: {position}, rot: {rotation}, trainNetId: {trainCarNetId}, socketIndex: {socketIndex})");
+
+        SendNetSerializablePacketToServer(new CommonPitStopPlugInteractionPacket
+        {
+            NetId = netId,
+            InteractionType = interaction,
+            TrainCarNetId = trainCarNetId,
+            SocketIndex = socketIndex,
+            Position = position,
+            Rotation = rotation,
+
+        }, DeliveryMethod.ReliableOrdered);
+    }
+
     public void SendItemsChangePacket(List<ItemUpdateData> items)
     {
-        Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items");
+        Log($"Sending SendItemsChangePacket with {items.Count()} items");
         //SendPacketToServer(new CommonItemChangePacket { Items = items },
         //    DeliveryMethod.ReliableUnordered);
 
@@ -1363,6 +1478,19 @@ public class NetworkClient : NetworkManager
     public void SendPaintThemeChangePacket(ushort netId, byte targetArea, sbyte themeIndex)
     {
         SendPacketToServer(new CommonPaintThemePacket { NetId = netId, TargetArea = targetArea, PaintThemeId = themeIndex }, DeliveryMethod.ReliableUnordered);
+    }
+
+    public void SendCashRegisterAction(ushort netId, CashRegisterAction action, double amount = 0.0f)
+    {
+        SendPacketToServer(
+            new CommonCashRegisterWithModulesActionPacket
+            {
+                NetId = netId,
+                Action = action,
+                Amount = amount
+            },
+            DeliveryMethod.ReliableOrdered
+        );
     }
 
     #endregion
