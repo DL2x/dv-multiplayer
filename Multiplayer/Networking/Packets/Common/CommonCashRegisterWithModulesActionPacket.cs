@@ -8,6 +8,7 @@ public enum CashRegisterAction : byte
     SetFunds,
     RejectGeneric,
     RejectFunds,
+    RejectedNoItems,
     Approve
 }
 public class CommonCashRegisterWithModulesActionPacket
