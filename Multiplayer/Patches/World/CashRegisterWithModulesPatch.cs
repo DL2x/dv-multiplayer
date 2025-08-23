@@ -37,6 +37,9 @@ public class CashRegisterWithModulesPatch
             return false;
         }
 
+        if (netCashRegister.IsShopRegister)
+            return true;
+
         CoroutineManager.Instance.StartCoroutine(netCashRegister.Buy());
 
         return false;
@@ -80,6 +83,9 @@ public class CashRegisterWithModulesPatch
             return false;
         }
 
+        if (netCashRegister.IsShopRegister)
+            return true;
+
         CoroutineManager.Instance.StartCoroutine(netCashRegister.Cancel());
 
         return false;
@@ -98,6 +104,9 @@ public class CashRegisterWithModulesPatch
             Multiplayer.LogWarning($"CashRegisterWithModules.Cancel_Postfix({__instance.GetObjectPath()}) NetworkedCashRegisterWithModules not found!");
             return;
         }
+
+        if (netCashRegister.IsShopRegister)
+            return;
 
         // Send cancel action to all clients
         NetworkLifecycle.Instance.Server.SendCashRegisterAction(new CommonCashRegisterWithModulesActionPacket

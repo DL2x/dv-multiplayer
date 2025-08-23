@@ -1,6 +1,7 @@
 using DV.CashRegister;
 using DV.Interaction;
 using DV.InventorySystem;
+using DV.Shops;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Utils;
@@ -31,6 +32,10 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
     public static void InitialiseCashRegisters()
     {
+        // Find all shop cash registers
+        var shopRegisters = GlobalShopController.Instance.globalShopList
+            .Select(shop => shop.cashRegister)
+            .ToArray();
 
         //Find all CashRegistersWithModules that are placed on the map
         //sort them by their hierarchy path for consistent ordering
@@ -47,6 +52,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         {
             var netRegister = register.GetOrAddComponent<NetworkedCashRegisterWithModules>();
             netRegister.CashRegister = register;
+            netRegister.IsShopRegister = shopRegisters.Contains(register);
 
             if (netRegister.NetId == 0)
                 netRegister.Awake();
@@ -69,7 +75,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
     bool isBuying;
 
     bool isCancelling;
-
+    public bool IsShopRegister { get; set; } = false;
     #endregion
 
     #region Common Variables
