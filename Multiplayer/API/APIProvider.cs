@@ -1,7 +1,9 @@
+using DV.Logic.Job;
 using MPAPI.Interfaces;
 using MPAPI.Types;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Train;
+using Multiplayer.Networking.Data;
 using System;
 
 namespace Multiplayer.API;
@@ -73,6 +75,16 @@ public class APIProvider : IMultiplayerAPI
             Multiplayer.LogWarning("APIProvider.UnregisterPaintTheme() called when server or client is not running");
             return;
         }
+    }
+
+    public bool RegisterTaskType<TGameTask>(TaskType taskType, Func<TGameTask, TaskNetworkData> converter, Func<TaskType, TaskNetworkData> emptyCreator) where TGameTask : Task
+    {
+        return TaskNetworkDataFactory.RegisterTaskType<TGameTask>(taskType, converter, emptyCreator);
+    }
+
+    public bool UnRegisterTaskType<TGameTask>(TaskType taskType) where TGameTask : Task
+    {
+        return TaskNetworkDataFactory.UnRegisterTaskType<TGameTask>(taskType);
     }
 
     #region Class Helpers

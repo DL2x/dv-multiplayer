@@ -1,3 +1,4 @@
+using DV.Logic.Job;
 using MPAPI.Types;
 using System;
 
@@ -101,5 +102,38 @@ public interface IMultiplayerAPI
     void UnregisterPaintTheme(uint themeId);
 
     /// <summary>
-    /// Returns 
+    /// Registers a serialiser and deserialiser for a custom <see cref="DV.Logic.Job.Task"/> type for multiplayer synchronization.
+    /// </summary>
+    /// <typeparam name="TGameTask">The concrete <see cref="DV.Logic.Job.Task"/> type to register.</typeparam>
+    /// <param name="taskType">The <see cref="DV.Logic.Job.TaskType"/> enum value</param>
+    /// <param name="converter">
+    /// A function that takes an instance of <typeparamref name="TGameTask"/> and returns a corresponding <see cref="TaskNetworkData"/> object
+    /// for serialisation.
+    /// </param>
+    /// <param name="emptyCreator">
+    /// A function that takes a <see cref="DV.Logic.Job.TaskType"/> and returns an empty <see cref="TaskNetworkData"/> instance for deserialisation.
+    /// </param>
+    /// <returns>
+    /// <c>true</c> if the task type was successfully registered; <c>false</c> if the task type was already registered or registration failed.
+    /// </returns>
+    /// <remarks>
+    /// This method allows the Multiplayer mod to correctly serialise and deserialise custom or extended task types.
+    /// </remarks>
+    bool RegisterTaskType<TGameTask>(TaskType taskType, Func<TGameTask, TaskNetworkData> converter, Func<TaskType, TaskNetworkData> emptyCreator)
+        where TGameTask : Task;
+
+    /// <summary>
+    /// Unregisters a previously registered custom <see cref="DV.Logic.Job.Task"/> type.
+    /// </summary>
+    /// <typeparam name="TGameTask">The concrete <see cref="DV.Logic.Job.Task"/> type to unregister.</typeparam>
+    /// <param name="taskType">The <see cref="DV.Logic.Job.TaskType"/> enum value associated with the task type to unregister.</param>
+    /// <returns>
+    /// <c>true</c> if the task type was successfully unregistered; <c>false</c> if the task type is a base game task type.
+    /// </returns>
+    /// <remarks>
+    /// This method allows removal of custom or extended task types from the multiplayer system. 
+    /// Base task types cannot be unregistered.
+    /// </remarks>
+    bool UnRegisterTaskType<TGameTask>(TaskType taskType) where TGameTask : Task;
+
 }
