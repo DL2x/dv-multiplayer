@@ -126,7 +126,7 @@ public interface IMultiplayerAPI
     /// Unregisters a previously registered custom <see cref="DV.Logic.Job.Task"/> type.
     /// </summary>
     /// <typeparam name="TGameTask">The concrete <see cref="DV.Logic.Job.Task"/> type to unregister.</typeparam>
-    /// <param name="taskType">The <see cref="DV.Logic.Job.TaskType"/> enum value associated with the task type to unregister.</param>
+    /// <param name="taskType">The <see cref="TaskType"/> enum value associated with the task type to unregister.</param>
     /// <returns>
     /// <c>true</c> if the task type was successfully unregistered; <c>false</c> if the task type is a base game task type.
     /// </returns>
