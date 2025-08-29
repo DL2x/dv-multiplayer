@@ -130,7 +130,7 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
         SerializeCommon(writer);
         writer.WriteUShortArray(CarNetIDs);
         writer.Write((byte)WarehouseTaskType);
-        writer.Write(WarehouseMachine);
+        writer.Write(WarehouseMachine ?? string.Empty);
         writer.Write((int)CargoType);
         writer.Write(CargoAmount);
         writer.Write(ReadyForMachine);
