@@ -15,7 +15,7 @@ public class ServerPlayerWrapper : IPlayer
     public ServerPlayerWrapper(ServerPlayer serverPlayer)
     {
         _serverPlayer = serverPlayer;
-        _isHost = NetworkLifecycle.Instance?.IsHost() ?? false;
+        _isHost = NetworkLifecycle.Instance?.IsHost(serverPlayer.Peer) ?? false;
     }
 
     public byte Id => _serverPlayer.Id;
