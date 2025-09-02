@@ -18,6 +18,7 @@ namespace Multiplayer.API
         public event Action<IPlayer> OnPlayerDisconnected;
 
         #region Client Properties
+        public byte PlayerId => client.PlayerId;
         public IReadOnlyCollection<IPlayer> Players => client.ClientPlayerManager.Players.Select(GetWrapper).ToList().AsReadOnly();
         public int PlayerCount => client.ClientPlayerManager.Players.Count + 1; // add 1 for local player
 
