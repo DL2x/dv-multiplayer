@@ -25,6 +25,7 @@ using Multiplayer.Networking.Packets.Clientbound.World;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Networking.Packets.Common.Train;
 using Multiplayer.Networking.Packets.Serverbound;
+using Multiplayer.Networking.Packets.Serverbound.Jobs;
 using Multiplayer.Networking.Packets.Serverbound.Train;
 using Multiplayer.Networking.Packets.Unconnected;
 using Multiplayer.Networking.TransportLayers;
@@ -35,6 +36,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using UnityEngine;
+
 
 namespace Multiplayer.Networking.Managers.Server;
 
@@ -168,6 +170,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, ITransportPeer>(OnCommonTrainPortsPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, ITransportPeer>(OnCommonTrainFusesPacket);
         netPacketProcessor.SubscribeReusable<ServerboundJobValidateRequestPacket, ITransportPeer>(OnServerboundJobValidateRequestPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundWarehouseMachineControllerRequestPacket, ITransportPeer>(OnServerboundWarehouseMachineControllerRequestPacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket, ITransportPeer>(OnCommonChatPacket);
         netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, ITransportPeer>(OnCommonItemChangePacket);
@@ -517,6 +520,22 @@ public class NetworkServer : NetworkManager
             CargoModelIndex = cargoModelIndex,
             WarehouseMachineId = logicCar.CargoOriginWarehouse?.ID
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
+    }
+
+    public void SendWarehouseControllerUpdate(ushort netId, bool isLoading, ushort jobNetId, ushort carNetId, CargoType cargoType, WarehouseMachineController.TextPreset preset)
+    {
+        LogDebug(() =>$"SendWarehouseControllerUpdate({netId}, {isLoading}, {jobNetId}, {carNetId}, {cargoType}, {preset})");
+
+        SendPacketToAll(new ClientboundWarehouseControllerUpdatePacket()
+        {
+            NetId = netId,
+            IsLoading = isLoading,
+            JobNetId = jobNetId,
+            CarNetId = carNetId,
+            CargoType = (ushort)cargoType,
+            Preset = (ushort)preset,
+        },
+        DeliveryMethod.Sequenced, SelfPeer);
     }
 
     public void SendCargoHealthUpdate(ushort netId, float currentHealth)
@@ -1038,8 +1057,8 @@ public class NetworkServer : NetworkManager
             //Car doesn't exist, tell client to delete it
             SendDestroyTrainCar(netTrainCar, peer);
         }
-
     }
+	
     //private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet, ITransportPeer peer)
     //{
     //    SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
@@ -1258,8 +1277,6 @@ public class NetworkServer : NetworkManager
         else
             LicenseManager.Instance.AcquireGeneralLicense(generalLicense);
     }
-
-
     private void OnServerboundJobValidateRequestPacket(ServerboundJobValidateRequestPacket packet, ITransportPeer peer)
     {
         Log($"OnServerboundJobValidateRequestPacket(): {packet.JobNetId}");
@@ -1298,6 +1315,30 @@ public class NetworkServer : NetworkManager
         }
 
         //SendPacket(peer, new ClientboundJobValidateResponsePacket { JobNetId = packet.JobNetId, Invalid = false }, DeliveryMethod.ReliableUnordered);
+    }
+
+    private void OnServerboundWarehouseMachineControllerRequestPacket(ServerboundWarehouseMachineControllerRequestPacket packet, ITransportPeer peer)
+    {
+        LogDebug(()=>$"ServerboundWarehouseMachineControllerRequestPacket(): {packet.NetId}");
+
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
+        {
+            LogWarning($"ServerboundWarehouseMachineControllerRequestPacket() ServerPlayer not found: {peer.Id}");
+            return;
+        }
+
+        //Todo: add check for player authorisation to use loading/uloading machines
+
+        //Find the warehouse
+        if(!NetworkedWarehouseMachineController.Get(packet.NetId, out var targetWarehouse))
+        {
+            LogWarning($"ServerboundWarehouseMachineControllerRequestPacket() WarehouseMachineController not found. NetId: {packet.NetId}");
+            return; 
+        }
+
+        //Todo: add check for player distance from machine
+
+        targetWarehouse.ServerProcessWarehouseAction(packet.WarehouseAction);
     }
 
     private void OnCommonChatPacket(CommonChatPacket packet, ITransportPeer peer)
