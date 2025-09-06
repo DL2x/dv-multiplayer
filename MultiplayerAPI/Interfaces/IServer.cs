@@ -30,6 +30,9 @@ public interface IServer
     /// <summary>
     /// Event fired when a player connects and is authenticated, but before the player receives game state information
     /// </summary>
+    /// <remarks>
+    /// Event is not triggered for the host player
+    /// </remarks>
     event Action<IPlayer> OnPlayerConnected;
 
     /// <summary>

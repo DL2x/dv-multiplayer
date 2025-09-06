@@ -802,8 +802,6 @@ public class NetworkServer : NetworkManager
         serverPlayers.Add(serverPlayer.PlayerId, serverPlayer);
         peerToPlayer.Add(peer, serverPlayer);
 
-        PlayerConnected?.Invoke(serverPlayer);
-
         ClientboundLoginResponsePacket acceptPacket = new()
         {
             Accepted = true,
@@ -823,6 +821,8 @@ public class NetworkServer : NetworkManager
             peer.Disconnect();
             return;
         }
+
+        PlayerConnected?.Invoke(player);
 
         //if (peers.ContainsKey((byte)peer.Id))
         //{
