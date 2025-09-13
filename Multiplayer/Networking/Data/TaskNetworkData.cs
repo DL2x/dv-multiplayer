@@ -3,10 +3,10 @@ using DV.ThingTypes;
 using MPAPI.Types;
 using MPAPI.Util;
 using Multiplayer.Components.Networking.Train;
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System;
 
 namespace Multiplayer.Networking.Data;
 
@@ -21,6 +21,8 @@ public static class TaskNetworkDataFactory
     public static bool RegisterTaskType<TGameTask>(TaskType taskType, Func<TGameTask, TaskNetworkData> converter, Func<TaskType, TaskNetworkData> emptyCreator)
         where TGameTask : Task
     {
+        Multiplayer.LogDebug(() => $"Registering Task Type {typeof(TGameTask)} with TaskType {taskType}");
+
         if (TypeToTaskNetworkData.Keys.Contains(typeof(TGameTask)) || EnumToEmptyTaskNetworkData.Keys.Contains(taskType))
         {
             Multiplayer.LogError($"Task Type {typeof(TGameTask)} already registered!");
@@ -36,7 +38,8 @@ public static class TaskNetworkDataFactory
     public static bool UnRegisterTaskType<TGameTask>(TaskType taskType)
         where TGameTask : Task
     {
-        if(baseTasks.Contains(typeof(TGameTask)) || baseTaskTypes.Contains(taskType))
+        Multiplayer.LogDebug(() => $"Unregistering Task Type {typeof(TGameTask)} with TaskType {taskType}");
+        if (baseTasks.Contains(typeof(TGameTask)) || baseTaskTypes.Contains(taskType))
         {
             Multiplayer.LogError($"Cannot unregister base task type {typeof(TGameTask)} with TaskType {taskType}");
             return false;
@@ -50,7 +53,7 @@ public static class TaskNetworkDataFactory
 
     public static TaskNetworkData ConvertTask(Task task)
     {
-        //Multiplayer.LogDebug(()=>$"TaskNetworkDataFactory.ConvertTask: Processing task of type {task.GetType()}");
+        Multiplayer.LogDebug(()=>$"TaskNetworkDataFactory.ConvertTask: Processing task of type {task.GetType()}");
         if (TypeToTaskNetworkData.TryGetValue(task.GetType(), out var converter))
         {
             return converter(task);
@@ -65,6 +68,7 @@ public static class TaskNetworkDataFactory
 
     public static TaskNetworkData ConvertTask(TaskType type)
     {
+        //Multiplayer.LogDebug(() => $"TaskNetworkDataFactory.ConvertTask({type})");
         if (EnumToEmptyTaskNetworkData.TryGetValue(type, out var creator))
         {
             return creator(type);
@@ -180,7 +184,9 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
            WarehouseTaskType,
            JobSaveManager.Instance.GetWarehouseMachineWithId(WarehouseMachine),
            CargoType,
-           CargoAmount
+           CargoAmount,
+           (long)TimeLimit,
+           IsLastTask
        );
 
         newWareTask.readyForMachine = ReadyForMachine;
@@ -295,7 +301,9 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
             cars,
             RailTrackRegistry.Instance.GetTrackWithName(DestinationTrack).LogicTrack(),
             RailTrackRegistry.Instance.GetTrackWithName(StartingTrack).LogicTrack(),
-            TransportedCargoPerCar?.ToList()
+            TransportedCargoPerCar?.ToList(),
+            (long)TimeLimit,
+            IsLastTask
         );
     }
 
@@ -378,16 +386,23 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
         List<Task> tasks = [];
 
         foreach (var task in Tasks)
-        {
-            //Multiplayer.LogDebug(() => $"SequentialTask.ToTask() task not null: {task != null}");
-
             tasks.Add(task.ToTask());
+
+        SequentialTasks newSeqTask = new(tasks, (long)TimeLimit);
+
+        // Rebuild linked list task states - this is the equivalent of OverrideTasksStates(TaskSaveData[] tasksData)
+        int index = 0;
+        for (var currentNode = newSeqTask.tasks.First; currentNode != null; currentNode = currentNode.Next)
+        {
+            currentNode.Value.state = tasks[index].state;
+            currentNode.Value.taskStartTime = tasks[index].taskStartTime;
+            currentNode.Value.taskFinishTime = tasks[index].taskFinishTime;
+
+            if (tasks[index].state == TaskState.Done && currentNode != newSeqTask.tasks.Last)
+                newSeqTask.currentTask = currentNode.Next;
+
+            index++;
         }
-
-        SequentialTasks newSeqTask = new SequentialTasks(Tasks.Select(t => t.ToTask()).ToList());
-
-        if (CurrentTaskIndex <= newSeqTask.tasks.Count())
-            newSeqTask.currentTask = new LinkedListNode<Task>(newSeqTask.tasks.ToArray()[CurrentTaskIndex]);
 
         return newSeqTask;
     }
@@ -446,7 +461,7 @@ public class ParallelTasksData : TaskNetworkData<ParallelTasksData>
 
     public override Task ToTask()
     {
-        return new ParallelTasks(Tasks.Select(t => t.ToTask()).ToList());
+        return new ParallelTasks(Tasks.Select(t => t.ToTask()).ToList(), (long)TimeLimit, IsLastTask);
     }
 
     public override List<ushort> GetCars()
