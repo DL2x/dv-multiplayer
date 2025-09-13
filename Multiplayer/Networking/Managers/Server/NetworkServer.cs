@@ -1,47 +1,48 @@
-using DV;
 using DV.InventorySystem;
 using DV.Logic.Job;
 using DV.Scenarios.Common;
 using DV.ServicePenalty;
 using DV.ThingTypes;
 using DV.WeatherSystem;
+using DV;
 using Humanizer;
-using LiteNetLib;
 using LiteNetLib.Utils;
+using LiteNetLib;
 using MPAPI.Interfaces.Packets;
 using MPAPI.Types;
 using Multiplayer.API;
-using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
-using Multiplayer.Networking.Data;
+using Multiplayer.Components.Networking;
 using Multiplayer.Networking.Data.Train;
-using Multiplayer.Networking.Packets.Clientbound;
+using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
 using Multiplayer.Networking.Packets.Clientbound.Train;
 using Multiplayer.Networking.Packets.Clientbound.World;
-using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Common.Train;
-using Multiplayer.Networking.Packets.Serverbound;
+using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Networking.Packets.Serverbound.Jobs;
 using Multiplayer.Networking.Packets.Serverbound.Train;
+using Multiplayer.Networking.Packets.Serverbound;
 using Multiplayer.Networking.Packets.Unconnected;
 using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System;
 using UnityEngine;
-
 
 namespace Multiplayer.Networking.Managers.Server;
 
 public class NetworkServer : NetworkManager
 {
+    private const int WEATHER_UPDATE_INTERVAL = 30; //seconds
+
     public Action<ServerPlayer> PlayerConnected;
     public Action<ServerPlayer> PlayerDisconnected;
     public Action<ServerPlayer> PlayerReady;
@@ -81,6 +82,8 @@ public class NetworkServer : NetworkManager
 
     private readonly ChatManager _chatManager = new();
     public ChatManager ChatManager => _chatManager;
+
+    private uint lastTick;
 
     public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData) : base(settings)
     {
@@ -132,6 +135,8 @@ public class NetworkServer : NetworkManager
         //Reset player ID pool
         foreach (var player in serverPlayers.Values)
             player.Dispose();
+
+        NetworkLifecycle.Instance.OnTick -= OnTick;
 
         base.Stop();
     }
@@ -221,6 +226,21 @@ public class NetworkServer : NetworkManager
             {
                 System.Console.WriteLine("Connection is not established.");
             }
+        }
+
+        lastTick = NetworkLifecycle.Instance.Tick;
+        NetworkLifecycle.Instance.OnTick += OnTick;
+    }
+
+    private void OnTick(uint tick)
+    {
+        if (!IsLoaded)
+            return;
+
+        if ((NetworkLifecycle.Instance.Tick - lastTick) > NetworkLifecycle.TICK_RATE * WEATHER_UPDATE_INTERVAL)
+        {
+            SendWeatherState();
+            lastTick = NetworkLifecycle.Instance.Tick;
         }
     }
 
@@ -408,6 +428,16 @@ public class NetworkServer : NetworkManager
     public void SendGameParams(GameParams gameParams)
     {
         SendPacketToAll(ClientboundGameParamsPacket.FromGameParams(gameParams), DeliveryMethod.ReliableOrdered, SelfPeer);
+    }
+
+    public void SendWeatherState(ITransportPeer peer = null)
+    {
+        var packet = WeatherDriver.Instance.GetSaveData(Globals.G.GameParams.WeatherEditorAlwaysAllowed).ToObject<ClientboundWeatherPacket>();
+
+        if (peer != null)
+            SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
+        else
+            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 
     public void SendSpawnTrainset(List<TrainCar> set, bool autoCouple, bool sendToAll, ITransportPeer sendTo = null)
@@ -905,7 +935,7 @@ public class NetworkServer : NetworkManager
         SendPacket(peer, new ClientboundBeginWorldSyncPacket(), DeliveryMethod.ReliableOrdered);
 
         // Send weather state
-        SendPacket(peer, WeatherDriver.Instance.GetSaveData(Globals.G.GameParams.WeatherEditorAlwaysAllowed).ToObject<ClientboundWeatherPacket>(), DeliveryMethod.ReliableOrdered);
+        SendWeatherState(peer);
 
         // Send junctions and turntables
         SendPacket(peer, new ClientboundRailwayStatePacket
