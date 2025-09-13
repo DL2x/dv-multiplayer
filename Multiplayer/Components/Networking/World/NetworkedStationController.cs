@@ -340,6 +340,9 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         }
         else if (networkedJob.Job.State == JobState.InProgress)
         {
+            StationController.logicStation.AddJobToStation(newJob);
+            StationController.processedNewJobs.Add(newJob);
+
             takenJobs.Add(newJob);
             newJob.TakeJob(true); //take job as if loaded from save to prevent debt controller kicking in
         }
