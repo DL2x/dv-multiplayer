@@ -778,16 +778,19 @@ public class NetworkClient : NetworkManager
             return;
         }
 
-        if (packet.CargoType == (ushort)CargoType.None && logicCar.CurrentCargoTypeInCar == CargoType.None)
         if (packet.CargoType == CargoType.None && logicCar.CurrentCargoTypeInCar == CargoType.None)
             return;
 
         //packet.CargoAmount is the total amount, not the amount to load/unload
         float cargoAmount = Mathf.Clamp(packet.CargoAmount, 0, logicCar.capacity);
 
-        // todo: cache warehouse machine
-        WarehouseMachine warehouse = string.IsNullOrEmpty(packet.WarehouseMachineId) ? null : JobSaveManager.Instance.GetWarehouseMachineWithId(packet.WarehouseMachineId);
+        WarehouseMachine warehouseMachine = null;
         if (packet.WarehouseMachineNetId != 0 && (!NetworkedWarehouseMachineController.TryGet(packet.WarehouseMachineNetId, out warehouseMachine) || warehouseMachine == null))
+        {
+            LogWarning($"OnClientboundCargoStatePacket() Failed to find WarehouseMachine for netId {packet.WarehouseMachineNetId}");
+            return;
+        }
+
         if (packet.IsLoading)
         {
             LogDebug(() => $"OnClientboundCargoStatePacket() Loading cargo: {packet.CargoType} into {networkedTrainCar.CurrentID}, current amount: {packet.CargoAmount}");
@@ -796,12 +799,10 @@ public class NetworkClient : NetworkManager
                 return;
 
             //We need either no cargo or the same cargo - if it's different, we need to remove it first
-            if (logicCar.CurrentCargoTypeInCar != CargoType.None && logicCar.CurrentCargoTypeInCar != (CargoType)packet.CargoType)
             if (logicCar.CurrentCargoTypeInCar != CargoType.None && logicCar.CurrentCargoTypeInCar != packet.CargoType)
                 logicCar.DumpCargo();
 
             //We have the correct cargo, but not the right amount, calculate the delta
-            if (logicCar.CurrentCargoTypeInCar == (CargoType)packet.CargoType)
             if (logicCar.CurrentCargoTypeInCar == packet.CargoType)
                 cargoAmount -= logicCar.LoadedCargoAmount;
 
