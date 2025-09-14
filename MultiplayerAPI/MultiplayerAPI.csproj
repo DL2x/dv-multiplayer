@@ -34,6 +34,14 @@
         </AssemblyAttribute>
     </ItemGroup>
 
+    <ItemGroup>
+        <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <Publicize Include="Assembly-CSharp" IncludeCompilerGeneratedMembers="false" />
+    </ItemGroup>
+
     <!-- Derail Valley References -->
     <ItemGroup>
         <Reference Include="Assembly-CSharp" />

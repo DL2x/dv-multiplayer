@@ -134,6 +134,6 @@ public interface IMultiplayerAPI
     /// This method allows removal of custom or extended task types from the multiplayer system. 
     /// Base task types cannot be unregistered.
     /// </remarks>
-    bool UnRegisterTaskType<TGameTask>(TaskType taskType) where TGameTask : Task;
+    bool UnregisterTaskType<TGameTask>(TaskType taskType) where TGameTask : Task;
 
 }

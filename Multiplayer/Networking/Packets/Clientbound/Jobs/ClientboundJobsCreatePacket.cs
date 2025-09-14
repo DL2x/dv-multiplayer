@@ -1,7 +1,8 @@
-using System.Collections.Generic;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Data;
+using System.Collections.Generic;
+
 namespace Multiplayer.Networking.Packets.Clientbound.Jobs;
 
 public class ClientboundJobsCreatePacket

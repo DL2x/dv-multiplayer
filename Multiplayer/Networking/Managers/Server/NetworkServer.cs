@@ -690,6 +690,19 @@ public class NetworkServer : NetworkManager
         SendPacketToAll(ClientboundJobsUpdatePacket.FromNetworkedJobs(stationNetId, jobs), DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 
+    public void SendTaskUpdate(ushort netId, ushort taskNetId, TaskState newState, float taskStartTime, float taskFinishTime)
+    {
+        Multiplayer.Log($"Sending TaskUpdate for jobNetId {netId}, taskNetId {taskNetId}, newState {newState}");
+        SendPacketToAll(new ClientboundTaskUpdatePacket
+        {
+            JobNetId = netId,
+            TaskNetId = taskNetId,
+            NewState = newState,
+            TaskStartTime = taskStartTime,
+            TaskFinishTime = taskFinishTime
+        }, DeliveryMethod.ReliableOrdered, SelfPeer);
+    }
+
     public void SendItemsChangePacket(List<ItemUpdateData> items, ServerPlayer player)
     {
         Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items to {player.Username}");

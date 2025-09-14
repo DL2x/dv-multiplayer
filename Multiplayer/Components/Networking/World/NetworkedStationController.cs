@@ -1,16 +1,15 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using DV.Booklets;
 using DV.Logic.Job;
 using DV.ServicePenalty;
-using DV.Utils;
 using DV.ThingTypes;
+using DV.Utils;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
 using Multiplayer.Utils;
+using System.Collections.Generic;
+using System.Collections;
+using System;
 using UnityEngine;
 
 namespace Multiplayer.Components.Networking.World;
@@ -321,10 +320,21 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
 
     private void AddJob(JobData jobData)
     {
-        Job newJob = JobData.ToJob(jobData);
+        var newJobData = JobData.ToJob(jobData);
+
+        Job newJob = newJobData.newJob;
+        var netIdToTask = newJobData.netIdToTask;
+
         var carNetIds = jobData.GetCars();
 
         NetworkedJob networkedJob = CreateNetworkedJob(newJob, jobData.NetID, carNetIds);
+
+        foreach(var kvp in netIdToTask)
+        {
+            ushort netTaskId = kvp.Key;
+            Task task = kvp.Value;
+            networkedJob.AddTask(netTaskId, task);
+        }
 
         NetworkedJobs.Add(networkedJob);
 
@@ -612,7 +622,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
 
     private void GenerateOverview(NetworkedJob networkedJob, ushort itemNetId, ItemPositionData posData)
     {
-        Multiplayer.Log($"GenerateOverview({networkedJob.Job.ID}, {itemNetId}) Position: {posData.Position}, Less currentMove: {posData.Position + WorldMover.currentMove} ");
+        Multiplayer.Log($"GenerateOverview([{networkedJob.Job.ID},{networkedJob.Job.jobType}], {itemNetId}) Position: {posData.Position}, Less currentMove: {posData.Position + WorldMover.currentMove}");
         JobOverview jobOverview = BookletCreator_JobOverview.Create(networkedJob.Job, posData.Position + WorldMover.currentMove, posData.Rotation,WorldMover.OriginShiftParent);
 
         NetworkedItem netItem = jobOverview.GetOrAddComponent<NetworkedItem>();

@@ -1,14 +1,10 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
 using DV.Logic.Job;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Data;
-using Newtonsoft.Json.Linq;
-using UnityEngine;
-
+using Multiplayer.Utils;
+using System.Collections.Generic;
+using System.Linq;
+using System;
 
 namespace Multiplayer.Components.Networking.Jobs;
 
@@ -57,6 +53,9 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     }
 
     #endregion
+
+    private static readonly Dictionary<Job, List<Task>> pendingJobTasks = [];
+
     protected override bool IsIdServerAuthoritative => true;
     public enum DirtyCause
     {
@@ -139,12 +138,15 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
 
     public List<ushort> JobCars = [];
 
+    private readonly IdPool<ushort> idPool = new();
+    private readonly Dictionary<ushort, Task> taskMap = [];
+
     protected override void Awake()
     {
         base.Awake();
     }
 
-    private void Start()
+    protected void Start()
     {
         if (Job != null)
         {
@@ -171,6 +173,13 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         if (gameObject.activeInHierarchy)
         {
             AddToCache();
+        }
+
+        //Check for any pending tasks that were added before the NetworkedJob was created
+        if(pendingJobTasks.TryGetValue(job, out var taskList) && taskList != null)
+        {
+            taskList.ForEach(t => AddTask(t));
+            pendingJobTasks.Remove(job);
         }
     }
 
@@ -245,7 +254,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         JobReports.Clear();
     }
 
-    private void OnDisable()
+    protected void OnDisable()
     {
         if (UnloadWatcher.isQuitting || UnloadWatcher.isUnloading)
             return;
@@ -262,5 +271,59 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         Job.JobExpired -= OnJobExpired;
 
         Destroy(this);
+    }
+
+    public static void EnqueTask(Task task)
+    {
+        if (!pendingJobTasks.TryGetValue(task.Job, out var taskList))
+        {
+            taskList = [];
+            pendingJobTasks[task.Job] = taskList;
+        }
+        taskList.Add(task);
+    }
+
+    private void AddTask(Task task)
+    {
+        if (taskMap.Values.Contains(task))
+            return;
+
+        var netId = idPool.NextId;
+
+        Multiplayer.LogDebug(() => $"NetworkedJob.AddTask() JobId: [{Job.ID}, {NetId}], TaskType: {task.InstanceTaskType}, taskNetId: {netId}");
+        taskMap[netId] = task;
+    }
+
+    public void AddTask(ushort netId, Task task)
+    {
+        if (taskMap.Values.Contains(task))
+            return;
+
+        if (taskMap.ContainsKey(netId))
+        {
+            Multiplayer.LogError($"NetworkedJob.AddTask({task.InstanceTaskType}) Attempted to add a task with duplicate netId: {netId} JobId: [{Job.ID}, {NetId}]");
+            return;
+        }
+
+        Multiplayer.LogDebug(() => $"NetworkedJob.AddTask({netId}, {task.InstanceTaskType}) JobId: [{Job.ID}, {NetId}]");
+
+        taskMap[netId] = task;
+    }
+
+    public ushort GetTaskNetId(Task task)
+    {
+        foreach (var kvp in taskMap)
+        {
+            if (kvp.Value == task)
+                return kvp.Key;
+        }
+        return 0;
+    }
+
+    public Task GetTaskFromNetId(ushort netId)
+    {
+        if (taskMap.TryGetValue(netId, out var task))
+            return task;
+        return null;
     }
 }

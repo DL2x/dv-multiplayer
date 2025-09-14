@@ -82,9 +82,9 @@ public class APIProvider : IMultiplayerAPI
         return TaskNetworkDataFactory.RegisterTaskType<TGameTask>(taskType, converter, emptyCreator);
     }
 
-    public bool UnRegisterTaskType<TGameTask>(TaskType taskType) where TGameTask : Task
+    public bool UnregisterTaskType<TGameTask>(TaskType taskType) where TGameTask : Task
     {
-        return TaskNetworkDataFactory.UnRegisterTaskType<TGameTask>(taskType);
+        return TaskNetworkDataFactory.UnregisterTaskType<TGameTask>(taskType);
     }
 
     #region Class Helpers

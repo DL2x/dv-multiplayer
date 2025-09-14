@@ -2,6 +2,7 @@ using DV.Logic.Job;
 using DV.ThingTypes;
 using MPAPI.Types;
 using MPAPI.Util;
+using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using System.Collections.Generic;
 using System.IO;
@@ -35,7 +36,7 @@ public static class TaskNetworkDataFactory
         return true;
     }
 
-    public static bool UnRegisterTaskType<TGameTask>(TaskType taskType)
+    public static bool UnregisterTaskType<TGameTask>(TaskType taskType)
         where TGameTask : Task
     {
         Multiplayer.LogDebug(() => $"Unregistering Task Type {typeof(TGameTask)} with TaskType {taskType}");
@@ -53,10 +54,22 @@ public static class TaskNetworkDataFactory
 
     public static TaskNetworkData ConvertTask(Task task)
     {
-        Multiplayer.LogDebug(()=>$"TaskNetworkDataFactory.ConvertTask: Processing task of type {task.GetType()}");
+        Multiplayer.LogDebug(() => $"TaskNetworkDataFactory.ConvertTask: Processing task of type {task.InstanceTaskType}");
         if (TypeToTaskNetworkData.TryGetValue(task.GetType(), out var converter))
         {
-            return converter(task);
+            var taskData = converter(task);
+
+            if (NetworkedJob.TryGetFromJob(task.Job, out var netJob) && netJob != null)
+            {
+                var taskNetId = netJob.GetTaskNetId(task);
+                taskData.TaskNetId = taskNetId;
+            }
+            else
+            {
+                Multiplayer.LogError($"TaskNetworkDataFactory.ConvertTask: Could not find NetworkedJob for jobId: {task.Job.ID}, taskType: {task.InstanceTaskType}");
+            }
+
+            return taskData;
         }
         throw new ArgumentException($"Unknown task type: {task.GetType()}");
     }
@@ -156,6 +169,8 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
         if (task is not WarehouseTask warehouseTask)
             throw new ArgumentException("Task is not a WarehouseTask");
 
+        FromTaskCommon(task);
+
         CarNetIDs = warehouseTask.cars
             .Select(car => NetworkedTrainCar.GetFromTrainId(car.ID, out var networkedTrainCar)
                 ? networkedTrainCar.NetId
@@ -170,16 +185,16 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
         return this;
     }
 
-    public override Task ToTask()
+    public override Task ToTask(ref Dictionary<ushort, Task> netIdToTask)
     {
-
         List<Car> cars = CarNetIDs
             .Select(netId => NetworkedTrainCar.TryGet(netId, out TrainCar trainCar) ? trainCar : null)
             .Where(car => car != null)
             .Select(car => car.logicCar)
             .ToList();
 
-        WarehouseTask newWareTask = new WarehouseTask(
+        WarehouseTask newWarehouseTask = new
+        (
            cars,
            WarehouseTaskType,
            JobSaveManager.Instance.GetWarehouseMachineWithId(WarehouseMachine),
@@ -187,11 +202,15 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
            CargoAmount,
            (long)TimeLimit,
            IsLastTask
-       );
+        );
 
-        newWareTask.readyForMachine = ReadyForMachine;
+        ToTaskCommon(newWarehouseTask);
 
-        return newWareTask;
+        newWarehouseTask.readyForMachine = ReadyForMachine;
+
+        netIdToTask.Add(TaskNetId, newWarehouseTask);
+
+        return newWarehouseTask;
     }
 
     public override List<ushort> GetCars()
@@ -270,6 +289,8 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
         if (task is not TransportTask transportTask)
             throw new ArgumentException("Task is not a TransportTask");
 
+        FromTaskCommon(task);
+
         //Multiplayer.LogDebug(() => $"TransportTaskData.FromTask() CarNetIDs count: {transportTask.cars.Count()}, Values: [{string.Join(", ", transportTask.cars.Select(car => car.ID))}]");
         CarNetIDs = transportTask.cars
             .Select(car => NetworkedTrainCar.GetFromTrainId(car.ID, out var networkedTrainCar)
@@ -288,16 +309,15 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
         return this;
     }
 
-    public override Task ToTask()
+    public override Task ToTask(ref Dictionary<ushort, Task> netIdToTask)
     {
-        //Multiplayer.LogDebug(() => $"TransportTaskData.ToTask() CarNetIDs !null {CarNetIDs != null}, count: {CarNetIDs?.Length}");
-
         List<Car> cars = CarNetIDs
             .Select(netId => NetworkedTrainCar.TryGet(netId, out TrainCar trainCar) ? trainCar.logicCar : null)
             .Where(car => car != null)
             .ToList();
 
-        return new TransportTask(
+        var newTransportTask = new TransportTask
+        (
             cars,
             RailTrackRegistry.Instance.GetTrackWithName(DestinationTrack).LogicTrack(),
             RailTrackRegistry.Instance.GetTrackWithName(StartingTrack).LogicTrack(),
@@ -305,6 +325,12 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
             (long)TimeLimit,
             IsLastTask
         );
+
+        ToTaskCommon(newTransportTask);
+
+        netIdToTask.Add(TaskNetId, newTransportTask);
+
+        return newTransportTask;
     }
 
     public override List<ushort> GetCars()
@@ -350,7 +376,6 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
         }
 
         CurrentTaskIndex = reader.ReadByte();
-
     }
 
     public override SequentialTasksData FromTask(Task task)
@@ -358,7 +383,7 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
         if (task is not SequentialTasks sequentialTasks)
             throw new ArgumentException("Task is not a SequentialTasks");
 
-        //Multiplayer.Log($"SequentialTasksData.FromTask() {sequentialTasks.tasks.Count}");
+        FromTaskCommon(task);
 
         Tasks = TaskNetworkDataFactory.ConvertTasks(sequentialTasks.tasks);
 
@@ -381,30 +406,37 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
         return this;
     }
 
-    public override Task ToTask()
+    public override Task ToTask(ref Dictionary<ushort, Task> netIdToTask)
     {
         List<Task> tasks = [];
 
         foreach (var task in Tasks)
-            tasks.Add(task.ToTask());
+        {
+            var taskResults = task.ToTask(ref netIdToTask);
+            tasks.Add(taskResults);
+        }
 
-        SequentialTasks newSeqTask = new(tasks, (long)TimeLimit);
+        SequentialTasks newSequentialTask = new(tasks, (long)TimeLimit);
+
+        ToTaskCommon(newSequentialTask);
+
+        netIdToTask.Add(TaskNetId, newSequentialTask);
 
         // Rebuild linked list task states - this is the equivalent of OverrideTasksStates(TaskSaveData[] tasksData)
         int index = 0;
-        for (var currentNode = newSeqTask.tasks.First; currentNode != null; currentNode = currentNode.Next)
+        for (var currentNode = newSequentialTask.tasks.First; currentNode != null; currentNode = currentNode.Next)
         {
             currentNode.Value.state = tasks[index].state;
             currentNode.Value.taskStartTime = tasks[index].taskStartTime;
             currentNode.Value.taskFinishTime = tasks[index].taskFinishTime;
 
-            if (tasks[index].state == TaskState.Done && currentNode != newSeqTask.tasks.Last)
-                newSeqTask.currentTask = currentNode.Next;
+            if (tasks[index].state == TaskState.Done && currentNode != newSequentialTask.tasks.Last)
+                newSequentialTask.currentTask = currentNode.Next;
 
             index++;
         }
 
-        return newSeqTask;
+        return newSequentialTask;
     }
 
     public override List<ushort> GetCars()
@@ -454,14 +486,27 @@ public class ParallelTasksData : TaskNetworkData<ParallelTasksData>
         if (task is not ParallelTasks parallelTasks)
             throw new ArgumentException("Task is not a ParallelTasks");
 
+        FromTaskCommon(task);
+
         Tasks = TaskNetworkDataFactory.ConvertTasks(parallelTasks.tasks);
 
         return this;
     }
 
-    public override Task ToTask()
+    public override Task ToTask(ref Dictionary<ushort, Task> netIdToTask)
     {
-        return new ParallelTasks(Tasks.Select(t => t.ToTask()).ToList(), (long)TimeLimit, IsLastTask);
+        List<Task> taskList = new(Tasks.Length);
+
+        for (int i = 0; i < Tasks.Length; i++)
+            taskList.Add(Tasks[i].ToTask(ref netIdToTask));
+
+        var newParallelTasks = new ParallelTasks(taskList, (long)TimeLimit, IsLastTask);
+
+        ToTaskCommon(newParallelTasks);
+
+        netIdToTask.Add(TaskNetId, newParallelTasks);
+
+        return newParallelTasks;
     }
 
     public override List<ushort> GetCars()

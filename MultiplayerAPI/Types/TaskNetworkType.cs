@@ -9,9 +9,13 @@ namespace MPAPI.Types;
 /// Base class for serialising and deserialising job task data for transmission by Multiplayer mod.
 /// Not intended for direct use; inherit via <see cref="TaskNetworkData{T}"/>.
 /// </summary>
-/// <remarks>
 public abstract class TaskNetworkData
 {
+    /// <summary>
+    /// Gets or sets the unique network identifier for this task within its job.
+    /// </summary>
+    public ushort TaskNetId { get; set; }
+
     /// <summary>
     /// Gets or sets the current state of the task.
     /// See <see cref="TaskState"/> for possible values.
@@ -65,11 +69,19 @@ public abstract class TaskNetworkData
     public abstract void Deserialize(BinaryReader reader);
 
     /// <summary>
-    /// Converts this network data instance into a <see cref="Task"/> object
-    /// compatible with the job/task system.
+    /// Converts this <see cref="TaskNetworkData"/> instance into a <see cref="Task"/> object
+    /// compatible with the job/task system, and adds them to the provided dictionary.
     /// </summary>
+    /// <param name="netIdToTask">
+    /// A reference to a <see cref="Dictionary{ushort, Task}"/> that will be populated with deserialized <see cref="Task"/> instances.
+    /// Each key is a netTaskId (<c>ushort</c>), and each value is the corresponding <see cref="Task"/> object.
+    /// </param>
     /// <returns>A <see cref="Task"/> instance representing the deserialized data.</returns>
-    public abstract Task ToTask();
+    /// <remarks>
+    /// Implementations should add all relevant <see cref="Task"/> instances to <paramref name="netIdToTask"/>.
+    /// This allows aggregation of multiple tasks from different <see cref="TaskNetworkData"/> objects into a single dictionary.
+    /// </remarks>
+    public abstract Task ToTask(ref Dictionary<ushort, Task> netIdToTask);
 
     /// <summary>
     /// Gets a list of car IDs (<see cref="ushort"/>) associated with this task.
@@ -94,12 +106,41 @@ public abstract class TaskNetworkData<T> : TaskNetworkData where T : TaskNetwork
     public abstract T FromTask(Task task);
 
     /// <summary>
+    /// Extracts and populates the common task data fields from the specified <see cref="Task"/> object.
+    /// Should be called as the first step in the <c>FromTask</c> implementation of derived classes.
+    /// </summary>
+    /// <param name="task">The <see cref="Task"/> to extract data from.</param>
+    protected void FromTaskCommon(Task task)
+    {
+        State = task.state;
+        TaskStartTime = task.taskStartTime;
+        TaskFinishTime = task.taskFinishTime;
+        IsLastTask = task.IsLastTask;
+        TimeLimit = task.TimeLimit;
+    }
+
+    /// <summary>
+    /// Populates common task data fields to the specified <see cref="Task"/> object.
+    /// Should be called after the new task has been instantiated <c>ToTask</c> implementation of derived classes.
+    /// </summary>
+    /// <param name="task">The <see cref="Task"/> to populate.</param>
+    protected void ToTaskCommon(Task task)
+    {
+        task.state = State;
+        task.taskStartTime = TaskStartTime;
+        task.taskFinishTime = TaskFinishTime;
+        task.isLastTask = IsLastTask;
+        task.TimeLimit = TimeLimit;
+    }
+
+    /// <summary>
     /// Serialises the common task data fields to the specified <see cref="BinaryWriter"/>.
     /// Should be called as the first step in the <c>Serialize</c> implementation of derived classes.
     /// </summary>
     /// <param name="writer">The <see cref="BinaryWriter"/> to write data to.</param>
     protected void SerializeCommon(BinaryWriter writer)
     {
+        writer.Write(TaskNetId);
         writer.Write((byte)State);
         writer.Write(TaskStartTime);
         writer.Write(TaskFinishTime);
@@ -116,6 +157,7 @@ public abstract class TaskNetworkData<T> : TaskNetworkData where T : TaskNetwork
     /// <param name="reader">The <see cref="BinaryReader"/> to read data from.</param>
     protected void DeserializeCommon(BinaryReader reader)
     {
+        TaskNetId = reader.ReadUInt16();
         State = (TaskState)reader.ReadByte();
         TaskStartTime = reader.ReadSingle();
         TaskFinishTime = reader.ReadSingle();

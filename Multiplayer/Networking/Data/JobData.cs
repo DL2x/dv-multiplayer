@@ -1,14 +1,13 @@
-using DV.Logic.Job;
-using DV.ThingTypes;
-using LiteNetLib.Utils;
-using MPAPI.Types;
-using Multiplayer.Components.Networking;
-using Multiplayer.Components.Networking.Jobs;
-using Multiplayer.Components.Networking.World;
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.IO;
+using System.Collections.Generic;
+using Multiplayer.Components.Networking.World;
+using Multiplayer.Components.Networking.Jobs;
+using MPAPI.Types;
+using LiteNetLib.Utils;
+using DV.ThingTypes;
+using DV.Logic.Job;
 
 namespace Multiplayer.Networking.Data;
 
@@ -80,9 +79,12 @@ public class JobData
         };
     }
 
-    public static Job ToJob(JobData jobData)
+    public static (Job newJob, Dictionary<ushort, Task> netIdToTask) ToJob(JobData jobData)
     {
-        List<Task> tasks = jobData.Tasks.Select(taskData => taskData.ToTask()).ToList();
+        Dictionary<ushort, Task> netIdToTask = [];
+
+        List<Task> tasks = jobData.Tasks.Select(taskData => taskData.ToTask(ref netIdToTask)).ToList();
+
         StationsChainData chainData = new(jobData.ChainData.ChainOriginYardId, jobData.ChainData.ChainDestinationYardId);
 
         Job newJob = new(tasks, jobData.JobType, jobData.TimeLimit, jobData.InitialWage, chainData, jobData.ID, jobData.RequiredLicenses)
@@ -92,7 +94,7 @@ public class JobData
             State = jobData.State,
         };
 
-        return newJob;
+        return new (newJob, netIdToTask);
     }
 
     public static void Serialize(NetDataWriter writer, JobData data)

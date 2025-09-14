@@ -171,7 +171,10 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundJobsUpdatePacket>(OnClientboundJobsUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundJobsCreatePacket>(OnClientboundJobsCreatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundJobValidateResponsePacket>(OnClientboundJobValidateResponsePacket);
+        netPacketProcessor.SubscribeReusable<ClientboundTaskUpdatePacket>(OnClientboundTaskUpdatePacket);
+
         netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
+
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket>(OnCommonItemChangePacket);
     }
 
@@ -973,6 +976,29 @@ public class NetworkClient : NetworkManager
         networkedStationController.UpdateJobs(packet.JobUpdates);
     }
 
+    private void OnClientboundTaskUpdatePacket(ClientboundTaskUpdatePacket packet)
+    {
+        if (NetworkLifecycle.Instance.IsHost())
+            return;
+
+        if (!NetworkedJob.Get(packet.JobNetId, out NetworkedJob networkedJob) || networkedJob == null)
+        {
+            LogError($"Received task update for jobNetId {packet.JobNetId}, but job was not found!");
+            return;
+        }
+
+        var task = networkedJob.GetTaskFromNetId(packet.TaskNetId);
+
+        if (task == null)
+        {
+            LogError($"Received task update for job [{networkedJob.Job.ID}, {packet.JobNetId}], with taskNetId {packet.TaskNetId}, task was not found");
+            return;
+        }
+
+        task.SetState(packet.NewState);
+        task.taskStartTime = packet.TaskStartTime;
+        task.taskFinishTime = packet.TaskFinishTime;
+    }
 
     private void OnClientboundJobValidateResponsePacket(ClientboundJobValidateResponsePacket packet)
     {
