@@ -426,11 +426,12 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
             if (!NetworkedJob.Get(job.JobNetID, out NetworkedJob netJob))
                 continue;
 
+            netJob.Job.startTime = job.StartTime;
+            netJob.Job.finishTime = job.FinishTime;
+
             UpdateJobState(netJob, job);
             UpdateJobOverview(netJob, job);
 
-            netJob.Job.startTime = job.StartTime;
-            netJob.Job.finishTime = job.FinishTime;
         }
     }
 
