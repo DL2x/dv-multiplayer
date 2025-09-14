@@ -24,7 +24,6 @@ public class NetworkedWarehouseMachineController : IdMonoBehaviour<ushort, Netwo
         return b;
     }
 
-    public static NetworkedWarehouseMachineController GetFromWarehouseMachineController(WarehouseMachineController warehouseMachineController)
     public static bool TryGetNetId(WarehouseMachineController warehouseMachineController, out ushort netId)
     {
         if (GetFromWarehouseMachineController(warehouseMachineController, out var networkedWarehouseMachineController))
