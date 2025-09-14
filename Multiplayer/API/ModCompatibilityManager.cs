@@ -33,6 +33,9 @@ public class ModCompatibilityManager : SingletonBehaviour<ModCompatibilityManage
         RegisterCompatibility("BookletOrganizer", MultiplayerCompatibility.Client);
         RegisterCompatibility("RemoteDispatch", MultiplayerCompatibility.Client);
         RegisterCompatibility("DVDiscordPresenceMod", MultiplayerCompatibility.Client);
+        RegisterCompatibility("CommsRadioAPI", MultiplayerCompatibility.Client);
+        RegisterCompatibility("DVLangHelper", MultiplayerCompatibility.Client);
+        RegisterCompatibility("LightingOverhaul", MultiplayerCompatibility.Client);
 
         //Json entries will override hardcoded entries
         ReadModJsons();
