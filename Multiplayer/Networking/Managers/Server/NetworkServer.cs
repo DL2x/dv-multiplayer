@@ -540,15 +540,28 @@ public class NetworkServer : NetworkManager
         }
 
         CargoType cargoType = isLoading ? logicCar.CurrentCargoTypeInCar : logicCar.LastUnloadedCargoType;
+
+        ushort netMachineId = 0;
+        if (logicCar.CargoOriginWarehouse != null)
+        {
+            if (!NetworkedWarehouseMachineController.TryGetNetId(logicCar.CargoOriginWarehouse, out netMachineId))
+            {
+                Log($"Attempting to send cargo state for {netTraincar.CurrentID}, for warehouse machine at track {logicCar.CargoOriginWarehouse.WarehouseTrack.ID}, but Warehouse Machine Controller was not found");
+                return;
+            }
+        }
+
+   
+
         SendPacketToAll(new ClientboundCargoStatePacket
         {
             NetId = netTraincar.NetId,
             IsLoading = isLoading,
-            CargoType = (ushort)cargoType,
+            CargoType = cargoType,
             CargoAmount = logicCar.LoadedCargoAmount,
             CargoHealth = netTraincar.TrainCar.CargoDamage.HealthPercentage,
             CargoModelIndex = cargoModelIndex,
-            WarehouseMachineId = logicCar.CargoOriginWarehouse?.ID
+            WarehouseMachineNetId = netMachineId,
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 

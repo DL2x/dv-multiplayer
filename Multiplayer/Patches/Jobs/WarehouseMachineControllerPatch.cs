@@ -40,8 +40,7 @@ public class WarehouseMachineControllerPatch
         if (skip)
             return true;
 
-        var netMachine = NetworkedWarehouseMachineController.GetFromWarehouseMachineController(__instance);
-        if (netMachine == null)
+        if (!NetworkedWarehouseMachineController.GetFromWarehouseMachineController(__instance, out var netMachine) || netMachine == null)
         {
             Multiplayer.LogError($"WarehouseMachineControllerPatch.SetScreen(): Failed to get NetworkedWarehouseMachineController for {__instance.warehouseTrackName}");
             return true;
@@ -113,7 +112,6 @@ public class WarehouseMachineControllerPatch
     private static void SendValidationRequest(WarehouseMachineController machine, WarehouseAction action)
     {
         string id = machine?.warehouseMachine?.ID;
-        var netController =  NetworkedWarehouseMachineController.GetFromWarehouseMachineController(machine);
 
         if (string.IsNullOrEmpty(id))
         {
@@ -121,7 +119,7 @@ public class WarehouseMachineControllerPatch
             return;
         }
 
-        if (netController == null)
+        if (!NetworkedWarehouseMachineController.GetFromWarehouseMachineController(machine, out var netController) || netController == null)
         {
             NetworkLifecycle.Instance.Client.LogError($"Failed to find NetworkedWarehouseMachineController {machine?.warehouseTrackName}. Warehouse not found!");
             return;
