@@ -40,6 +40,7 @@ using Multiplayer.Patches.SaveGame;
 using Multiplayer.Utils;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -55,7 +56,7 @@ public class NetworkClient : NetworkManager
     private string disconnectMessage;
 
     private ITransportPeer selfPeer;
-    public byte PlayerId{ get; private set; }
+    public byte PlayerId { get; private set; }
     public readonly ClientPlayerManager ClientPlayerManager;
 
     // One way ping in milliseconds
@@ -67,6 +68,9 @@ public class NetworkClient : NetworkManager
 
     private bool isAlsoHost;
     IGameSession originalSession;
+
+    // Allow mods to add to the wait Queue
+    private readonly List<string> readyBlocks = [];
 
     public NetworkClient(Settings settings, bool singlePlayer) : base(settings)
     {
@@ -196,6 +200,29 @@ public class NetworkClient : NetworkManager
         );
     }
 
+    // Allow mods to register ready blocks
+    internal void RegisterReadyBlock(string modName)
+    {
+        Log($"Ready Block has been registered by {modName}");
+
+        if (readyBlocks.Contains(modName))
+            return;
+
+        readyBlocks.Add(modName);
+    }
+
+    internal void CancelReadyBlock(string modName)
+    {
+        Log($"Ready Block has been cleared by {modName}");
+
+        if (readyBlocks.Contains(modName))
+        {
+            readyBlocks.Remove(modName);
+            DisplayLoadingInfo displayLoadingInfo = Object.FindObjectOfType<DisplayLoadingInfo>();
+            displayLoadingInfo?.OnLoadingStatusChanged($"Mod {modName} loaded", false, 100);
+        }
+    }
+
     private void OnLoaded()
     {
         Log($"WorldStreamingInit.LoadingFinished()");
@@ -203,9 +230,23 @@ public class NetworkClient : NetworkManager
         Log($"WorldStreamingInit.LoadingFinished() CacheWorldItems()");
         NetworkedItemManager.Instance.CacheWorldItems();
         Log($"WorldStreamingInit.LoadingFinished() SendReadyPacket()");
-        SendReadyPacket();
+        CoroutineManager.Instance.StartCoroutine(WaitForReadyBlocks());
 
         WorldStreamingInit.LoadingFinished -= OnLoaded;
+    }
+
+    private IEnumerator WaitForReadyBlocks()
+    {
+        DisplayLoadingInfo displayLoadingInfo = Object.FindObjectOfType<DisplayLoadingInfo>();
+        foreach (string modName in readyBlocks)
+            displayLoadingInfo?.OnLoadingStatusChanged($"Waiting for mod {modName} to load", false, 100);
+
+        while (readyBlocks.Count > 0)
+        {
+            yield return null;
+        }
+
+        SendReadyPacket();
     }
 
     #region Net Events

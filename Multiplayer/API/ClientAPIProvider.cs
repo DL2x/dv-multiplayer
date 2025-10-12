@@ -6,6 +6,7 @@ using Multiplayer.Networking.Managers.Client;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static UnityModManagerNet.UnityModManager;
 
 namespace Multiplayer.API
 {
@@ -16,6 +17,16 @@ namespace Multiplayer.API
 
         public event Action<IPlayer> OnPlayerConnected;
         public event Action<IPlayer> OnPlayerDisconnected;
+
+        public void RegisterReadyBlock(ModInfo modInfo)
+        {
+            client.RegisterReadyBlock(modInfo.DisplayName);
+        }
+
+        public void CancelReadyBlock(ModInfo modInfo)
+        {
+            client.CancelReadyBlock(modInfo.DisplayName);
+        }
 
         #region Client Properties
         public byte PlayerId => client.PlayerId;

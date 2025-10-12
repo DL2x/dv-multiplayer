@@ -2,6 +2,7 @@ using MPAPI.Interfaces.Packets;
 using MPAPI.Types;
 using System;
 using System.Collections.Generic;
+using static UnityModManagerNet.UnityModManager;
 
 namespace MPAPI.Interfaces;
 
@@ -21,6 +22,24 @@ public interface IClient
     /// </summary>
     /// <returns>IPlayer object for the disconnected player</returns>
     event Action<IPlayer> OnPlayerDisconnected;
+
+    /// <Summary>
+    /// Registers a block to prevent the client from sending the 'Ready' signal to the server until all mods have called 'CancelReadyBlock'.
+    /// </Summary>
+    /// <param name="modInfo">Mod information</param>
+    /// <remarks>
+    /// Only required if the mod needs complete loading prior to receiving game state from the server.
+    /// </remarks>
+    void RegisterReadyBlock(ModInfo modInfo);
+
+    /// <summary>
+    /// Cancels a previously registered ready block
+    /// </summary>
+    /// <param name="modInfo">Mod information</param>
+    /// <remarks>
+    /// All registered blocks must be cancelled prior to the client sending the 'Ready' signal to the server.
+    /// </remarks>
+    void CancelReadyBlock(ModInfo modInfo);
 
     /// <summary>
     /// Gets Player Id of the local player
