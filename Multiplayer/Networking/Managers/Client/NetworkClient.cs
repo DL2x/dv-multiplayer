@@ -181,7 +181,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket>(OnCommonItemChangePacket);
     }
 
-    //allow mods to register their own packets
+    // Allow mods to register their own packets
     public void RegisterExternalPacket<T>(ClientPacketHandler<T> handler) where T : class, IPacket, new()
     {
         netPacketProcessor.SubscribeReusable<T>((packet) =>
@@ -826,7 +826,7 @@ public class NetworkClient : NetworkManager
         float cargoAmount = Mathf.Clamp(packet.CargoAmount, 0, logicCar.capacity);
 
         WarehouseMachine warehouseMachine = null;
-        if (packet.WarehouseMachineNetId != 0 && (!NetworkedWarehouseMachineController.TryGet(packet.WarehouseMachineNetId, out warehouseMachine) || warehouseMachine == null))
+        if (packet.WarehouseMachineNetId != 0 && (!WarehouseMachineLookup.TryGet(packet.WarehouseMachineNetId, out warehouseMachine) || warehouseMachine == null))
         {
             LogWarning($"OnClientboundCargoStatePacket() Failed to find WarehouseMachine for netId {packet.WarehouseMachineNetId}");
             return;

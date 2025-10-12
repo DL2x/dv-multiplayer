@@ -533,6 +533,8 @@ public class NetworkServer : NetworkManager
     {
         Car logicCar = netTraincar?.TrainCar?.logicCar;
 
+        LogDebug(() => $"SendCargoState({netTraincar?.CurrentID}, isLoading: {isLoading}, cargoModelIndex: {cargoModelIndex}), logicCar: {logicCar?.ID}, WareHouseMachineID: {logicCar.CargoOriginWarehouse?.ID}, warehouse track: {logicCar.CargoOriginWarehouse?.WarehouseTrack?.ID}");
+
         if (logicCar == null)
         {
             LogWarning($"Attempted to send cargo state for {netTraincar?.CurrentID}, but logic car does not exist!");
@@ -544,14 +546,12 @@ public class NetworkServer : NetworkManager
         ushort netMachineId = 0;
         if (logicCar.CargoOriginWarehouse != null)
         {
-            if (!NetworkedWarehouseMachineController.TryGetNetId(logicCar.CargoOriginWarehouse, out netMachineId))
+            if (!WarehouseMachineLookup.TryGetNetId(logicCar.CargoOriginWarehouse, out netMachineId))
             {
-                Log($"Attempting to send cargo state for {netTraincar.CurrentID}, for warehouse machine at track {logicCar.CargoOriginWarehouse.WarehouseTrack.ID}, but Warehouse Machine Controller was not found");
+                Log($"Attempting to send cargo state for {netTraincar.CurrentID}, for warehouse machine at track {logicCar.CargoOriginWarehouse?.WarehouseTrack?.ID}, but Warehouse Machine was not found");
                 return;
             }
         }
-
-   
 
         SendPacketToAll(new ClientboundCargoStatePacket
         {
@@ -567,7 +567,7 @@ public class NetworkServer : NetworkManager
 
     public void SendWarehouseControllerUpdate(ushort netId, bool isLoading, ushort jobNetId, ushort carNetId, CargoType cargoType, WarehouseMachineController.TextPreset preset)
     {
-        LogDebug(() =>$"SendWarehouseControllerUpdate({netId}, {isLoading}, {jobNetId}, {carNetId}, {cargoType}, {preset})");
+        LogDebug(() => $"SendWarehouseControllerUpdate({netId}, {isLoading}, {jobNetId}, {carNetId}, {cargoType}, {preset})");
 
         SendPacketToAll(new ClientboundWarehouseControllerUpdatePacket()
         {
@@ -703,12 +703,11 @@ public class NetworkServer : NetworkManager
         SendPacketToAll(ClientboundJobsUpdatePacket.FromNetworkedJobs(stationNetId, jobs), DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 
-    public void SendTaskUpdate(ushort netId, ushort taskNetId, TaskState newState, float taskStartTime, float taskFinishTime)
+    public void SendTaskUpdate(ushort taskNetId, TaskState newState, float taskStartTime, float taskFinishTime)
     {
-        Multiplayer.Log($"Sending TaskUpdate for jobNetId {netId}, taskNetId {taskNetId}, newState {newState}");
+        Multiplayer.Log($"Sending TaskUpdate for taskNetId {taskNetId}, newState {newState}");
         SendPacketToAll(new ClientboundTaskUpdatePacket
         {
-            JobNetId = netId,
             TaskNetId = taskNetId,
             NewState = newState,
             TaskStartTime = taskStartTime,
@@ -1039,7 +1038,7 @@ public class NetworkServer : NetworkManager
             LogWarning($"Received Player Position from {peer.GetType()}, peerId: {peer.Id}, but could not find matching player.");
             return;
         }
- 
+
         player.CarId = packet.CarID;
         player.RawPosition = packet.Position;
         player.RawRotationY = packet.RotationY;
@@ -1114,7 +1113,7 @@ public class NetworkServer : NetworkManager
             SendDestroyTrainCar(netTrainCar, peer);
         }
     }
-	
+
     //private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet, ITransportPeer peer)
     //{
     //    SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
@@ -1375,7 +1374,7 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundWarehouseMachineControllerRequestPacket(ServerboundWarehouseMachineControllerRequestPacket packet, ITransportPeer peer)
     {
-        LogDebug(()=>$"ServerboundWarehouseMachineControllerRequestPacket(): {packet.NetId}");
+        LogDebug(() => $"ServerboundWarehouseMachineControllerRequestPacket(): {packet.NetId}");
 
         if (!TryGetServerPlayer(peer, out ServerPlayer player))
         {
@@ -1386,10 +1385,10 @@ public class NetworkServer : NetworkManager
         //Todo: add check for player authorisation to use loading/uloading machines
 
         //Find the warehouse
-        if(!NetworkedWarehouseMachineController.Get(packet.NetId, out var targetWarehouse))
+        if (!NetworkedWarehouseMachineController.Get(packet.NetId, out var targetWarehouse))
         {
             LogWarning($"ServerboundWarehouseMachineControllerRequestPacket() WarehouseMachineController not found. NetId: {packet.NetId}");
-            return; 
+            return;
         }
 
         //Todo: add check for player distance from machine

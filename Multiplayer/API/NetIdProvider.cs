@@ -30,7 +30,8 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
         RegisterHandler<StationController>(NetworkedStationController.TryGetNetId, NetworkedStationController.TryGet);
         RegisterHandler<Station>(NetworkedStationController.TryGetNetId, NetworkedStationController.TryGet);
         RegisterHandler<JobValidator>(NetworkedStationController.TryGetNetId, NetworkedStationController.TryGet);
-        RegisterHandler<WarehouseMachine>(NetworkedWarehouseMachineController.TryGetNetId, NetworkedWarehouseMachineController.TryGet);
+
+        RegisterHandler<WarehouseMachine>(WarehouseMachineLookup.TryGetNetId, WarehouseMachineLookup.TryGet);
         RegisterHandler<WarehouseMachineController>(NetworkedWarehouseMachineController.TryGetNetId, NetworkedWarehouseMachineController.TryGet);
 
         RegisterHandler<Job>(NetworkedJob.TryGetNetId, NetworkedJob.TryGetJob);
