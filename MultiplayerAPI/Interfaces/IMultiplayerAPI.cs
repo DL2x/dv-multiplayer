@@ -135,5 +135,4 @@ public interface IMultiplayerAPI
     /// Base task types cannot be unregistered.
     /// </remarks>
     bool UnregisterTaskType<TGameTask>(TaskType taskType) where TGameTask : Task;
-
 }

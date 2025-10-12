@@ -73,7 +73,7 @@ public abstract class TaskNetworkData
     /// compatible with the job/task system, and adds them to the provided dictionary.
     /// </summary>
     /// <param name="netIdToTask">
-    /// A reference to a <see cref="Dictionary{ushort, Task}"/> that will be populated with deserialized <see cref="Task"/> instances.
+    /// A reference to a <see cref="Dictionary{TKey, TValue}"/> that will be populated with deserialized <see cref="Task"/> instances.
     /// Each key is a netTaskId (<c>ushort</c>), and each value is the corresponding <see cref="Task"/> object.
     /// </param>
     /// <returns>A <see cref="Task"/> instance representing the deserialized data.</returns>

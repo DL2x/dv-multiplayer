@@ -16,7 +16,6 @@ public class ClientboundJobsCreatePacket
         foreach (var job in jobs)
         {
             JobData jd = JobData.FromJob(netStation, job);
-            Multiplayer.Log($"JobData: jobNetId: {jd.NetID}, jobId: {jd.ID}, itemNetId {jd.ItemNetID}");
             jobData.Add(jd);
         }
 

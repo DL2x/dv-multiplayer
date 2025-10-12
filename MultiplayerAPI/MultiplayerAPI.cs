@@ -137,7 +137,6 @@ public static class MultiplayerAPI
         ServerStarted?.Invoke(server);
     }
 
-
     /// <summary>
     /// Internal method for the Multiplayer mod to deregister a server instance
     /// </summary>

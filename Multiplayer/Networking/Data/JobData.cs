@@ -1,13 +1,13 @@
-using System;
-using System.Linq;
-using System.IO;
-using System.Collections.Generic;
-using Multiplayer.Components.Networking.World;
-using Multiplayer.Components.Networking.Jobs;
-using MPAPI.Types;
-using LiteNetLib.Utils;
-using DV.ThingTypes;
 using DV.Logic.Job;
+using DV.ThingTypes;
+using LiteNetLib.Utils;
+using MPAPI.Types;
+using Multiplayer.Components.Networking.Jobs;
+using Multiplayer.Components.Networking.World;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System;
 
 namespace Multiplayer.Networking.Data;
 
@@ -52,7 +52,7 @@ public class JobData
                 itemPos = ItemPositionData.FromItem(networkedJob.JobBooklet);
             }
         }
-        else if(job.State == JobState.Completed)
+        else if (job.State == JobState.Completed)
         {
             if (networkedJob.JobReport != null)
             {
@@ -94,7 +94,7 @@ public class JobData
             State = jobData.State,
         };
 
-        return new (newJob, netIdToTask);
+        return new(newJob, netIdToTask);
     }
 
     public static void Serialize(NetDataWriter writer, JobData data)
@@ -132,7 +132,7 @@ public class JobData
 
             byte[] compressedData = PacketCompression.Compress(ms.ToArray());
 
-           // Multiplayer.Log($"JobData.Serialize() Uncompressed: {ms.Length} Compressed: {compressedData.Length}");
+            // Multiplayer.Log($"JobData.Serialize() Uncompressed: {ms.Length} Compressed: {compressedData.Length}");
             writer.PutBytesWithLength(compressedData);
         }
 
@@ -150,12 +150,15 @@ public class JobData
 
     public static JobData Deserialize(NetDataReader reader)
     {
+        ushort netID = 0;
+        JobType jobType = JobType.Custom;
+        string id = string.Empty;
+
         try
         {
-
-            ushort netID = reader.GetUShort();
-            JobType jobType = (JobType)reader.GetByte();
-            string id = reader.GetString();
+            netID = reader.GetUShort();
+            jobType = (JobType)reader.GetByte();
+            id = reader.GetString();
 
             //Decompress task data
             byte[] compressedData = reader.GetBytesWithLength();
@@ -216,7 +219,7 @@ public class JobData
         }
         catch (Exception ex)
         {
-            Multiplayer.Log($"JobData.Deserialize() Failed! {ex.Message}\r\n{ex.StackTrace}");
+            Multiplayer.Log($"JobData.Deserialize() Failed! netId: {netID}, jobId: {id} {ex.Message}\r\n{ex.StackTrace}");
             return null;
         }
     }

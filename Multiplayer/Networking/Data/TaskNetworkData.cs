@@ -59,15 +59,10 @@ public static class TaskNetworkDataFactory
         {
             var taskData = converter(task);
 
-            if (NetworkedJob.TryGetFromJob(task.Job, out var netJob) && netJob != null)
-            {
-                var taskNetId = netJob.GetTaskNetId(task);
+            if (NetworkedTask.TryGetNetId(task, out var taskNetId) && taskNetId != 0)
                 taskData.TaskNetId = taskNetId;
-            }
             else
-            {
                 Multiplayer.LogError($"TaskNetworkDataFactory.ConvertTask: Could not find NetworkedJob for jobId: {task.Job.ID}, taskType: {task.InstanceTaskType}");
-            }
 
             return taskData;
         }

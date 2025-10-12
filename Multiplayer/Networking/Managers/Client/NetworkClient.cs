@@ -1029,17 +1029,9 @@ public class NetworkClient : NetworkManager
         if (NetworkLifecycle.Instance.IsHost())
             return;
 
-        if (!NetworkedJob.Get(packet.JobNetId, out NetworkedJob networkedJob) || networkedJob == null)
+        if (!NetworkedTask.TryGet(packet.TaskNetId, out Task task) || task == null)
         {
-            LogError($"Received task update for jobNetId {packet.JobNetId}, but job was not found!");
-            return;
-        }
-
-        var task = networkedJob.GetTaskFromNetId(packet.TaskNetId);
-
-        if (task == null)
-        {
-            LogError($"Received task update for job [{networkedJob.Job.ID}, {packet.JobNetId}], with taskNetId {packet.TaskNetId}, task was not found");
+            LogError($"Received task update for taskNetId {packet.TaskNetId}, task was not found");
             return;
         }
 

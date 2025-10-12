@@ -33,7 +33,8 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
         RegisterHandler<WarehouseMachine>(NetworkedWarehouseMachineController.TryGetNetId, NetworkedWarehouseMachineController.TryGet);
         RegisterHandler<WarehouseMachineController>(NetworkedWarehouseMachineController.TryGetNetId, NetworkedWarehouseMachineController.TryGet);
 
-        RegisterHandler<Job>(NetworkedJob.TryGetNetId, NetworkedJob.GetJob);
+        RegisterHandler<Job>(NetworkedJob.TryGetNetId, NetworkedJob.TryGetJob);
+        RegisterHandler<Task>(NetworkedTask.TryGetNetId, NetworkedTask.TryGet);
 
         RegisterHandler<ItemBase>(NetworkedItem.TryGetNetId, NetworkedItem.GetItem);
     }
@@ -66,7 +67,7 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
         if (handlers.TryGetValue(typeof(T), out var handler) && handler is (TryGetNetIdDelegate<T> _, TryGetObjectDelegate<T> tryGetObject))
             return tryGetObject(netId, out obj);
 
-            return false;
+        return false;
     }
 
     [UsedImplicitly]

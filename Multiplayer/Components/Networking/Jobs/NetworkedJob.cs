@@ -1,10 +1,9 @@
 using DV.Logic.Job;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Data;
-using Multiplayer.Utils;
-using System.Collections.Generic;
-using System.Linq;
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace Multiplayer.Components.Networking.Jobs;
 
@@ -12,9 +11,9 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
 {
     #region Lookup Cache
 
-    private static readonly Dictionary<Job, NetworkedJob> jobToNetworkedJob = new();
-    private static readonly Dictionary<string, NetworkedJob> jobIdToNetworkedJob = new();
-    private static readonly Dictionary<string, Job> jobIdToJob = new();
+    private static readonly Dictionary<Job, NetworkedJob> jobToNetworkedJob = [];
+    private static readonly Dictionary<string, NetworkedJob> jobIdToNetworkedJob = [];
+    private static readonly Dictionary<string, Job> jobIdToJob = [];
 
     public static bool Get(ushort netId, out NetworkedJob obj)
     {
@@ -23,7 +22,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         return b;
     }
 
-    public static bool GetJob(ushort netId, out Job obj)
+    public static bool TryGetJob(ushort netId, out Job obj)
     {
         bool b = Get(netId, out NetworkedJob networkedJob);
         obj = b ? networkedJob.Job : null;
@@ -122,7 +121,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         }
     }
 
-    private List<NetworkedItem> JobReports = new List<NetworkedItem>();
+    private readonly List<NetworkedItem> JobReports = [];
 
     public Guid OwnedBy { get; set; } = Guid.Empty;
     public JobValidator JobValidator { get; set; }
@@ -138,8 +137,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
 
     public List<ushort> JobCars = [];
 
-    private readonly IdPool<ushort> idPool = new();
-    private readonly Dictionary<ushort, Task> taskMap = [];
+    private bool tasksInitialized = false;
 
     protected override void Awake()
     {
@@ -163,6 +161,8 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         Job = job;
         Station = station;
 
+        transform.SetParent(station.transform);
+
         // Setup handlers
         job.JobTaken += OnJobTaken;
         job.JobAbandoned += OnJobAbandoned;
@@ -175,12 +175,20 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
             AddToCache();
         }
 
-        //Check for any pending tasks that were added before the NetworkedJob was created
-        if(pendingJobTasks.TryGetValue(job, out var taskList) && taskList != null)
+        // Check for any pending tasks that were added before the NetworkedJob was created
+        if (pendingJobTasks.TryGetValue(job, out var taskList) && taskList != null)
         {
-            taskList.ForEach(t => AddTask(t));
             pendingJobTasks.Remove(job);
+
+            Multiplayer.LogDebug(() => $"NetworkedJob.Initialize(): Found {taskList.Count} pending tasks for jobId {job.ID}");
+
+            foreach (var task in taskList)
+                CreateNetworkedTask(task);
         }
+
+        tasksInitialized = true;
+
+        Multiplayer.LogDebug(() => $"NetworkedJob.Initialize(): Initialized NetworkedJob for jobId {job.ID} with {Job.tasks.Count} tasks");
     }
 
     private void AddToCache()
@@ -189,6 +197,53 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         jobIdToNetworkedJob[Job.ID] = this;
         jobIdToJob[Job.ID] = Job;
         //Multiplayer.Log($"NetworkedJob added to cache: {Job.ID}");
+    }
+
+    public static void EnqueueTask(Task task, Job job)
+    {
+        if (TryGetFromJob(job, out var netJob) || netJob != null && netJob.tasksInitialized)
+        {
+            Multiplayer.LogDebug(() => $"NetworkedJob.EnqueueTask(): Creating task immediately for jobId {task.Job.ID}");
+            netJob.CreateNetworkedTask(task);
+            return;
+        }
+
+        Multiplayer.LogDebug(() => $"NetworkedJob.EnqueueTask(): Enqueuing task for later creation for jobId {task.Job.ID}");
+
+        if (!pendingJobTasks.TryGetValue(task.Job, out var taskList))
+        {
+            taskList = [];
+            pendingJobTasks[task.Job] = taskList;
+        }
+        taskList.Add(task);
+    }
+
+    public void SetTasksFromServer(Dictionary<ushort, Task> netIdToTask)
+    {
+        if (netIdToTask == null)
+        {
+            Multiplayer.LogError($"NetworkedJob.SetTasksFromServer(): netIdToTask is null for jobId {Job?.ID}");
+            return;
+        }
+        
+        foreach (var kvp in netIdToTask)
+        {
+            CreateNetworkedTask(kvp.Value, kvp.Key);
+        }
+    }
+
+    private void CreateNetworkedTask(Task task, ushort netId = 0)
+    {
+        if (task == null)
+        {
+            Multiplayer.LogError($"NetworkedJob.CreateNetworkedTask(): Task is null for jobId {Job?.ID}");
+            return;
+        }
+
+        NetworkedTask taskObj = new GameObject().AddComponent<NetworkedTask>();
+        taskObj.Initialize(task, netId);
+        taskObj.name = $"{Job.ID}-{taskObj.NetId}";
+        taskObj.transform.SetParent(transform);
     }
 
     private void OnJobTaken(Job job, bool viaLoadGame)
@@ -227,7 +282,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         }
 
         Type reportType = item.TrackedItemType;
-        if(    reportType == typeof(JobReport) ||
+        if (reportType == typeof(JobReport) ||
                reportType == typeof(JobExpiredReport) ||
                reportType == typeof(JobMissingLicenseReport) /*||
                reportType == typeof(Debtre) ||*/
@@ -273,57 +328,4 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         Destroy(this);
     }
 
-    public static void EnqueTask(Task task)
-    {
-        if (!pendingJobTasks.TryGetValue(task.Job, out var taskList))
-        {
-            taskList = [];
-            pendingJobTasks[task.Job] = taskList;
-        }
-        taskList.Add(task);
-    }
-
-    private void AddTask(Task task)
-    {
-        if (taskMap.Values.Contains(task))
-            return;
-
-        var netId = idPool.NextId;
-
-        Multiplayer.LogDebug(() => $"NetworkedJob.AddTask() JobId: [{Job.ID}, {NetId}], TaskType: {task.InstanceTaskType}, taskNetId: {netId}");
-        taskMap[netId] = task;
-    }
-
-    public void AddTask(ushort netId, Task task)
-    {
-        if (taskMap.Values.Contains(task))
-            return;
-
-        if (taskMap.ContainsKey(netId))
-        {
-            Multiplayer.LogError($"NetworkedJob.AddTask({task.InstanceTaskType}) Attempted to add a task with duplicate netId: {netId} JobId: [{Job.ID}, {NetId}]");
-            return;
-        }
-
-        Multiplayer.LogDebug(() => $"NetworkedJob.AddTask({netId}, {task.InstanceTaskType}) JobId: [{Job.ID}, {NetId}]");
-
-        taskMap[netId] = task;
-    }
-
-    public ushort GetTaskNetId(Task task)
-    {
-        foreach (var kvp in taskMap)
-        {
-            if (kvp.Value == task)
-                return kvp.Key;
-        }
-        return 0;
-    }
-
-    public Task GetTaskFromNetId(ushort netId)
-    {
-        if (taskMap.TryGetValue(netId, out var task))
-            return task;
-        return null;
-    }
 }
