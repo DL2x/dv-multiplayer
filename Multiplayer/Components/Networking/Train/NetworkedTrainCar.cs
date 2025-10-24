@@ -519,15 +519,15 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (!TrainCar.frontCoupler.hoseAndCock.IsHoseConnected)
             //    NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.frontCoupler, TrainCar.frontCoupler.coupledTo, false);
             //else
-            NetworkLifecycle.Instance.Client.SendHoseDisconnected(TrainCar.frontCoupler, true);
+            NetworkLifecycle.Instance.Server.SendHoseDisconnected(TrainCar.frontCoupler, true);
 
         if (!TrainCar.rearCoupler.hoseAndCock.IsHoseConnected)
             //    NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.rearCoupler, TrainCar.rearCoupler.coupledTo, false);
             //else
-            NetworkLifecycle.Instance.Client.SendHoseDisconnected(TrainCar.rearCoupler, true);
+            NetworkLifecycle.Instance.Server.SendHoseDisconnected(TrainCar.rearCoupler, true);
 
-        NetworkLifecycle.Instance.Client.SendCockState(NetId, TrainCar.frontCoupler, TrainCar.frontCoupler.IsCockOpen);
-        NetworkLifecycle.Instance.Client.SendCockState(NetId, TrainCar.rearCoupler, TrainCar.rearCoupler.IsCockOpen);
+        NetworkLifecycle.Instance.Server.SendCockState(NetId, TrainCar.frontCoupler, TrainCar.frontCoupler.IsCockOpen);
+        NetworkLifecycle.Instance.Server.SendCockState(NetId, TrainCar.rearCoupler, TrainCar.rearCoupler.IsCockOpen);
     }
     private void Server_SendCables()
     {

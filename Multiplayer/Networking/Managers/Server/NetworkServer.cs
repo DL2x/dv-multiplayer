@@ -685,6 +685,46 @@ public class NetworkServer : NetworkManager
         );
     }
 
+    public void SendHoseDisconnected(Coupler coupler, bool playAudio)
+    {
+        ushort couplerNetId = coupler.train.GetNetId();
+
+        if (couplerNetId == 0)
+        {
+            LogWarning($"SendHoseDisconnected failed. Coupler: {coupler.name} {couplerNetId}");
+            return;
+        }
+
+        LogDebug(() => $"SendHoseDisconnected({coupler.train.ID}, {coupler.isFrontCoupler}, {playAudio})");
+
+        SendPacketToAll
+        (
+            new CommonHoseDisconnectedPacket
+            {
+                NetId = couplerNetId,
+                IsFront = coupler.isFrontCoupler,
+                PlayAudio = playAudio
+            },
+            DeliveryMethod.ReliableOrdered,
+            excludeSelf: true
+        );
+    }
+
+    public void SendCockState(ushort netId, Coupler coupler, bool isOpen)
+    {
+        SendPacketToAll
+        (
+            new CommonCockFiddlePacket
+            {
+                NetId = netId,
+                IsFront = coupler.isFrontCoupler,
+                IsOpen = isOpen
+            },
+            DeliveryMethod.ReliableOrdered,
+            true
+        );
+    }
+
     public void SendJobsCreatePacket(NetworkedStationController networkedStation, NetworkedJob[] jobs, ITransportPeer peer = null)
     {
         Multiplayer.Log($"Sending JobsCreatePacket for stationNetId {networkedStation.NetId} with {jobs.Count()} jobs");
