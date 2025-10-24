@@ -1293,7 +1293,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                 if (TrainCar.rb != null)
                 {
                     TrainCar.rb.MovePosition(worldPos);
-                    TrainCar.rb.MoveRotation(movementPart.Rotation);
+                    //TrainCar.rb.MoveRotation(movementPart.Rotation); // removed due to motion sickness issues
                 }
 
                 //clear the queues?
