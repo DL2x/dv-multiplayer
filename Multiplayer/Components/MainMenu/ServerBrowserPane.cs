@@ -1013,7 +1013,7 @@ namespace Multiplayer.Components.MainMenu
                 string hasPass = lobby.GetData(SteamworksUtils.LOBBY_HAS_PASSWORD);
                 Multiplayer.Log($"Lobby ({lobby.Id}) has password: {hasPass}");
 
-                if (string.IsNullOrEmpty(hasPass))
+                if (string.IsNullOrEmpty(hasPass) || hasPass == "False")
                 {
                     Multiplayer.Log($"Attempting connection...");
                     InitiateConnection();
