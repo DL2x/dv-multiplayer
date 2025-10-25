@@ -45,24 +45,24 @@ public class ServerAPIProvider : IServer
     }
 
 
-    public void SendPacketToAll<T>(T packet, bool reliable = true, IPlayer excludePlayer = null) where T : class, IPacket, new()
+    public void SendPacketToAll<T>(T packet, bool reliable = true, bool excludeSelf = false, IPlayer excludePlayer = null) where T : class, IPacket, new()
     {
         ITransportPeer peer = null;
 
         if (excludePlayer != null)
             peer = GetPeerFromPlayer(excludePlayer, $"SendPacketToAll<{typeof(T).Name}>");
 
-        server.SendExternalPacketToAll(packet, reliable, peer);
+        server.SendExternalPacketToAll(packet, reliable, peer, excludeSelf);
     }
 
-    public void SendSerializablePacketToAll<T>(T packet, bool reliable = true, IPlayer excludePlayer = null) where T : class, ISerializablePacket, new()
+    public void SendSerializablePacketToAll<T>(T packet, bool reliable = true, bool excludeSelf = false, IPlayer excludePlayer = null) where T : class, ISerializablePacket, new()
     {
         ITransportPeer peer = null;
 
         if(excludePlayer != null)
             peer = GetPeerFromPlayer(excludePlayer, $"SendSerializablePacketToAll<{typeof(T).Name}>");
 
-        server.SendExternalSerializablePacketToAll(packet, reliable, peer);
+        server.SendExternalSerializablePacketToAll(packet, reliable, peer, excludeSelf);
     }
 
     public void SendPacketToPlayer<T>(T packet, IPlayer player, bool reliable = true) where T : class, IPacket, new()

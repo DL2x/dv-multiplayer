@@ -163,8 +163,8 @@ internal class ServerTest : MonoBehaviour
             WheelArrangement = arrangement
         };
 
-        //send the packet reliably (ensure it makes it to all players)
-        server.SendPacketToAll(packet, true, excludePlayer);
+        // Send the packet reliably (ensure it makes it to all players), allow sending to the local client (true will block sending to a local client), exclude a player if specified
+        server.SendPacketToAll(packet, true, false, excludePlayer);
     }
 
     public void SendSimplePacketWithNetIdToAll(ushort carId, Vector3 position, WheelArrangement arrangement, IPlayer excludePlayer = null)
@@ -178,7 +178,7 @@ internal class ServerTest : MonoBehaviour
         };
 
         //send the packet reliably (ensure it makes it to all players)
-        server.SendPacketToAll(packet, true, excludePlayer);
+        server.SendPacketToAll(packet, true, true, excludePlayer);
     }
 
     public void SendComplexPacket(Dictionary<string, Vector3> carToPos, IPlayer excludePlayer = null)
@@ -189,8 +189,8 @@ internal class ServerTest : MonoBehaviour
             CarToPositionMap = carToPos
         };
 
-        //send the packet reliably (ensure it makes it to all players)
-        server.SendSerializablePacketToAll(packet, true, excludePlayer);
+        // Send the packet reliably (ensure it makes it to all players), allow sending to the local client (true will block sending to a local client), exclude a player if specified
+        server.SendSerializablePacketToAll(packet, true, false, excludePlayer);
     }
     #endregion
 

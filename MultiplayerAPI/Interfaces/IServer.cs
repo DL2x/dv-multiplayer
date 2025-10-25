@@ -90,8 +90,9 @@ public interface IServer
     /// <typeparam name="T">Packet type</typeparam>
     /// <param name="packet">Packet to send</param>
     /// <param name="reliable">Whether to send reliably</param>
+    /// <param name="excludeSelf">Sends the packet to the local client when false, skips sending to the local client when true</param>
     /// <param name="excludePlayer">Exclude this player</param>
-    void SendPacketToAll<T>(T packet, bool reliable = true, IPlayer excludePlayer = null) where T : class, IPacket, new();
+    void SendPacketToAll<T>(T packet, bool reliable = true, bool excludeSelf = false, IPlayer excludePlayer = null) where T : class, IPacket, new();
 
     /// <summary>
     /// Send a packet to all connected players
@@ -99,8 +100,9 @@ public interface IServer
     /// <typeparam name="T">Packet type</typeparam>
     /// <param name="packet">Packet to send</param>
     /// <param name="reliable">Whether to send reliably</param>
+    /// <param name="excludeSelf">Sends the packet to the local client when false, skips sending to the local client when true</param>
     /// <param name="excludePlayer">Exclude this player</param>
-    void SendSerializablePacketToAll<T>(T packet, bool reliable = true, IPlayer excludePlayer = null) where T : class, ISerializablePacket, new();
+    void SendSerializablePacketToAll<T>(T packet, bool reliable = true, bool excludeSelf = false, IPlayer excludePlayer = null) where T : class, ISerializablePacket, new();
 
     /// <summary>
     /// Send a packet to a specific player

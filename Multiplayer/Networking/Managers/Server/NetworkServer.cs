@@ -331,75 +331,86 @@ public class NetworkServer : NetworkManager
 
     #region Packet Senders
 
-    private void SendPacketToAll<T>(T packet, DeliveryMethod deliveryMethod) where T : class, new()
-    {
-        NetDataWriter writer = WritePacket(packet);
-        foreach (var peer in peers.Values)
-            peer?.Send(writer, deliveryMethod);
-    }
-
-    private void SendPacketToAll<T>(T packet, DeliveryMethod deliveryMethod, ITransportPeer excludePeer) where T : class, new()
+    private void SendPacketToAll<T>(T packet, DeliveryMethod deliveryMethod, bool excludeSelf = false) where T : class, new()
     {
         NetDataWriter writer = WritePacket(packet);
         foreach (var peer in peers.Values)
         {
-            if (peer == excludePeer)
+            if (excludeSelf && peer == SelfPeer)
                 continue;
+
             peer?.Send(writer, deliveryMethod);
         }
     }
 
-    private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod) where T : INetSerializable, new()
+    private void SendPacketToAll<T>(T packet, DeliveryMethod deliveryMethod, ITransportPeer excludePeer, bool excludeSelf = false) where T : class, new()
     {
-        NetDataWriter writer = WriteNetSerializablePacket(packet);
+        NetDataWriter writer = WritePacket(packet);
         foreach (var peer in peers.Values)
+        {
+            if (peer == excludePeer || (excludeSelf && peer == SelfPeer))
+                continue;
+
             peer?.Send(writer, deliveryMethod);
+        }
     }
 
-    private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod, ITransportPeer excludePeer) where T : INetSerializable, new()
+    private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod, bool excludeSelf = false) where T : INetSerializable, new()
     {
         NetDataWriter writer = WriteNetSerializablePacket(packet);
         foreach (var peer in peers.Values)
         {
-            if (peer == excludePeer)
+            if (excludeSelf && peer == SelfPeer)
+                continue;
+
+            peer?.Send(writer, deliveryMethod);
+        }
+    }
+
+    private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod, ITransportPeer excludePeer, bool excludeSelf = false) where T : INetSerializable, new()
+    {
+        NetDataWriter writer = WriteNetSerializablePacket(packet);
+        foreach (var peer in peers.Values)
+        {
+            if (peer == excludePeer || (excludeSelf && peer == SelfPeer))
                 continue;
             peer?.Send(writer, deliveryMethod);
         }
     }
 
     #region Mod Packets
-    public void SendExternalPacketToAll<T>(T packet, bool reliable) where T : class, IPacket, new()
+    public void SendExternalPacketToAll<T>(T packet, bool reliable, bool excludeSelf = false) where T : class, IPacket, new()
     {
         var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
-        SendPacketToAll(packet, deliveryMethod);
+        SendPacketToAll(packet, deliveryMethod, excludeSelf);
     }
 
-    public void SendExternalPacketToAll<T>(T packet, bool reliable, ITransportPeer excludePeer) where T : class, IPacket, new()
+    public void SendExternalPacketToAll<T>(T packet, bool reliable, ITransportPeer excludePeer, bool excludeSelf = false) where T : class, IPacket, new()
     {
         var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
 
         if (excludePeer == null)
-            SendPacketToAll(packet, deliveryMethod);
+            SendPacketToAll(packet, deliveryMethod, excludeSelf);
         else
-            SendPacketToAll(packet, deliveryMethod, excludePeer);
+            SendPacketToAll(packet, deliveryMethod, excludePeer, excludeSelf);
     }
 
-    public void SendExternalSerializablePacketToAll<T>(T packet, bool reliable) where T : class, ISerializablePacket, new()
+    public void SendExternalSerializablePacketToAll<T>(T packet, bool reliable, bool excludeSelf = false) where T : class, ISerializablePacket, new()
     {
         var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
         var wrapper = new ExternalSerializablePacketWrapper<T> { Packet = packet };
-        SendNetSerializablePacketToAll(wrapper, deliveryMethod);
+        SendNetSerializablePacketToAll(wrapper, deliveryMethod, excludeSelf);
     }
 
-    public void SendExternalSerializablePacketToAll<T>(T packet, bool reliable, ITransportPeer excludePeer) where T : class, ISerializablePacket, new()
+    public void SendExternalSerializablePacketToAll<T>(T packet, bool reliable, ITransportPeer excludePeer, bool excludeSelf = false) where T : class, ISerializablePacket, new()
     {
         var deliveryMethod = reliable ? DeliveryMethod.ReliableUnordered : DeliveryMethod.Unreliable;
         var wrapper = new ExternalSerializablePacketWrapper<T> { Packet = packet };
 
         if (excludePeer == null)
-            SendNetSerializablePacketToAll(wrapper, deliveryMethod);
+            SendNetSerializablePacketToAll(wrapper, deliveryMethod, excludeSelf);
         else
-            SendNetSerializablePacketToAll(wrapper, deliveryMethod, excludePeer);
+            SendNetSerializablePacketToAll(wrapper, deliveryMethod, excludePeer, excludeSelf);
     }
 
     public void SendExternalPacketToPlayer<T>(T packet, ITransportPeer peer, bool reliable) where T : class, IPacket, new()
@@ -427,7 +438,7 @@ public class NetworkServer : NetworkManager
     }
     public void SendGameParams(GameParams gameParams)
     {
-        SendPacketToAll(ClientboundGameParamsPacket.FromGameParams(gameParams), DeliveryMethod.ReliableOrdered, SelfPeer);
+        SendPacketToAll(ClientboundGameParamsPacket.FromGameParams(gameParams), DeliveryMethod.ReliableOrdered, excludeSelf: true);
     }
 
     public void SendWeatherState(ITransportPeer peer = null)
@@ -437,7 +448,7 @@ public class NetworkServer : NetworkManager
         if (peer != null)
             SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
         else
-            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
+            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, excludeSelf: true);
     }
 
     public void SendSpawnTrainset(List<TrainCar> set, bool autoCouple, bool sendToAll, ITransportPeer sendTo = null)
@@ -473,7 +484,7 @@ public class NetworkServer : NetworkManager
 
     public void SendSpawnTrainCar(NetworkedTrainCar networkedTrainCar)
     {
-        SendPacketToAll(ClientboundSpawnTrainCarPacket.FromTrainCar(networkedTrainCar), DeliveryMethod.ReliableOrdered, SelfPeer);
+        SendPacketToAll(ClientboundSpawnTrainCarPacket.FromTrainCar(networkedTrainCar), DeliveryMethod.ReliableOrdered, excludeSelf: true);
     }
 
     public void SendDestroyTrainCar(NetworkedTrainCar netTrainCar, ITransportPeer peer = null)
@@ -612,7 +623,9 @@ public class NetworkServer : NetworkManager
 
     public void SendWindowsBroken(ushort netId, Vector3 forceDirection)
     {
-        SendPacketToAll(new ClientboundWindowsBrokenPacket
+        SendPacketToAll
+            (
+            new ClientboundWindowsBrokenPacket
         {
             NetId = netId,
             ForceDirection = forceDirection
@@ -621,35 +634,55 @@ public class NetworkServer : NetworkManager
 
     public void SendWindowsRepaired(ushort netId)
     {
-        SendPacketToAll(new ClientboundWindowsRepairedPacket
-        {
-            NetId = netId
-        }, DeliveryMethod.ReliableUnordered, SelfPeer);
+        SendPacketToAll
+        (
+            new ClientboundWindowsRepairedPacket
+            {
+                NetId = netId
+            },
+            DeliveryMethod.ReliableUnordered,
+            excludeSelf: true
+        );
     }
 
     public void SendMoney(float amount)
     {
-        SendPacketToAll(new ClientboundMoneyPacket
-        {
-            Amount = amount
-        }, DeliveryMethod.ReliableUnordered, SelfPeer);
+        SendPacketToAll
+        (
+            new ClientboundMoneyPacket
+            {
+                Amount = amount
+            },
+            DeliveryMethod.ReliableUnordered,
+            excludeSelf: true
+        );
     }
 
     public void SendLicense(string id, bool isJobLicense)
     {
-        SendPacketToAll(new ClientboundLicenseAcquiredPacket
-        {
-            Id = id,
-            IsJobLicense = isJobLicense
-        }, DeliveryMethod.ReliableUnordered, SelfPeer);
+        SendPacketToAll
+        (
+            new ClientboundLicenseAcquiredPacket
+            {
+                Id = id,
+                IsJobLicense = isJobLicense
+            },
+            DeliveryMethod.ReliableUnordered,
+            excludeSelf: true
+        );
     }
 
     public void SendGarage(string id)
     {
-        SendPacketToAll(new ClientboundGarageUnlockPacket
-        {
-            Id = id
-        }, DeliveryMethod.ReliableUnordered, SelfPeer);
+        SendPacketToAll
+        (
+            new ClientboundGarageUnlockPacket
+            {
+                Id = id
+            },
+            DeliveryMethod.ReliableUnordered,
+            excludeSelf: true
+        );
     }
 
     public void SendDebtStatus(bool hasDebt)
@@ -681,7 +714,8 @@ public class NetworkServer : NetworkManager
                 ViaChainInteraction = viaChainInteraction,
                 DueToBrokenCouple = dueToBrokenCouple,
             },
-            DeliveryMethod.ReliableOrdered
+            DeliveryMethod.ReliableOrdered,
+            excludeSelf: true
         );
     }
 
@@ -732,7 +766,7 @@ public class NetworkServer : NetworkManager
         var packet = ClientboundJobsCreatePacket.FromNetworkedJobs(networkedStation, jobs);
 
         if (peer == null)
-            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
+            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, excludeSelf: true);
         else
             SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
     }
@@ -740,19 +774,24 @@ public class NetworkServer : NetworkManager
     public void SendJobsUpdatePacket(ushort stationNetId, NetworkedJob[] jobs)
     {
         Multiplayer.Log($"Sending JobsUpdatePacket for stationNetId {stationNetId} with {jobs.Count()} jobs");
-        SendPacketToAll(ClientboundJobsUpdatePacket.FromNetworkedJobs(stationNetId, jobs), DeliveryMethod.ReliableOrdered, SelfPeer);
+        SendPacketToAll(ClientboundJobsUpdatePacket.FromNetworkedJobs(stationNetId, jobs), DeliveryMethod.ReliableOrdered, excludeSelf: true);
     }
 
     public void SendTaskUpdate(ushort taskNetId, TaskState newState, float taskStartTime, float taskFinishTime)
     {
         Multiplayer.Log($"Sending TaskUpdate for taskNetId {taskNetId}, newState {newState}");
-        SendPacketToAll(new ClientboundTaskUpdatePacket
-        {
-            TaskNetId = taskNetId,
-            NewState = newState,
-            TaskStartTime = taskStartTime,
-            TaskFinishTime = taskFinishTime
-        }, DeliveryMethod.ReliableOrdered, SelfPeer);
+        SendPacketToAll
+        (
+            new ClientboundTaskUpdatePacket
+            {
+                TaskNetId = taskNetId,
+                NewState = newState,
+                TaskStartTime = taskStartTime,
+                TaskFinishTime = taskFinishTime
+            },
+            DeliveryMethod.ReliableOrdered,
+            excludeSelf: true
+        );
     }
 
     public void SendItemsChangePacket(List<ItemUpdateData> items, ServerPlayer player)
@@ -768,31 +807,30 @@ public class NetworkServer : NetworkManager
 
     public void SendChat(string message, ServerPlayer exclude = null)
     {
+        var packet = new CommonChatPacket
+        {
+            message = message
+        };
 
         if (exclude != null)
-        {
-            NetworkLifecycle.Instance.Server.SendPacketToAll(new CommonChatPacket
-            {
-                message = message
-            }, DeliveryMethod.ReliableUnordered, exclude.Peer);
-        }
+            SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, exclude.Peer);
         else
-        {
-            NetworkLifecycle.Instance.Server.SendPacketToAll(new CommonChatPacket
-            {
-                message = message
-            }, DeliveryMethod.ReliableUnordered);
-        }
+            SendPacketToAll(packet, DeliveryMethod.ReliableUnordered);
     }
 
     public void SendWhisper(string message, ServerPlayer recipient)
     {
         if (!string.IsNullOrEmpty(message) && recipient != null && recipient.Peer != null)
         {
-            NetworkLifecycle.Instance.Server.SendPacket(recipient.Peer, new CommonChatPacket
-            {
-                message = message
-            }, DeliveryMethod.ReliableUnordered);
+            NetworkLifecycle.Instance.Server.SendPacket
+            (
+                recipient.Peer,
+                new CommonChatPacket
+                {
+                    message = message
+                },
+                DeliveryMethod.ReliableUnordered
+            );
         }
 
     }
@@ -1098,10 +1136,15 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundTimeAdvancePacket(ServerboundTimeAdvancePacket packet, ITransportPeer peer)
     {
-        SendPacketToAll(new ClientboundTimeAdvancePacket
-        {
-            amountOfTimeToSkipInSeconds = packet.amountOfTimeToSkipInSeconds
-        }, DeliveryMethod.ReliableUnordered, peer);
+        SendPacketToAll
+        (
+            new ClientboundTimeAdvancePacket
+            {
+                amountOfTimeToSkipInSeconds = packet.amountOfTimeToSkipInSeconds
+            },
+            DeliveryMethod.ReliableUnordered,
+            peer
+        );
     }
 
     private void OnCommonChangeJunctionPacket(CommonChangeJunctionPacket packet, ITransportPeer peer)
@@ -1134,16 +1177,17 @@ public class NetworkServer : NetworkManager
             {
                 LogDebug(() => $"OnCommonCouplerInteractionPacket([{packet.Flags}, {netTrainCar.CurrentID}, {packet.NetId}], {player.PlayerId}) Sending validation failure");
                 //failed validation notify client
-                SendPacket(
-                            peer,
-                            new CommonCouplerInteractionPacket
-                            {
-                                NetId = packet.NetId,
-                                Flags = (ushort)CouplerInteractionType.NoAction,
-                                IsFrontCoupler = packet.IsFrontCoupler,
-                            }
-                            , DeliveryMethod.ReliableOrdered
-                          );
+                SendPacket
+                (
+                    peer,
+                    new CommonCouplerInteractionPacket
+                    {
+                        NetId = packet.NetId,
+                        Flags = (ushort)CouplerInteractionType.NoAction,
+                        IsFrontCoupler = packet.IsFrontCoupler,
+                    },
+                    DeliveryMethod.ReliableOrdered
+                );
             }
         }
         else
