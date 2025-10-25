@@ -104,11 +104,11 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         return false;
     }
 
-    public static Dictionary<ushort, string>GetAll()
+    public static Dictionary<ushort, string> GetAll()
     {
         Dictionary<ushort, string> result = [];
 
-        foreach (var kvp in stationIdToNetworkedStationController )
+        foreach (var kvp in stationIdToNetworkedStationController)
         {
             //Multiplayer.Log($"GetAll() adding {kvp.Value.NetId}, {kvp.Key}");
             result.Add(kvp.Value.NetId, kvp.Key);
@@ -156,7 +156,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
     {
         string stationID = stationController.logicStation.ID;
 
-        stationControllerToNetworkedStationController.Add(stationController,networkedStationController);
+        stationControllerToNetworkedStationController.Add(stationController, networkedStationController);
         stationIdToNetworkedStationController.Add(stationID, networkedStationController);
         stationIdToStationController.Add(stationID, stationController);
         stationToNetworkedStationController.Add(stationController.logicStation, networkedStationController);
@@ -177,7 +177,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
     }
     #endregion
 
-     const int MAX_FRAMES = 120;
+    const int MAX_FRAMES = 120;
 
     protected override bool IsIdServerAuthoritative => true;
 
@@ -249,7 +249,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
             string stationName = validator.transform.parent.name ?? "";
             stationName += "_office_anchor";
 
-            if(this.transform.parent.name.Equals(stationName, StringComparison.OrdinalIgnoreCase))
+            if (this.transform.parent.name.Equals(stationName, StringComparison.OrdinalIgnoreCase))
             {
                 JobValidator = validator;
                 RegisterJobValidator(validator, this);
@@ -266,7 +266,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         NetworkedJob networkedJob = new GameObject($"NetworkedJob {job.ID}").AddComponent<NetworkedJob>();
         networkedJob.Initialize(job, this);
         NetworkedJobs.Add(networkedJob);
-   
+
         NewJobs.Add(networkedJob);
 
         //Setup handlers
@@ -355,7 +355,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
             return;
         }
 
-       
+
         Multiplayer.LogDebug(() => $"AddJob({jobData.ID}) Starting plate update {newJob.ID} count: {jobData.GetCars().Count}");
         StartCoroutine(UpdateCarPlates(carNetIds, newJob.ID));
 
@@ -617,7 +617,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
     private void GenerateOverview(NetworkedJob networkedJob, ushort itemNetId, ItemPositionData posData)
     {
         Multiplayer.Log($"GenerateOverview([{networkedJob.Job.ID},{networkedJob.Job.jobType}], {itemNetId}) Position: {posData.Position}, Less currentMove: {posData.Position + WorldMover.currentMove}");
-        JobOverview jobOverview = BookletCreator_JobOverview.Create(networkedJob.Job, posData.Position + WorldMover.currentMove, posData.Rotation,WorldMover.OriginShiftParent);
+        JobOverview jobOverview = BookletCreator_JobOverview.Create(networkedJob.Job, posData.Position + WorldMover.currentMove, posData.Rotation, WorldMover.OriginShiftParent);
 
         NetworkedItem netItem = jobOverview.GetOrAddComponent<NetworkedItem>();
         netItem.Initialize(jobOverview, itemNetId, false);

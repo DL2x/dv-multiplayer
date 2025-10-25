@@ -42,8 +42,9 @@ public interface IClient
     void CancelReadyBlock(ModInfo modInfo);
 
     /// <summary>
-    /// Gets Player Id of the local player
+    /// Gets Player Id of the local player.
     /// </summary>
+    /// <returns
     /// <remarks>
     /// The local player does not have an IPlayer object
     /// </remarks>

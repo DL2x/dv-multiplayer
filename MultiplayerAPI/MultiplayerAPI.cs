@@ -80,27 +80,27 @@ public static class MultiplayerAPI
     private static IClient _client;
 
     /// <summary>
-    /// Gets whether the Multiplayer mod is available
+    /// Gets whether the Multiplayer mod is available.
     /// </summary>
     public static bool IsMultiplayerLoaded => _instance != null;
 
     /// <summary>
-    /// Gets the current API instance (null if Multiplayer mod is not loaded)
+    /// Gets the current API instance (null if Multiplayer mod is not loaded).
     /// </summary>
     public static IMultiplayerAPI Instance => _instance;
 
     /// <summary>
-    /// Gets the current Server API instance (null if Multiplayer mod is not loaded or server not running)
+    /// Gets the current Server API instance (null if Multiplayer mod is not loaded or server not running).
     /// </summary>
     public static IServer Server => _server;
 
     /// <summary>
-    /// Gets the current Client API instance (null if Multiplayer mod is not loaded or client not running)
+    /// Gets the current Client API instance (null if Multiplayer mod is not loaded or client not running).
     /// </summary>
     public static IClient Client => _client;
 
     /// <summary>
-    /// Internal method for the Multiplayer mod to register itself
+    /// Internal method for the Multiplayer mod to register itself.
     /// </summary>
     /// <param name="apiInstance">The API implementation</param>
     internal static void RegisterAPI(IMultiplayerAPI apiInstance)
@@ -109,7 +109,7 @@ public static class MultiplayerAPI
     }
 
     /// <summary>
-    /// Internal method for the Multiplayer mod to register a client instance
+    /// Internal method for the Multiplayer mod to register a client instance.
     /// </summary>
     /// <param name="client">The Client implementation</param>
     internal static void RegisterClient(IClient client)
@@ -119,7 +119,7 @@ public static class MultiplayerAPI
     }
 
     /// <summary>
-    /// Internal method for the Multiplayer mod to deregister a client instance
+    /// Internal method for the Multiplayer mod to deregister a client instance.
     /// </summary>
     internal static void ClearClient()
     {
@@ -128,7 +128,7 @@ public static class MultiplayerAPI
     }
 
     /// <summary>
-    /// Internal method for the Multiplayer mod to register a server instance
+    /// Internal method for the Multiplayer mod to register a server instance.
     /// </summary>
     /// <param name="server">The API implementation</param>
     internal static void RegisterServer(IServer server)
@@ -138,7 +138,7 @@ public static class MultiplayerAPI
     }
 
     /// <summary>
-    /// Internal method for the Multiplayer mod to deregister a server instance
+    /// Internal method for the Multiplayer mod to deregister a server instance.
     /// </summary>
     internal static void ClearServer()
     {

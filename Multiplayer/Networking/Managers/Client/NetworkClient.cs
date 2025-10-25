@@ -144,7 +144,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundDestroyTrainCarPacket>(OnClientboundDestroyTrainCarPacket);
         netPacketProcessor.SubscribeReusable<ClientboundTrainsetPhysicsPacket>(OnClientboundTrainPhysicsPacket);
         netPacketProcessor.SubscribeReusable<CommonCouplerInteractionPacket>(OnCommonCouplerInteractionPacket);
-        netPacketProcessor.SubscribeReusable<CommonTrainCouplePacket>(OnCommonTrainCouplePacket);
+        //netPacketProcessor.SubscribeReusable<CommonTrainCouplePacket>(OnCommonTrainCouplePacket);
         netPacketProcessor.SubscribeReusable<CommonTrainUncouplePacket>(OnCommonTrainUncouplePacket);
         netPacketProcessor.SubscribeReusable<CommonHoseConnectedPacket>(OnCommonHoseConnectedPacket);
         netPacketProcessor.SubscribeReusable<CommonHoseDisconnectedPacket>(OnCommonHoseDisconnectedPacket);
@@ -351,7 +351,6 @@ public class NetworkClient : NetworkManager
         ClientPlayerManager.RemovePlayer(packet.PlayerId);
     }
 
-
     //For server shutting down / player kicked
     private void OnClientboundDisconnectPacket(ClientboundDisconnectPacket packet)
     {
@@ -365,6 +364,7 @@ public class NetworkClient : NetworkManager
             disconnectMessage = "Server Shutting Down";
         }
     }
+
     private void OnClientboundPlayerPositionPacket(ClientboundPlayerPositionPacket packet)
     {
         ClientPlayerManager.UpdatePosition(packet.PlayerId, packet.Position, packet.MoveDir, packet.RotationY, packet.IsJumping, packet.IsOnCar, packet.CarID);
@@ -515,7 +515,6 @@ public class NetworkClient : NetworkManager
         }
     }
 
-
     private void OnClientboundRailwayStatePacket(ClientboundRailwayStatePacket packet)
     {
         for (int i = 0; i < packet.SelectedJunctionBranches.Length; i++)
@@ -626,25 +625,26 @@ public class NetworkClient : NetworkManager
 
         netTrainCar.Common_ReceiveCouplerInteraction(packet);
     }
-    private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet)
-    {
-        //    TrainCar trainCar = null;
-        //    TrainCar otherTrainCar = null;
 
-        //    if (!NetworkedTrainCar.TryGet(packet.NetId, out trainCar) || !NetworkedTrainCar.TryGet(packet.OtherNetId, out otherTrainCar))
-        //    {
-        //        LogDebug(() => $"OnCommonTrainCouplePacket() netId: {packet.NetId}, trainCar found?: {trainCar != null}, otherNetId: {packet.OtherNetId}, otherTrainCar found?: {otherTrainCar != null}");
-        //        return;
-        //    }
+    //private void OnCommonTrainCouplePacket(CommonTrainCouplePacket packet)
+    //{
+    //    TrainCar trainCar = null;
+    //    TrainCar otherTrainCar = null;
 
-        //    LogDebug(() => $"OnCommonTrainCouplePacket() netId: {packet.NetId}, trainCar: {trainCar.ID}, otherNetId: {packet.OtherNetId}, otherTrainCar: {otherTrainCar.ID}");
+    //    if (!NetworkedTrainCar.TryGet(packet.NetId, out trainCar) || !NetworkedTrainCar.TryGet(packet.OtherNetId, out otherTrainCar))
+    //    {
+    //        LogDebug(() => $"OnCommonTrainCouplePacket() netId: {packet.NetId}, trainCar found?: {trainCar != null}, otherNetId: {packet.OtherNetId}, otherTrainCar found?: {otherTrainCar != null}");
+    //        return;
+    //    }
 
-        //    Coupler coupler = packet.IsFrontCoupler ? trainCar.frontCoupler : trainCar.rearCoupler;
-        //    Coupler otherCoupler = packet.OtherCarIsFrontCoupler ? otherTrainCar.frontCoupler : otherTrainCar.rearCoupler;
+    //    LogDebug(() => $"OnCommonTrainCouplePacket() netId: {packet.NetId}, trainCar: {trainCar.ID}, otherNetId: {packet.OtherNetId}, otherTrainCar: {otherTrainCar.ID}");
 
-        //    if (coupler.CoupleTo(otherCoupler, packet.PlayAudio, false/*B99 packet.ViaChainInteraction*/) == null)
-        //        LogDebug(() => $"OnCommonTrainCouplePacket() netId: {packet.NetId}, trainCar: {trainCar.ID}, otherNetId: {packet.OtherNetId}, otherTrainCar: {otherTrainCar.ID} Failed to couple!");
-    }
+    //    Coupler coupler = packet.IsFrontCoupler ? trainCar.frontCoupler : trainCar.rearCoupler;
+    //    Coupler otherCoupler = packet.OtherCarIsFrontCoupler ? otherTrainCar.frontCoupler : otherTrainCar.rearCoupler;
+
+    //    if (coupler.CoupleTo(otherCoupler, packet.PlayAudio, false/*B99 packet.ViaChainInteraction*/) == null)
+    //        LogDebug(() => $"OnCommonTrainCouplePacket() netId: {packet.NetId}, trainCar: {trainCar.ID}, otherNetId: {packet.OtherNetId}, otherTrainCar: {otherTrainCar.ID} Failed to couple!");
+    //}
 
     private void OnCommonTrainUncouplePacket(CommonTrainUncouplePacket packet)
     {
@@ -986,11 +986,11 @@ public class NetworkClient : NetworkManager
     {
         CareerManagerDebtControllerPatch.HasDebt = packet.HasDebt;
     }
+
     private void OnCommonChatPacket(CommonChatPacket packet)
     {
         chatGUI?.ReceiveMessage(packet.message);
     }
-
 
     private void OnClientboundJobsCreatePacket(ClientboundJobsCreatePacket packet)
     {
@@ -1347,6 +1347,7 @@ public class NetworkClient : NetworkManager
             Position = position
         }, DeliveryMethod.ReliableOrdered);
     }
+
     public void SendAddCoal(ushort netId, float coalMassDelta)
     {
         SendPacketToServer(new ServerboundAddCoalPacket
@@ -1447,7 +1448,6 @@ public class NetworkClient : NetworkManager
             WarehouseAction = action,
         }, DeliveryMethod.ReliableUnordered);
     }
-
 
     public void SendChat(string message)
     {
