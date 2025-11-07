@@ -30,10 +30,11 @@ public class ModCompatibilityManager : SingletonBehaviour<ModCompatibilityManage
 
         //we don't care if the client does/doesn't have these mods
         RegisterCompatibility("RuntimeUnityEditor", MultiplayerCompatibility.Client);
-        RegisterCompatibility("BookletOrganizer", MultiplayerCompatibility.Client);
+        RegisterCompatibility("BookletOrganizer", MultiplayerCompatibility.Host);
         RegisterCompatibility("RemoteDispatch", MultiplayerCompatibility.Client);
-        RegisterCompatibility("DVDiscordPresenceMod", MultiplayerCompatibility.Client);
         RegisterCompatibility("CommsRadioAPI", MultiplayerCompatibility.Client);
+        RegisterCompatibility("DVCustomCargo", MultiplayerCompatibility.All);
+        RegisterCompatibility("DVDiscordPresenceMod", MultiplayerCompatibility.Client);
         RegisterCompatibility("DVLangHelper", MultiplayerCompatibility.Client);
         RegisterCompatibility("LightingOverhaul", MultiplayerCompatibility.Client);
 

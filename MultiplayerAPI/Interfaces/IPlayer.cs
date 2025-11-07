@@ -53,9 +53,9 @@ namespace MPAPI.Interfaces
         int Ping { get; }
 
         /// <summary>
-        /// Gets the current network ping/latency for this player.
+        /// Gets a value indicating whether this player is on a car.
         /// </summary>
-        /// <value>The round-trip time in milliseconds between the server and this player.</value>
+        /// <value><c>true</c> if the player is on a car; otherwise, <c>false</c>.</value>
         bool IsOnCar { get; }
 
         /// <summary>

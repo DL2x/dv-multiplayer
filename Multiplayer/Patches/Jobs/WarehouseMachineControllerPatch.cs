@@ -21,10 +21,10 @@ public class WarehouseMachineControllerPatch
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(WarehouseMachineController.SetScreen))]
-    public static bool SetScreen(WarehouseMachineController __instance, TextPreset preset, bool isLoading, string jobId, Car car, CargoType_v2 cargoType)
+    public static void SetScreen(WarehouseMachineController __instance, TextPreset preset, bool isLoading, string jobId, Car car, CargoType_v2 cargoType)
     {
         if (!NetworkLifecycle.Instance.IsHost())
-            return true;
+            return;
 
         //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() is host");
 
@@ -38,12 +38,12 @@ public class WarehouseMachineControllerPatch
 
         //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() skipping: {skip}");
         if (skip)
-            return true;
+            return;
 
         if (!NetworkedWarehouseMachineController.GetFromWarehouseMachineController(__instance, out var netMachine) || netMachine == null)
         {
             Multiplayer.LogError($"WarehouseMachineControllerPatch.SetScreen(): Failed to get NetworkedWarehouseMachineController for {__instance.warehouseTrackName}");
-            return true;
+            return;
         }
 
         //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetMachine found");
@@ -60,7 +60,7 @@ public class WarehouseMachineControllerPatch
             if (tc == null || !NetworkedTrainCar.TryGetFromTrainCar(tc, out var netTC))
             {
                 //Multiplayer.LogWarning($"WarehouseMachineControllerPatch.SetScreen() Failed to get NetworkedTrainCar for {car?.ID}");
-                return true;
+                return;
             }
 
             //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetCar found");
@@ -72,7 +72,7 @@ public class WarehouseMachineControllerPatch
             if(!NetworkedJob.TryGetFromJobId(jobId, out var netJob))
             {
                 Multiplayer.LogWarning($"WarehouseMachineControllerPatch.SetScreen() Failed to get NetworkedJob for {jobId}");
-                return true;
+                return;
             }
 
             //Multiplayer.LogDebug(() => $"WarehouseMachineControllerPatch.SetScreen() NetJob found");
@@ -83,8 +83,6 @@ public class WarehouseMachineControllerPatch
                 cargoTypeV1 = cargoType.v1;
 
         NetworkLifecycle.Instance.Server.SendWarehouseControllerUpdate(netMachine.NetId, isLoading, jobNetId, carNetId, cargoTypeV1, preset);
-
-        return false;
     }
 
     [HarmonyPrefix]

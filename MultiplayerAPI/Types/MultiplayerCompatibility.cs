@@ -34,7 +34,7 @@ public enum MultiplayerCompatibility : byte
     Host,
 
     /// <summary>
-    /// Mod has no effect on the gamne play and can be ignored
+    /// Mod has no effect on the game play and can be ignored.
     ///     This should be used for client-only mods e.g. GUI enhancements, controller mods, RUE, etc.
     /// </summary>
     Client,

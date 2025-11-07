@@ -11,7 +11,7 @@ namespace MultiplayerAPITest.Packets
         //    Primitives (bool, byte, sbyte, short, ushort, int, uint, long, ulong, float, double, string, char, IPEndPoint, Guid)
         //    Arrays of primitives
         //    Enums derived from primitives e.g. `enum MyEnum : byte`
-        //    UnityEngine: Vector2, Vector3, Quarternion
+        //    UnityEngine: Vector2, Vector3, Quaternion
 
         //Be mindful of the amount of data per packet.
         //  Avoid sending long strings or large structures
