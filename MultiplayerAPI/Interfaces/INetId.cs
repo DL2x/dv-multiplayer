@@ -9,7 +9,7 @@ namespace MPAPI.Interfaces;
 /// which are used to synchronise object references across the network. Only objects that are actively
 /// synchronised by Multiplayer mod will have associated network identifiers.
 /// 
-/// Additional objects from the base game will be added as Multiplayer features are implemented. If there are
+/// Additional objects from the base-game will be added as Multiplayer features are implemented. If there are
 /// specific object types you would like to see supported, please create an issue on the Multiplayer Mod GitHub repository.
 /// </remarks>
 public interface INetIdProvider

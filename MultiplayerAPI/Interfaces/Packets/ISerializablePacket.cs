@@ -3,20 +3,20 @@ using System.IO;
 namespace MPAPI.Interfaces.Packets;
 
 /// <summary>
-/// Base interface for packets using manual serialization
-/// Implementing classes must handle their own serialization/deserialization.
+/// Base interface for packets using manual serialisation.
+/// Implementing classes must handle their own serialisation/deserialisation.
 /// </summary>
 public interface ISerializablePacket
 {
     /// <summary>
-    /// Serialize the packet data to the provided writer
+    /// Serialise the packet data to the provided <see cref="BinaryWriter"/>.
     /// </summary>
-    /// <param name="writer">Writer to serialize data to</param>
+    /// <param name="writer"><see cref="BinaryWriter"/> to serialise data to.</param>
     void Serialize(BinaryWriter writer);
 
     /// <summary>
-    /// Deserialize the packet data from the provided reader
+    /// Deserialise the packet data from the provided <see cref="BinaryReader"/>.
     /// </summary>
-    /// <param name="reader">Reader to deserialize data from</param>
+    /// <param name="reader"><see cref="BinaryReader"/> to deserialise data from.</param>
     void Deserialize(BinaryReader reader);
 }

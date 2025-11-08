@@ -1,11 +1,12 @@
 using DV.Logic.Job;
 using MPAPI.Types;
 using System;
+using System.Collections.Generic;
 
 namespace MPAPI.Interfaces;
 
 /// <summary>
-/// Main interface for interacting with the Multiplayer mod
+/// Main interface for interacting with the Multiplayer mod.
 /// </summary>
 public interface IMultiplayerAPI
 {
@@ -20,44 +21,44 @@ public interface IMultiplayerAPI
     public string MultiplayerVersion { get; }
 
     /// <summary>
-    /// Gets whether the multiplayer mod is currently loaded and active
+    /// Gets whether the multiplayer mod is currently loaded and active.
     /// </summary>
     bool IsMultiplayerLoaded { get; }
 
-    /// <summary>Sets the mod's compatibility requirements</summary>
-    /// <param name="modId">String representing the your mod's Id (`ModEntry.Info.Id`)</param>
-    /// <param name="compatibility">ModCompatibility flags representing installation host/client requirements</param>
+    /// <summary>Sets the mod's compatibility requirements.</summary>
+    /// <param name="modId">String representing the your mod's Id (`ModEntry.Info.Id`).</param>
+    /// <param name="compatibility">ModCompatibility flags representing installation host/client requirements.</param>
     void SetModCompatibility(string modId, MultiplayerCompatibility compatibility);
 
     /// <summary>
-    /// Returns true if either a host or client exist
+    /// Returns true if either a host or client exist.
     /// </summary>
     bool IsConnected { get; }
  
     /// <summary>
-    /// Gets whether this instance is host
+    /// Gets whether this instance is host.
     /// </summary>
     bool IsHost { get; }
 
     /// <summary>
-    /// Gets whether this instance is a dedicated server
+    /// Gets whether this instance is a dedicated server.
     /// </summary>
     bool IsDedicatedServer { get; }
 
     /// <summary>
-    /// Gets whether this current session is single player
+    /// Gets whether this current session is single player.
     /// </summary>
     bool IsSinglePlayer { get; }
 
     /// <summary>
-    /// Event fired when a game/network tick occurs
+    /// Event fired when a game/network tick occurs.
     /// Ticks occur at a fixed interval (TICK_INTERVAL = 1/TICK_RATE) and are useful for synchronisation, batching, and processing changes.
     ///
     /// The tick parameter can be used to determine if non-reliable packets have been dropped and to sequence actions for rollbacks or preventing stale data from being processed.
     /// 
     /// Example: In Multiplayer's TrainCar simulation sync, small changes are cached when they occur but sent as a single packet per TrainCar when OnTick fires, reducing network overhead.
     /// </summary>
-    /// <remarks>The parameter represents the current tick number</remarks>
+    /// <remarks>The event handler receives a <see cref="uint"/> representing the current tick number.</remarks>
     event Action<uint> OnTick;
 
     /// <summary>
@@ -72,33 +73,33 @@ public interface IMultiplayerAPI
     uint CurrentTick { get; }
 
     /// <summary>
-    /// Gets the NetId for an object
+    /// Gets the NetId for an object.
     /// </summary>
-    /// <param name="obj">The object you want the NetId for</param>
-    /// <param name="netId">When this method returns, contains the NetId associated with the specified object, if found; otherwise, 0</param>
-    /// <returns>True if a NetId for the object was found; otherwise, false</returns>
+    /// <param name="obj">The object you want the NetId for.</param>
+    /// <param name="netId">When this method returns, contains the NetId associated with the specified object, if found; otherwise, 0.</param>
+    /// <returns><c>True</c> if a NetId for the object was found; otherwise, <c>false</c>.</returns>
     bool TryGetNetId<T>(T obj, out ushort netId) where T : class;
 
     /// <summary>
-    /// Gets the object for a NetId
+    /// Gets the object for a NetId.
     /// </summary>
-    /// <param name="netId">The non-zero NetId for the object</param>
-    /// <param name="obj">When this method returns, contains the object associated with the NetId, if found; otherwise null</param>
-    /// <returns>True if the object was found; otherwise, false</returns>
+    /// <param name="netId">The non-zero NetId for the object.</param>
+    /// <param name="obj">When this method returns, contains the object associated with the NetId, if found; otherwise <c>null</c>.</param>
+    /// <returns><c>True</c> if the object was found; otherwise, <c>false</c>.</returns>
     bool TryGetObjectFromNetId<T>(ushort netId, out T obj) where T : class;
 
     /// <summary>
-    /// Registers a PaintTheme and returns its ID
+    /// Registers a PaintTheme and returns its ID.
     /// </summary>
-    /// <param name="assetName">The string representing the `PaintTheme.AssetName`</param>
-    /// <returns>Non-zero, unique Id if the theme was successfully registered, otherwise 0</returns>
+    /// <param name="assetName">The string representing the `PaintTheme.AssetName`.</param>
+    /// <returns>Non-zero, unique Id if the theme was successfully registered, otherwise 0.</returns>
     /// <remarks>PaintThemes must be registered each time the client or server starts, registration is not persistent across sessions.</remarks>
     uint RegisterPaintTheme(string assetName);
 
     /// <summary>
-    /// Unregisters a PaintTheme
+    /// Unregisters a PaintTheme.
     /// </summary>
-    /// <param name="themeId">The Id of the PaintTheme to be unregistered</param>
+    /// <param name="themeId">The Id of the PaintTheme to be unregistered.</param>
     void UnregisterPaintTheme(uint themeId);
 
     /// <summary>
