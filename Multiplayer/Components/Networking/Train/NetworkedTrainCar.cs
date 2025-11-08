@@ -1,5 +1,6 @@
 using DV.CabControls;
 using DV.Customization.Paint;
+using DV.Logic.Job;
 using DV.MultipleUnit;
 using DV.Simulation.Brake;
 using DV.Simulation.Cars;
@@ -44,6 +45,13 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         return b;
     }
 
+    public static bool TryGet(ushort netId, out Car trainCar)
+    {
+        bool b = TryGet(netId, out NetworkedTrainCar networkedTrainCar);
+        trainCar = b ? networkedTrainCar.TrainCar?.logicCar : null;
+        return b;
+    }
+
     public static bool TryGetCoupler(HoseAndCock hoseAndCock, out Coupler coupler)
     {
         return hoseToCoupler.TryGetValue(hoseAndCock, out coupler);
@@ -68,6 +76,17 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         netId = 0;
 
         if (!trainCarsToNetworkedTrainCars.TryGetValue(trainCar, out var networkedTrainCar) || networkedTrainCar == false || networkedTrainCar.NetId == 0)
+            return false;
+
+        netId = networkedTrainCar.NetId;
+        return true;
+    }
+
+    public static bool TryGetNetId(Car car, out ushort netId)
+    {
+        netId = 0;
+
+        if (car == null || !GetFromTrainId(car.ID, out var networkedTrainCar) || networkedTrainCar == false || networkedTrainCar.NetId == 0)
             return false;
 
         netId = networkedTrainCar.NetId;

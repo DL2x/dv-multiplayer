@@ -22,6 +22,7 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
     {
         base.Awake();
         RegisterHandler<TrainCar>(NetworkedTrainCar.TryGetNetId, NetworkedTrainCar.TryGet);
+        RegisterHandler<Car>(NetworkedTrainCar.TryGetNetId, NetworkedTrainCar.TryGet);
 
         RegisterHandler<Junction>(NetworkedJunction.TryGetNetId, NetworkedJunction.TryGet);
         RegisterHandler<TurntableRailTrack>(NetworkedTurntable.TryGetNetId, NetworkedTurntable.TryGet);
