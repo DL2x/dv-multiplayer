@@ -49,7 +49,7 @@ public abstract class TaskNetworkData
     public TaskType TaskType { get; set; }
 
     /// <summary>
-    /// Serializes the task network data to the specified <see cref="BinaryWriter"/>.
+    /// Serialises the task network data to the specified <see cref="BinaryWriter"/>.
     /// Implementations should write all relevant fields for network transmission.
     /// </summary>
     /// <remarks>
@@ -59,7 +59,7 @@ public abstract class TaskNetworkData
     public abstract void Serialize(BinaryWriter writer);
 
     /// <summary>
-    /// Deserializes the task network data from the specified <see cref="BinaryReader"/>.
+    /// Deserialises the task network data from the specified <see cref="BinaryReader"/>.
     /// Implementations should read all relevant fields in the same order and size as written by <see cref="Serialize(BinaryWriter)"/>.
     /// </summary>
     /// <remarks>

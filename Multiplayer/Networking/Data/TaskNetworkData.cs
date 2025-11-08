@@ -19,8 +19,9 @@ public static class TaskNetworkDataFactory
     internal static readonly List<Type> baseTasks = [];
     internal static readonly List<TaskType> baseTaskTypes = [];
 
-    public static bool RegisterTaskType<TGameTask>(TaskType taskType, Func<TGameTask, TaskNetworkData> converter, Func<TaskType, TaskNetworkData> emptyCreator)
+    public static bool RegisterTaskType<TGameTask, TNetworkData>(TaskType taskType)
         where TGameTask : Task
+        where TNetworkData : TaskNetworkData<TNetworkData>, new()
     {
         Multiplayer.LogDebug(() => $"Registering Task Type {typeof(TGameTask)} with TaskType {taskType}");
 
@@ -30,8 +31,13 @@ public static class TaskNetworkDataFactory
             return false;
         }
 
-        TypeToTaskNetworkData[typeof(TGameTask)] = task => converter((TGameTask)task);
-        EnumToEmptyTaskNetworkData[taskType] = emptyCreator;
+        TypeToTaskNetworkData[typeof(TGameTask)] = task =>
+        {
+            var networkData = new TNetworkData { TaskType = taskType };
+            return ((TaskNetworkData<TNetworkData>)networkData).FromTask(task);
+        };
+
+        EnumToEmptyTaskNetworkData[taskType] = type => new TNetworkData { TaskType = type };
 
         return true;
     }
@@ -74,51 +80,35 @@ public static class TaskNetworkDataFactory
         return tasks.Select(ConvertTask).ToArray();
     }
 
-    public static TaskNetworkData ConvertTask(TaskType type)
+    public static TaskNetworkData ConvertTask(TaskType taskType)
     {
         //Multiplayer.LogDebug(() => $"TaskNetworkDataFactory.ConvertTask({type})");
-        if (EnumToEmptyTaskNetworkData.TryGetValue(type, out var creator))
+        if (EnumToEmptyTaskNetworkData.TryGetValue(taskType, out var creator))
         {
-            return creator(type);
+            return creator(taskType);
         }
-        throw new ArgumentException($"Unknown task type: {type}");
+        throw new ArgumentException($"Unknown task type: {taskType}");
     }
 
     // Register base task types
     static TaskNetworkDataFactory()
     {
-        RegisterTaskType<WarehouseTask>(
-            TaskType.Warehouse,
-            task => new WarehouseTaskData { TaskType = TaskType.Warehouse }.FromTask(task),
-            type => new WarehouseTaskData { TaskType = type }
-        );
+        RegisterTaskType<WarehouseTask, WarehouseTaskData>(TaskType.Warehouse);
 
         baseTasks.Add(typeof(WarehouseTask));
         baseTaskTypes.Add(TaskType.Warehouse);
 
-        RegisterTaskType<TransportTask>(
-            TaskType.Transport,
-            task => new TransportTaskData { TaskType = TaskType.Transport }.FromTask(task),
-            type => new TransportTaskData { TaskType = type }
-        );
+        RegisterTaskType<TransportTask, TransportTaskData>(TaskType.Transport);
 
         baseTasks.Add(typeof(TransportTask));
         baseTaskTypes.Add(TaskType.Transport);
 
-        RegisterTaskType<SequentialTasks>(
-            TaskType.Sequential,
-            task => new SequentialTasksData { TaskType = TaskType.Sequential }.FromTask(task),
-            type => new SequentialTasksData { TaskType = type }
-        );
+        RegisterTaskType<SequentialTasks, SequentialTasksData>(TaskType.Sequential);
 
         baseTasks.Add(typeof(SequentialTasks));
         baseTaskTypes.Add(TaskType.Sequential);
 
-        RegisterTaskType<ParallelTasks>(
-            TaskType.Parallel,
-            task => new ParallelTasksData { TaskType = TaskType.Parallel }.FromTask(task),
-            type => new ParallelTasksData { TaskType = type }
-        );
+        RegisterTaskType<ParallelTasks, ParallelTasksData>(TaskType.Parallel);
 
         baseTasks.Add(typeof(ParallelTasks));
         baseTaskTypes.Add(TaskType.Parallel);
@@ -337,7 +327,7 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
 public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
 {
     public TaskNetworkData[] Tasks { get; set; }
-    public byte CurrentTaskIndex { get; set; }
+
 
     public override void Serialize(BinaryWriter writer)
     {
@@ -354,8 +344,6 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
             writer.Write((byte)task.TaskType);
             task.Serialize(writer);
         }
-
-        writer.Write(CurrentTaskIndex);
     }
 
     public override void Deserialize(BinaryReader reader)
@@ -369,8 +357,6 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
             Tasks[i] = TaskNetworkDataFactory.ConvertTask(taskType);
             Tasks[i].Deserialize(reader);
         }
-
-        CurrentTaskIndex = reader.ReadByte();
     }
 
     public override SequentialTasksData FromTask(Task task)
@@ -381,22 +367,6 @@ public class SequentialTasksData : TaskNetworkData<SequentialTasksData>
         FromTaskCommon(task);
 
         Tasks = TaskNetworkDataFactory.ConvertTasks(sequentialTasks.tasks);
-
-        bool found = false;
-
-        CurrentTaskIndex = 0;
-        foreach (Task subTask in sequentialTasks.tasks)
-        {
-            if (subTask == sequentialTasks.currentTask.Value)
-            {
-                found = true;
-                break;
-            }
-            CurrentTaskIndex++;
-        }
-
-        if (!found)
-            CurrentTaskIndex = byte.MaxValue;
 
         return this;
     }

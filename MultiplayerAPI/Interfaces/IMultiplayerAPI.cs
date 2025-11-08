@@ -102,37 +102,55 @@ public interface IMultiplayerAPI
     void UnregisterPaintTheme(uint themeId);
 
     /// <summary>
-    /// Registers a serialiser and deserialiser for a custom <see cref="DV.Logic.Job.Task"/> type for multiplayer synchronization.
+    /// Registers a <see cref="TaskNetworkData{T}"/> serialiser/deserialiser for a custom <see cref="DV.Logic.Job.Task"/> type for multiplayer synchronisation.
     /// </summary>
-    /// <typeparam name="TGameTask">The concrete <see cref="DV.Logic.Job.Task"/> type to register.</typeparam>
-    /// <param name="taskType">The <see cref="DV.Logic.Job.TaskType"/> enum value</param>
-    /// <param name="converter">
-    /// A function that takes an instance of <typeparamref name="TGameTask"/> and returns a corresponding <see cref="TaskNetworkData"/> object
-    /// for serialisation.
-    /// </param>
-    /// <param name="emptyCreator">
-    /// A function that takes a <see cref="DV.Logic.Job.TaskType"/> and returns an empty <see cref="TaskNetworkData"/> instance for deserialisation.
-    /// </param>
+    /// <typeparam name="TCustomTask">The concrete <see cref="DV.Logic.Job.Task"/> type to register.</typeparam>
+    /// <typeparam name="TTaskNetworkData">
+    /// The <see cref="TaskNetworkData{T}"/> type that handles serialisation and deserialisation for <typeparamref name="TCustomTask"/>.
+    /// Must have a parameterless constructor and implement <see cref="TaskNetworkData{TCustomTask}.FromTask(Task)"/> to convert from the task.
+    /// </typeparam>
+    /// <param name="taskType">The <see cref="DV.Logic.Job.TaskType"/> enum value associated with this task type.</param>
     /// <returns>
     /// <c>true</c> if the task type was successfully registered; <c>false</c> if the task type was already registered or registration failed.
     /// </returns>
     /// <remarks>
-    /// This method allows the Multiplayer mod to correctly serialise and deserialise custom or extended task types.
+    /// This method automatically handles conversion by instantiating <typeparamref name="TTaskNetworkData"/>, calling its 
+    /// <see cref="TaskNetworkData{TCustomTask}.FromTask(Task)"/> method for serialisation, and creating empty instances for deserialisation.
     /// </remarks>
-    bool RegisterTaskType<TGameTask>(TaskType taskType, Func<TGameTask, TaskNetworkData> converter, Func<TaskType, TaskNetworkData> emptyCreator)
-        where TGameTask : Task;
+    bool RegisterTaskType<TCustomTask, TTaskNetworkData>(TaskType taskType) where TCustomTask : Task where TTaskNetworkData : TaskNetworkData<TTaskNetworkData>, new();
 
     /// <summary>
     /// Unregisters a previously registered custom <see cref="DV.Logic.Job.Task"/> type.
     /// </summary>
-    /// <typeparam name="TGameTask">The concrete <see cref="DV.Logic.Job.Task"/> type to unregister.</typeparam>
+    /// <typeparam name="TCustomTask">The concrete <see cref="DV.Logic.Job.Task"/> type to unregister.</typeparam>
     /// <param name="taskType">The <see cref="TaskType"/> enum value associated with the task type to unregister.</param>
     /// <returns>
-    /// <c>true</c> if the task type was successfully unregistered; <c>false</c> if the task type is a base game task type.
+    /// <c>true</c> if the task type was successfully unregistered; <c>false</c> if the task type was not found or is a base-game task type.
     /// </returns>
     /// <remarks>
     /// This method allows removal of custom or extended task types from the multiplayer system. 
-    /// Base task types cannot be unregistered.
+    /// Base-game task types cannot be unregistered.
     /// </remarks>
-    bool UnregisterTaskType<TGameTask>(TaskType taskType) where TGameTask : Task;
+    bool UnregisterTaskType<TCustomTask>(TaskType taskType) where TCustomTask : Task;
+
+    /// <summary>
+    /// Converts an IEnumerable collection of <see cref="DV.Logic.Job.Task"/> into an array of <see cref="TaskNetworkData"/>.
+    /// </summary>
+    /// <param name="tasks">The collection of tasks to convert.</param>
+    /// <returns>An array of <see cref="TaskNetworkData"/> representing the tasks.</returns>
+    TaskNetworkData[] ConvertTasks(IEnumerable<Task> tasks);
+
+    /// <summary>
+    /// Converts a <see cref="DV.Logic.Job.Task"/> into a <see cref="TaskNetworkData"/>.
+    /// </summary>
+    /// <param name="task">The task to convert.</param>
+    /// <returns>A <see cref="TaskNetworkData"/> representing the task.</returns>
+    TaskNetworkData ConvertTask(Task task);
+
+    /// <summary>
+    /// Retrieves a <see cref="TaskNetworkData"/> for the specified <see cref="DV.Logic.Job.TaskType"/>.
+    /// </summary>
+    /// <param name="taskType">The task type to convert.</param>
+    /// <returns>A <see cref="TaskNetworkData"/> representing the task.</returns>
+    TaskNetworkData ConvertTask(TaskType taskType);
 }

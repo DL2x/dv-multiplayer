@@ -5,6 +5,7 @@ using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
 using System;
+using System.Collections.Generic;
 
 namespace Multiplayer.API;
 
@@ -77,15 +78,35 @@ public class APIProvider : IMultiplayerAPI
         }
     }
 
-    public bool RegisterTaskType<TGameTask>(TaskType taskType, Func<TGameTask, TaskNetworkData> converter, Func<TaskType, TaskNetworkData> emptyCreator) where TGameTask : Task
+    #region Task Serialisation
+    public bool RegisterTaskType<TGameTask, TNetworkData>(TaskType taskType)
+        where TGameTask : Task
+        where TNetworkData : TaskNetworkData<TNetworkData>, new()
     {
-        return TaskNetworkDataFactory.RegisterTaskType<TGameTask>(taskType, converter, emptyCreator);
+        return TaskNetworkDataFactory.RegisterTaskType<TGameTask, TNetworkData>(taskType);
     }
 
     public bool UnregisterTaskType<TGameTask>(TaskType taskType) where TGameTask : Task
     {
         return TaskNetworkDataFactory.UnregisterTaskType<TGameTask>(taskType);
     }
+
+    public TaskNetworkData[] ConvertTasks(IEnumerable<Task> tasks)
+    {
+        return TaskNetworkDataFactory.ConvertTasks(tasks);
+    }
+
+    public TaskNetworkData ConvertTask(Task task)
+    {
+        return TaskNetworkDataFactory.ConvertTask(task);
+    }
+
+    public TaskNetworkData ConvertTask(TaskType type)
+    {
+        return TaskNetworkDataFactory.ConvertTask(type);
+    }
+
+    #endregion
 
     #region Class Helpers
 
