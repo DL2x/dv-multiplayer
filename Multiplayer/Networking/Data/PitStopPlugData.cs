@@ -25,7 +25,7 @@ public readonly struct PitStopPlugData(ushort netId, PlugInteractionType state, 
                 (
                     plugData.NetId,
                     interaction,
-                    plugData.HeldBy?.Id ?? 0,
+                    plugData.HeldBy?.PlayerId ?? 0,
                     plugData.TrainCarNetId,
                     plugData.SocketIndex,
                     plugData.transform.GetWorldAbsolutePosition(),

@@ -16,6 +16,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 using static CashRegisterModule;
+using static DV.Interaction.Inputs.InputManager;
 
 namespace Multiplayer.Components.Networking.World;
 
@@ -148,7 +149,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             // Setup network events
             NetworkLifecycle.Instance.OnTick += OnTick;
 
-            NetworkLifecycle.Instance.Server.PlayerDisconnect += OnPlayerDisconnect;
+            NetworkLifecycle.Instance.Server.PlayerDisconnected += OnPlayerDisconnect;
 
             // Ensure host can interact
             Refreshed = true;
@@ -187,7 +188,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
             NetworkLifecycle.Instance.OnTick -= OnTick;
 
-            NetworkLifecycle.Instance.Server.PlayerDisconnect -= OnPlayerDisconnect;
+            NetworkLifecycle.Instance.Server.PlayerDisconnected -= OnPlayerDisconnect;
 
             // Monitor changes to vehicles in the pit stop
             Station.pitstop.CarEntered -= OnCarPitStopEntered;
@@ -246,7 +247,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     }
 
     //todo: update when merged with ModAPI branch
-    public void OnPlayerDisconnect(uint playerId)
+    public void OnPlayerDisconnect(ServerPlayer player)
     {
         //todo: when a player disconnects, if they are interacting with a lever, cancel the interaction
         //Multiplayer.LogWarning($"OnPlayerDisconnect()");
@@ -309,7 +310,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     public void ProcessInteractionPacketAsHost(CommonPitStopInteractionPacket packet, ServerPlayer senderPlayer)
     {
-        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessInteractionPacketAsHost() from: {senderPlayer.Username}, id: {senderPlayer.Id}, selfpeer: {NetworkLifecycle.Instance.Server.SelfId}");
+        Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessInteractionPacketAsHost() from: {senderPlayer.Username}, id: {senderPlayer.PlayerId}, selfpeer: {NetworkLifecycle.Instance.Server.SelfId}");
 
         if (ValidateInteraction(packet, senderPlayer))
         {
@@ -317,7 +318,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             OnCarPitStopEntered();
 
             processingAsHost = true;
-            if (senderPlayer.Id != NetworkLifecycle.Instance.Server.SelfId)
+            if (senderPlayer.PlayerId != NetworkLifecycle.Instance.Server.SelfId)
             {
                 Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessInteractionPacketAsHost() ProcessPacketAsClient()");
                 ProcessInteractionPacketAsClient(packet);
@@ -327,7 +328,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             // Send to all other players
             foreach (var player in CullingManager.ActivePlayers)
             {
-                if (player.Id != senderPlayer.Id)
+                if (player.PlayerId != senderPlayer.PlayerId)
                 {
                     Multiplayer.LogDebug(() => $"NetworkedPitStopStation.ProcessInteractionPacketAsHost() sending to player: {player.Username}");
                     NetworkLifecycle.Instance.Server.SendPitStopInteractionPacket(player, packet);

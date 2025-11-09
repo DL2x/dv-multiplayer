@@ -156,7 +156,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
                     success = Inventory.Instance.RemoveMoney(spend);
 
-                    if(success && player.Id != NetworkLifecycle.Instance.Server.SelfId)
+                    if(success && player.PlayerId != NetworkLifecycle.Instance.Server.SelfId)
                         CashRegister?.AddCash(spend);
                 }
                 else

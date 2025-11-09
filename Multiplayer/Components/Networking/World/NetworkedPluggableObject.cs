@@ -86,7 +86,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
         if (NetworkLifecycle.Instance.IsHost())
         {
-            NetworkLifecycle.Instance.Server.PlayerDisconnect += OnPlayerDisconnected;
+            NetworkLifecycle.Instance.Server.PlayerDisconnected += OnPlayerDisconnected;
 
             Refreshed = true;
         }
@@ -136,7 +136,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
         if (NetworkLifecycle.Instance.IsHost())
         {
-            NetworkLifecycle.Instance.Server.PlayerDisconnect -= OnPlayerDisconnected;
+            NetworkLifecycle.Instance.Server.PlayerDisconnected -= OnPlayerDisconnected;
         }
 
         base.OnDestroy();
@@ -220,10 +220,10 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
                     break;
             }
 
-            packet.PlayerId = senderPlayer.Id;
+            packet.PlayerId = senderPlayer.PlayerId;
 
             //Allow host to process packet if not from a local client
-            if (!NetworkLifecycle.Instance.IsClientRunning || (NetworkLifecycle.Instance.IsClientRunning && senderPlayer.Id != NetworkLifecycle.Instance.Server.SelfId))
+            if (!NetworkLifecycle.Instance.IsClientRunning || (NetworkLifecycle.Instance.IsClientRunning && senderPlayer.PlayerId != NetworkLifecycle.Instance.Server.SelfId))
             {
                 processingAsHost = true;
                 ProcessPacket(packet);
@@ -235,7 +235,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
             foreach (var player in Station.CullingManager.ActivePlayers)
             {
-                if (player.Id != senderPlayer.Id)
+                if (player.PlayerId != senderPlayer.PlayerId)
                 {
                     Multiplayer.LogDebug(() => $"NetworkedPluggableObject.ProcessInteractionPacketAsHost() Sending interaction packet to player: {player.Username}");
                     NetworkLifecycle.Instance.Server.SendPitStopPlugInteractionPacket(player, packet);
@@ -282,7 +282,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
         {
 
             //verify TrainCar
-            if (packet.TrainCarNetId == 0 || !NetworkedTrainCar.Get(packet.TrainCarNetId, out var networkedTrainCar) || networkedTrainCar == null)
+            if (packet.TrainCarNetId == 0 || !NetworkedTrainCar.TryGet(packet.TrainCarNetId, out NetworkedTrainCar networkedTrainCar) || networkedTrainCar == null)
             {
                 Multiplayer.LogDebug(() => $"NetworkedPluggableObject.ValidateInteraction() NetId: {NetId}, trainCarNetId: {packet.TrainCarNetId}, NetworkedTrainCar not found!");
                 return false;
@@ -417,9 +417,9 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
             NetworkLifecycle.Instance.Server.SendPitStopPlugInteractionPacket(player, packet);
     }
 
-    private void OnPlayerDisconnected(uint disconnectedPlayerId)
+    private void OnPlayerDisconnected(ServerPlayer disconnectedPlayer)
     {
-        if (HeldBy == null || HeldBy.Id != disconnectedPlayerId)
+        if (HeldBy == null || HeldBy != disconnectedPlayer)
             return;
 
         HeldBy = null;
@@ -437,7 +437,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
         foreach (var player in Station.CullingManager.ActivePlayers)
         {
-            if (player.Id != disconnectedPlayerId && player.Id != NetworkLifecycle.Instance.Server.SelfId)
+            if (player != disconnectedPlayer && player.PlayerId != NetworkLifecycle.Instance.Server.SelfId)
                 NetworkLifecycle.Instance.Server.SendPitStopPlugInteractionPacket(player, packet);
         }
     }
@@ -625,7 +625,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
     {
         DropPlug();
 
-        if (NetworkedTrainCar.Get(trainNetId, out var netTrainCar))
+        if (NetworkedTrainCar.TryGet(trainNetId, out NetworkedTrainCar netTrainCar))
         {
             var socket = GetTrainCarSocket(netTrainCar, socketIndex);
             if (socket == null)
