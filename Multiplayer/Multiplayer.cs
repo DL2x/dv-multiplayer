@@ -14,6 +14,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using UnityChan;
 using UnityEngine;
 using UnityModManagerNet;
@@ -89,6 +90,9 @@ public static class Multiplayer
 
             Log("Patching...");
             harmony = new Harmony(ModEntry.Info.Id);
+#if DEBUG
+            Harmony.DEBUG = true;
+#endif
             harmony.PatchAll();
             SimComponent_Tick_Patch.Patch(harmony);
 
@@ -116,6 +120,11 @@ public static class Multiplayer
             Log("Loading API Provider...");
             _apiProvider = new APIProvider();
             MultiplayerAPI.RegisterAPI(_apiProvider);
+
+#if DEBUG
+            CheckPatches();
+#endif
+
         }
         catch (Exception ex)
         {
@@ -159,6 +168,9 @@ public static class Multiplayer
     {
         if (ModEntry.NewestVersion != null && ModEntry.NewestVersion.ToString() != "")
         {
+#if DEBUG
+            CheckPatches();
+#endif
             Log($"Multiplayer Latest Version: {ModEntry.NewestVersion}");
 
             ModEntry.OnLateUpdate -= Multiplayer.LateUpdate;
@@ -214,6 +226,24 @@ public static class Multiplayer
 
         return assemblyName.Version.ToString();
     }
+#if DEBUG
+    public static void CheckPatches()
+    {
+        StringBuilder sb = new StringBuilder("Harmony patches:");
+        foreach (var info in Harmony.GetAllPatchedMethods())
+        {
+            var patches = Harmony.GetPatchInfo(info);
+            sb.Append($"\r\n- {info.DeclaringType.FullName}.{info.Name} patched by:");
+            foreach (var p in patches.Prefixes)
+                sb.Append($"\r\n  - Prefix: {p.PatchMethod.DeclaringType.FullName}.{p.PatchMethod.Name}");
+            foreach (var p in patches.Postfixes)
+                sb.Append($"\r\n  - Postfix: {p.PatchMethod.DeclaringType.FullName}.{p.PatchMethod.Name}");
+        }
+
+        LogDebug(()=>sb.ToString());
+    }
+#endif
+
 
     #region Logging
 
