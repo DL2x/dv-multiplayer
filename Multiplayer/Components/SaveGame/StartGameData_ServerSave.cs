@@ -47,8 +47,6 @@ public class StartGameData_ServerSave : AStartGameData
 
         CareerManagerDebtControllerPatch.HasDebt = packet.HasDebt;
 
-        JobsManager.Instance.LoadTime(packet.JobManagerTime);
-
         Multiplayer.LogDebug(() =>
         {
             string unlockedGen = string.Join(", ", UnlockablesManager.Instance.UnlockedGeneralLicenses);
@@ -88,6 +86,12 @@ public class StartGameData_ServerSave : AStartGameData
         playerTransform.eulerAngles = new Vector3(0, packet.Rotation, 0);
 
         LicenseManager.Instance.LoadData(saveGameData);
+
+        Multiplayer.Log("Waiting for Logic Controller...");
+        yield return new WaitUntil(() => LogicController.Instance.initialized);
+        Multiplayer.Log("Logic Controller initialised.");
+
+        JobsManager.Instance.LoadTime(packet.JobManagerTime);
 
         if (saveGameData.GetString(SaveGameKeys.Game_mode) == "FreeRoam")
             LicenseManager.Instance.GrabAllGameModeSpecificUnlockables(SaveGameKeys.Game_mode);
