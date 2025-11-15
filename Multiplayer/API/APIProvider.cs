@@ -36,7 +36,18 @@ public class APIProvider : IMultiplayerAPI
         return NetIdProvider.Instance.TryGetNetId<T>(obj, out netId);
     }
 
+
+    public bool TryGetNetId<T>(T obj, out uint netId) where T : class
+    {
+        return NetIdProvider.Instance.TryGetNetId<T>(obj, out netId);
+    }
+
     public bool TryGetObjectFromNetId<T>(ushort netId, out T obj) where T : class
+    {
+        return NetIdProvider.Instance.TryGetObject<T>(netId, out obj);
+    }
+
+    public bool TryGetObjectFromNetId<T>(uint netId, out T obj) where T : class
     {
         return NetIdProvider.Instance.TryGetObject<T>(netId, out obj);
     }

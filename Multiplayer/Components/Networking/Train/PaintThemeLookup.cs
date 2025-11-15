@@ -1,6 +1,7 @@
 using DV.Customization.Paint;
 using DV.Utils;
 using JetBrains.Annotations;
+using Multiplayer.Utils;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -60,7 +61,7 @@ public class PaintThemeLookup : SingletonBehaviour<PaintThemeLookup>
         if (string.IsNullOrEmpty(themeName))
             return 0;
 
-        return Fnv1aHash(themeName);
+        return StringHashing.Fnv1aHash(themeName);
     }
 
     public uint RegisterTheme(string themeName)
@@ -103,21 +104,6 @@ public class PaintThemeLookup : SingletonBehaviour<PaintThemeLookup>
         }
     }
     
-
-    private uint Fnv1aHash(string text)
-    {
-        unchecked
-        {
-            const uint fnvPrime = 0x01000193;
-            uint hash = 0x811C9DC5;
-            foreach (char c in text)
-            {
-                hash ^= c;
-                hash *= fnvPrime;
-            }
-            return hash;
-        }
-    }
 
     [UsedImplicitly]
     public new static string AllowAutoCreate()
