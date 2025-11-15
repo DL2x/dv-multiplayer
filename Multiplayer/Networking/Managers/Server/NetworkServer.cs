@@ -561,7 +561,9 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        CargoType cargoType = isLoading ? logicCar.CurrentCargoTypeInCar : logicCar.LastUnloadedCargoType;
+        CargoType cargoTypeV1 = isLoading ? logicCar.CurrentCargoTypeInCar : logicCar.LastUnloadedCargoType;
+
+        CargoTypeLookup.Instance.TryGetNetId(cargoTypeV1, out uint cargoType);
 
         ushort netMachineId = 0;
         if (logicCar.CargoOriginWarehouse != null)
@@ -577,7 +579,7 @@ public class NetworkServer : NetworkManager
         {
             NetId = netTraincar.NetId,
             IsLoading = isLoading,
-            CargoType = cargoType,
+            CargoTypeNetId = cargoType,
             CargoAmount = logicCar.LoadedCargoAmount,
             CargoHealth = netTraincar.TrainCar.CargoDamage.HealthPercentage,
             CargoModelIndex = cargoModelIndex,
@@ -585,9 +587,9 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 
-    public void SendWarehouseControllerUpdate(ushort netId, bool isLoading, ushort jobNetId, ushort carNetId, CargoType cargoType, WarehouseMachineController.TextPreset preset)
+    public void SendWarehouseControllerUpdate(ushort netId, bool isLoading, ushort jobNetId, ushort carNetId, uint cargoTypeNetId, WarehouseMachineController.TextPreset preset)
     {
-        LogDebug(() => $"SendWarehouseControllerUpdate({netId}, {isLoading}, {jobNetId}, {carNetId}, {cargoType}, {preset})");
+        LogDebug(() => $"SendWarehouseControllerUpdate({netId}, {isLoading}, {jobNetId}, {carNetId}, {cargoTypeNetId}, {preset})");
 
         SendPacketToAll(new ClientboundWarehouseControllerUpdatePacket()
         {
@@ -595,7 +597,7 @@ public class NetworkServer : NetworkManager
             IsLoading = isLoading,
             JobNetId = jobNetId,
             CarNetId = carNetId,
-            CargoType = (ushort)cargoType,
+            CargoTypeNetId = cargoTypeNetId,
             Preset = (ushort)preset,
         },
         DeliveryMethod.Sequenced, SelfPeer);

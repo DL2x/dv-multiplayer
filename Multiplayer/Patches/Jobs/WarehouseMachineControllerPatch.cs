@@ -51,7 +51,6 @@ public class WarehouseMachineControllerPatch
         //obtain serialisable info
         ushort carNetId = 0;
         ushort jobNetId = 0;
-        CargoType cargoTypeV1 = CargoType.None;
 
         if (car != null)
         {
@@ -79,10 +78,9 @@ public class WarehouseMachineControllerPatch
             jobNetId = netJob.NetId;
         }
 
-        if (cargoType != null)
-                cargoTypeV1 = cargoType.v1;
+        CargoTypeLookup.Instance.TryGetNetId(cargoType, out uint cargoTypeNetId);
 
-        NetworkLifecycle.Instance.Server.SendWarehouseControllerUpdate(netMachine.NetId, isLoading, jobNetId, carNetId, cargoTypeV1, preset);
+        NetworkLifecycle.Instance.Server.SendWarehouseControllerUpdate(netMachine.NetId, isLoading, jobNetId, carNetId, cargoTypeNetId, preset);
     }
 
     [HarmonyPrefix]

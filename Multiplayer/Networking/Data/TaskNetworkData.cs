@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System;
+using DV.ThingTypes.TransitionHelpers;
 
 namespace Multiplayer.Networking.Data;
 
@@ -133,7 +134,11 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
         writer.WriteUShortArray(CarNetIDs);
         writer.Write((byte)WarehouseTaskType);
         writer.Write(WarehouseMachine ?? string.Empty);
-        writer.Write((int)CargoType);
+
+        if (!CargoTypeLookup.Instance.TryGetNetId(CargoType.ToV2(), out var cargoNetId))
+            Multiplayer.LogError($"WarehouseTaskData.Serialize(): Could not find netId for CargoType {CargoType}");
+
+        writer.Write(cargoNetId);
         writer.Write(CargoAmount);
         writer.Write(ReadyForMachine);
     }
@@ -144,7 +149,11 @@ public class WarehouseTaskData : TaskNetworkData<WarehouseTaskData>
         CarNetIDs = reader.ReadUShortArray();
         WarehouseTaskType = (WarehouseTaskType)reader.ReadByte();
         WarehouseMachine = reader.ReadString();
-        CargoType = (CargoType)reader.ReadInt32();
+
+        uint cargoNetId = reader.ReadUInt32();
+        CargoTypeLookup.Instance.TryGet(cargoNetId, out CargoType cargoType);
+        CargoType = cargoType;
+
         CargoAmount = reader.ReadSingle();
         ReadyForMachine = reader.ReadBoolean();
     }
@@ -227,12 +236,16 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
         writer.Write(DestinationTrack);
 
         //Multiplayer.Log($"TaskNetworkData.Serialize() TransportedCargoPerCar != null {TransportedCargoPerCar != null}");
-        writer.Write(TransportedCargoPerCar != null);
+
+        writer.Write(TransportedCargoPerCar?.Length ?? 0);
 
         if (TransportedCargoPerCar != null)
         {
-            //Multiplayer.Log($"TaskNetworkData.Serialize() TransportedCargoPerCar.PutArray() length: {TransportedCargoPerCar.Length}");
-            writer.WriteInt32Array(TransportedCargoPerCar.Select(x => (int)x).ToArray());
+            foreach (var cargoType in TransportedCargoPerCar)
+            {
+                CargoTypeLookup.Instance.TryGetNetId(cargoType.ToV2(), out var cargoNetId);
+                writer.Write(cargoNetId);
+            }
         }
 
         //Multiplayer.Log($"TaskNetworkData.Serialize() CouplingRequiredAndNotDone {CouplingRequiredAndNotDone}");
@@ -254,15 +267,19 @@ public class TransportTaskData : TaskNetworkData<TransportTaskData>
         DestinationTrack = reader.ReadString();
         //Multiplayer.Log($"TaskNetworkData.Deserialize() DestinationTrack {DestinationTrack}");
 
-        if (reader.ReadBoolean())
+        var cargoCount = reader.ReadInt32();
+        if (cargoCount > 0)
         {
-            //Multiplayer.Log($"TaskNetworkData.Deserialize() TransportedCargoPerCar != null True");
-            TransportedCargoPerCar = reader.ReadInt32Array().Select(x => (CargoType)x).ToArray();
+            TransportedCargoPerCar = new CargoType[cargoCount];
+
+            for (var i = 0; i < cargoCount; i++)
+            {
+                uint cargoNetId = reader.ReadUInt32();
+                CargoTypeLookup.Instance.TryGet(cargoNetId, out CargoType cargoType);
+                TransportedCargoPerCar[i] = cargoType;
+            }
         }
-        //else
-        //{
-        //    Multiplayer.LogWarning($"TaskNetworkData.Deserialize() TransportedCargoPerCar != null False");
-        //}
+
         CouplingRequiredAndNotDone = reader.ReadBoolean();
         //Multiplayer.Log($"TaskNetworkData.Deserialize() CouplingRequiredAndNotDone {CouplingRequiredAndNotDone}");
         AnyHandbrakeRequiredAndNotDone = reader.ReadBoolean();

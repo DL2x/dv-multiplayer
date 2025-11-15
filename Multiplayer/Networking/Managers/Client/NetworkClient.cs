@@ -828,7 +828,7 @@ public class NetworkClient : NetworkManager
         if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
-        LogDebug(() => $"OnClientboundCargoStatePacket() {networkedTrainCar.CurrentID}, IsLoading: {packet.IsLoading}, CargoType: {packet.CargoType}, CargoAmount: {packet.CargoAmount}, Health: {packet.CargoHealth}, CargoModelIndex: {packet.CargoModelIndex}, WarehouseMachineId: {packet.WarehouseMachineNetId}");
+        LogDebug(() => $"OnClientboundCargoStatePacket() {networkedTrainCar.CurrentID}, IsLoading: {packet.IsLoading}, CargoType: {packet.CargoTypeNetId}, CargoAmount: {packet.CargoAmount}, Health: {packet.CargoHealth}, CargoModelIndex: {packet.CargoModelIndex}, WarehouseMachineId: {packet.WarehouseMachineNetId}");
 
         networkedTrainCar.CargoModelIndex = packet.CargoModelIndex;
         Car logicCar = networkedTrainCar.TrainCar.logicCar;
@@ -839,7 +839,9 @@ public class NetworkClient : NetworkManager
             return;
         }
 
-        if (packet.CargoType == CargoType.None && logicCar.CurrentCargoTypeInCar == CargoType.None)
+        CargoTypeLookup.Instance.TryGet(packet.CargoTypeNetId, out CargoType cargoType);
+
+        if (cargoType == CargoType.None && logicCar.CurrentCargoTypeInCar == CargoType.None)
             return;
 
         //packet.CargoAmount is the total amount, not the amount to load/unload
@@ -854,49 +856,49 @@ public class NetworkClient : NetworkManager
 
         if (packet.IsLoading)
         {
-            LogDebug(() => $"OnClientboundCargoStatePacket() Loading cargo: {packet.CargoType} into {networkedTrainCar.CurrentID}, current amount: {packet.CargoAmount}");
+            LogDebug(() => $"OnClientboundCargoStatePacket() Loading cargo: {cargoType} into {networkedTrainCar.CurrentID}, current amount: {packet.CargoAmount}");
             //Check correct cargo is loaded and the amount is correct
-            if (logicCar.LoadedCargoAmount == cargoAmount && logicCar.CurrentCargoTypeInCar == packet.CargoType)
+            if (logicCar.LoadedCargoAmount == cargoAmount && logicCar.CurrentCargoTypeInCar == cargoType)
                 return;
 
             //We need either no cargo or the same cargo - if it's different, we need to remove it first
-            if (logicCar.CurrentCargoTypeInCar != CargoType.None && logicCar.CurrentCargoTypeInCar != packet.CargoType)
+            if (logicCar.CurrentCargoTypeInCar != CargoType.None && logicCar.CurrentCargoTypeInCar != cargoType)
                 logicCar.DumpCargo();
 
             //We have the correct cargo, but not the right amount, calculate the delta
-            if (logicCar.CurrentCargoTypeInCar == packet.CargoType)
+            if (logicCar.CurrentCargoTypeInCar == cargoType)
                 cargoAmount -= logicCar.LoadedCargoAmount;
 
             if (cargoAmount > 0)
             {
-                logicCar.LoadCargo(cargoAmount, packet.CargoType, warehouseMachine);
+                logicCar.LoadCargo(cargoAmount, cargoType, warehouseMachine);
             }
 
             networkedTrainCar.TrainCar.CargoDamage.LoadCargoDamageState(packet.CargoHealth);
         }
         else
         {
-            LogDebug(() => $"OnClientboundCargoStatePacket() Unloading cargo: {packet.CargoType} into {networkedTrainCar.CurrentID}, current amount: {packet.CargoAmount}");
+            LogDebug(() => $"OnClientboundCargoStatePacket() Unloading cargo: {cargoType} into {networkedTrainCar.CurrentID}, current amount: {packet.CargoAmount}");
 
             //Check correct cargo is loaded and the amount is correct
-            if (logicCar.LoadedCargoAmount == cargoAmount && logicCar.CurrentCargoTypeInCar == packet.CargoType)
+            if (logicCar.LoadedCargoAmount == cargoAmount && logicCar.CurrentCargoTypeInCar == cargoType)
                 return;
 
             //If there is different cargo we need to remove it, then load the appropriate amount
-            if (logicCar.CurrentCargoTypeInCar == CargoType.None || logicCar.CurrentCargoTypeInCar != packet.CargoType)
+            if (logicCar.CurrentCargoTypeInCar == CargoType.None || logicCar.CurrentCargoTypeInCar != cargoType)
             {
                 //avoid triggering the load event by backdooring it
                 logicCar.LastUnloadedCargoType = logicCar.CurrentCargoTypeInCar;
-                logicCar.CurrentCargoTypeInCar = packet.CargoType;
+                logicCar.CurrentCargoTypeInCar = cargoType;
                 logicCar.LoadedCargoAmount = cargoAmount;
             }
 
             //We have the correct cargo, calculate the delta
-            if (logicCar.CurrentCargoTypeInCar == packet.CargoType)
+            if (logicCar.CurrentCargoTypeInCar == cargoType)
                 cargoAmount = logicCar.LoadedCargoAmount - cargoAmount;
 
             if (cargoAmount > 0)
-                logicCar.UnloadCargo(cargoAmount, packet.CargoType, warehouseMachine);
+                logicCar.UnloadCargo(cargoAmount, cargoType, warehouseMachine);
         }
     }
 
@@ -928,7 +930,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundWarehouseControllerUpdatePacket(ClientboundWarehouseControllerUpdatePacket packet)
     {
-        LogDebug(() => $"OnClientboundWarehouseControllerUpdatePacket() NetId: {packet.NetId}, IsLoading: {packet.IsLoading}, JobNetId: {packet.JobNetId}, CarNetId: {packet.CarNetId}, CargoType: {packet.CargoType}, Preset: [{(WarehouseMachineController.TextPreset)packet.Preset}, {packet.Preset}]");
+        LogDebug(() => $"OnClientboundWarehouseControllerUpdatePacket() NetId: {packet.NetId}, IsLoading: {packet.IsLoading}, JobNetId: {packet.JobNetId}, CarNetId: {packet.CarNetId}, CargoType: {packet.CargoTypeNetId}, Preset: [{(WarehouseMachineController.TextPreset)packet.Preset}, {packet.Preset}]");
         if (!NetworkedWarehouseMachineController.Get(packet.NetId, out NetworkedWarehouseMachineController networkedWarehouseMachineController))
         {
             LogWarning($"OnClientboundWarehouseControllerUpdatePacket() Failed to find networked warehouse machine controller for [{packet.NetId}]");

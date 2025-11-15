@@ -7,6 +7,6 @@ public class ClientboundWarehouseControllerUpdatePacket
     public bool IsLoading { get; set; }
     public ushort JobNetId { get; set; }    
     public ushort CarNetId { get; set; }
-    public ushort CargoType { get; set; }
+    public uint CargoTypeNetId { get; set; }
     public ushort Preset { get; set; }
 }

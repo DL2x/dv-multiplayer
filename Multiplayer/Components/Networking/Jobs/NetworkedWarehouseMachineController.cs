@@ -183,7 +183,10 @@ public class NetworkedWarehouseMachineController : IdMonoBehaviour<ushort, Netwo
 
         if (car != null && jobId != null)
         {
-            cargoType_V2 = ((CargoType)packet.CargoType).ToV2();
+            if (!CargoTypeLookup.Instance.TryGet(packet.CargoTypeNetId, out cargoType_V2))
+            {
+                Multiplayer.LogWarning($"NetworkedWarehouseMachineController failed to find CargoType with netId: {packet.CargoTypeNetId} for JobId: {jobId} on Car: {car.ID}");
+            }
         }
 
         WarehouseMachineController?.SetScreen(preset, isLoading, jobId, car, cargoType_V2, extra);
