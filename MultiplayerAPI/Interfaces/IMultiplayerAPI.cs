@@ -89,6 +89,22 @@ public interface IMultiplayerAPI
     bool TryGetObjectFromNetId<T>(ushort netId, out T obj) where T : class;
 
     /// <summary>
+    /// Gets the NetId for an object.
+    /// </summary>
+    /// <param name="obj">The object you want the NetId for.</param>
+    /// <param name="netId">When this method returns, contains the NetId associated with the specified object, if found; otherwise, 0.</param>
+    /// <returns><c>True</c> if a NetId for the object was found; otherwise, <c>false</c>.</returns>
+    bool TryGetNetId<T>(T obj, out uint netId) where T : class;
+
+    /// <summary>
+    /// Gets the object for a NetId.
+    /// </summary>
+    /// <param name="netId">The non-zero NetId for the object.</param>
+    /// <param name="obj">When this method returns, contains the object associated with the NetId, if found; otherwise <c>null</c>.</param>
+    /// <returns><c>True</c> if the object was found; otherwise, <c>false</c>.</returns>
+    bool TryGetObjectFromNetId<T>(uint netId, out T obj) where T : class;
+
+    /// <summary>
     /// Registers a PaintTheme and returns its ID.
     /// </summary>
     /// <param name="assetName">The string representing the `PaintTheme.AssetName`.</param>

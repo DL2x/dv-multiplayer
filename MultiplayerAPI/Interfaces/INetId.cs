@@ -41,4 +41,38 @@ public interface INetIdProvider
     /// <c>true</c> if the object was successfully retrieved; otherwise, <c>false</c>.
     /// </returns>
     bool TryGetObject<T>(ushort netId, out T obj) where T : class;
+
+    /// <summary>
+    /// Attempts to retrieve the network identifier for the specified object.
+    /// </summary>
+    /// <typeparam name="T">The type of object to get the network ID for. Must be a reference type.</typeparam>
+    /// <param name="obj">The object to get the network identifier for.</param>
+    /// <param name="netId">
+    /// When this method returns, contains the network identifier associated with the object if found; 
+    /// otherwise, the default value for the type.
+    /// </param>
+    /// <returns>
+    /// <c>true</c> if the network identifier was successfully retrieved; otherwise, <c>false</c>.
+    /// </returns>
+    /// <remarks>
+    /// This method is for network identifiers represented as unsigned 32-bit integers, and is typically used where V2 types are involved.
+    /// </remarks>
+    bool TryGetNetId<T>(T obj, out uint netId) where T : class;
+
+    /// <summary>
+    /// Attempts to retrieve the object associated with the specified network identifier.
+    /// </summary>
+    /// <typeparam name="T">The type of object to retrieve. Must be a reference type.</typeparam>
+    /// <param name="netId">The network identifier of the object to retrieve.</param>
+    /// <param name="obj">
+    /// When this method returns, contains the object associated with the network identifier if found; 
+    /// otherwise, the default value for the type.
+    /// </param>
+    /// <returns>
+    /// <c>true</c> if the object was successfully retrieved; otherwise, <c>false</c>.
+    /// </returns>
+    /// <remarks>
+    /// This method is for network identifiers represented as unsigned 32-bit integers, and is typically used where V2 types are involved.
+    /// </remarks>
+    bool TryGetObject<T>(uint netId, out T obj) where T : class;
 }

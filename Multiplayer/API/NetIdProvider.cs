@@ -1,5 +1,6 @@
 using DV.CabControls;
 using DV.Logic.Job;
+using DV.ThingTypes;
 using DV.Utils;
 using JetBrains.Annotations;
 using MPAPI.Interfaces;
@@ -14,6 +15,9 @@ namespace Multiplayer.API;
 public delegate bool TryGetNetIdDelegate<T>(T obj, out ushort netId) where T : class;
 public delegate bool TryGetObjectDelegate<T>(ushort netId, out T obj) where T : class;
 
+public delegate bool TryGetUIntNetIdDelegate<T>(T obj, out uint netId) where T : class;
+public delegate bool TryGetObjectUIntDelegate<T>(uint netId, out T obj) where T : class;
+
 internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
 {
     private readonly Dictionary<Type, object> handlers = [];
@@ -23,6 +27,9 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
         base.Awake();
         RegisterHandler<TrainCar>(NetworkedTrainCar.TryGetNetId, NetworkedTrainCar.TryGet);
         RegisterHandler<Car>(NetworkedTrainCar.TryGetNetId, NetworkedTrainCar.TryGet);
+
+        //RegisterUIntHandler<CargoType>(CargoTypeLookup.Instance.TryGetNetId, CargoTypeLookup.Instance.TryGet);
+        RegisterHandler<CargoType_v2>(CargoTypeLookup.Instance.TryGetNetId, CargoTypeLookup.Instance.TryGet);
 
         RegisterHandler<Junction>(NetworkedJunction.TryGetNetId, NetworkedJunction.TryGet);
         RegisterHandler<TurntableRailTrack>(NetworkedTurntable.TryGetNetId, NetworkedTurntable.TryGet);
@@ -42,6 +49,11 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
     }
 
     public void RegisterHandler<T>(TryGetNetIdDelegate<T> tryGetNetId, TryGetObjectDelegate<T> tryGetObject) where T : class
+    {
+        handlers[typeof(T)] = (tryGetNetId, tryGetObject);
+    }
+
+    public void RegisterHandler<T>(TryGetUIntNetIdDelegate<T> tryGetNetId, TryGetObjectUIntDelegate <T> tryGetObject) where T : class
     {
         handlers[typeof(T)] = (tryGetNetId, tryGetObject);
     }
@@ -67,6 +79,32 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
             return false;
 
         if (handlers.TryGetValue(typeof(T), out var handler) && handler is (TryGetNetIdDelegate<T> _, TryGetObjectDelegate<T> tryGetObject))
+            return tryGetObject(netId, out obj);
+
+        return false;
+    }
+
+    public bool TryGetNetId<T>(T obj, out uint netId) where T : class
+    {
+        netId = 0;
+
+        if (obj == null)
+            return false;
+
+        if (handlers.TryGetValue(typeof(T), out var handler) && handler is (TryGetUIntNetIdDelegate<T> tryGetNetId, TryGetObjectUIntDelegate<T> _))
+            return tryGetNetId(obj, out netId);
+
+        return false;
+    }
+
+    public bool TryGetObject<T>(uint netId, out T obj) where T : class
+    {
+        obj = null;
+
+        if (netId == 0)
+            return false;
+
+        if (handlers.TryGetValue(typeof(T), out var handler) && handler is (TryGetUIntNetIdDelegate<T> _, TryGetObjectUIntDelegate<T> tryGetObject))
             return tryGetObject(netId, out obj);
 
         return false;
