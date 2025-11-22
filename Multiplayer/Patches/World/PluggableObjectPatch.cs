@@ -26,7 +26,7 @@ public static class PluggableObjectPatch
     public static bool IsHeldInHand(PluggableObject __instance, ref bool __result)
     {
         var result = __result;
-        Multiplayer.LogDebug(() => $"IsHeldInHand({result})");
+        //Multiplayer.LogDebug(() => $"IsHeldInHand({result})");
 
         if (NetworkedPluggableObject.Get(__instance, out var networkedPluggableObject))
             __result = networkedPluggableObject.IsHeld;
@@ -34,7 +34,7 @@ public static class PluggableObjectPatch
             __result = __instance.controlGrabbed;
 
         result = __result;
-        Multiplayer.LogDebug(() => $"IsHeldInHand() result: {result}, net found: {networkedPluggableObject != null}");
+        //Multiplayer.LogDebug(() => $"IsHeldInHand() result: {result}, net found: {networkedPluggableObject != null}");
 
         return false;
     }

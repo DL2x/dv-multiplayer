@@ -53,7 +53,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
     public bool IsHeld => playerHolding != 0 || HeldBy != null || PluggableObject.controlGrabbed;
 
-    private GrabHandlerGizmoItem grabHandler;
+    private CustomNonVrGrabAnchor nonVrGrabAnchor;
 
     private bool handlersInitialised = false;
 
@@ -99,7 +99,7 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
 
         //Multiplayer.LogDebug(() => $"NetworkedPluggableObject.Start() Controlbase {PluggableObject?.controlBase?.spec?.name}, {transform.parent.name}");
 
-        grabHandler = this.GetComponent<GrabHandlerGizmoItem>();
+        nonVrGrabAnchor = this.GetComponent<CustomNonVrGrabAnchor>();
 
         PluggableObject.controlBase.Grabbed += OnGrabbed;
         PluggableObject.controlBase.Ungrabbed += OnUngrabbed;
@@ -616,7 +616,8 @@ public class NetworkedPluggableObject : IdMonoBehaviour<ushort, NetworkedPluggab
         if (NetworkLifecycle.Instance.IsClientRunning &&
             NetworkLifecycle.Instance.Client.ClientPlayerManager.TryGetPlayer(playerHolding, out var player))
         {
-            var target = grabHandler?.customGrabAnchor?.GetGrabAnchor();
+            var target = nonVrGrabAnchor?.GetGrabAnchor();
+            Multiplayer.LogDebug(() => $"GrabPlug() NetId: {NetId}, player: {player.Username}, targetPos: {target?.localPos}, targetRot: {target?.localRot}");
             player.HoldItem(gameObject, target?.localPos, target?.localRot);
         }
     }
