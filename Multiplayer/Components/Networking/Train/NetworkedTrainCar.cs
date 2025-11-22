@@ -101,6 +101,49 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private const float MAX_PORT_DELTA = 0.001f;
     private const uint MIN_KINEMATIC_CYCLES = 10;
 
+    #region Port and Fuse Map
+
+    private static readonly Dictionary<uint, string> netIdToPort = [];
+    private static readonly Dictionary<string, uint> portToNetId = [];
+    private static readonly Dictionary<uint, string> netIdToFuse = [];
+    private static readonly Dictionary<string, uint> fuseToNetId = [];
+
+    static uint GetPortNetId(string portId)
+    {
+        if (portToNetId.TryGetValue(portId, out var netId))
+            return netId;
+
+        netId = StringHashing.Fnv1aHash(portId);
+        netIdToPort[netId] = portId;
+        portToNetId[portId] = netId;
+
+        return netId;
+    }
+
+    static string GetPort(uint netId)
+    {
+        netIdToPort.TryGetValue(netId, out var portId);
+        return portId;
+    }
+
+    static uint GetFuseNetId(string fuseId)
+    {
+        if (fuseToNetId.TryGetValue(fuseId, out var netId))
+            return netId;
+
+        netId = StringHashing.Fnv1aHash(fuseId);
+        netIdToFuse[netId] = fuseId;
+        fuseToNetId[fuseId] = netId;
+
+        return netId;
+    }
+    static string GetFuse(uint netId)
+    {
+        netIdToFuse.TryGetValue(netId, out var portId);
+        return portId;
+    }
+    #endregion
+
 
     public string CurrentID { get; private set; }
     public TrainCar TrainCar;
@@ -119,10 +162,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     public CoalPileSimController coalPile;
     private readonly Dictionary<TrainDamage, TrainDamage.HealthChanged> trainDamageDelegates = [];
 
-    private HashSet<string> dirtyPorts;
-    private Dictionary<string, float> lastSentPortValues;
-    private HashSet<string> dirtyFuses;
-    private float lastSentFireboxValue;
+    private HashSet<uint> dirtyPorts;
+    private Dictionary<uint, float> lastSentPortValues;
+    private HashSet<uint> dirtyFuses;
     private readonly Dictionary<string, float> lastSentTrainDamages = [];
 
     private bool handbrakeDirty;
@@ -140,13 +182,17 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     public bool IsDestroying;
 
+    #region Server Variables
     //Coupler interaction
     private bool frontInteracting = false;
     private bool rearInteracting = false;
 
     private ServerPlayer frontInteractionPlayer;
     private ServerPlayer rearInteractionPlayer;
-    #region Client
+
+    #endregion
+
+    #region Client Variables
 
     public bool Client_Initialized { get; private set; }
     public TickedQueue<float> Client_trainSpeedQueue;
@@ -160,6 +206,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private Coupler originalCoupledTo;
 
     private uint kinematicCycles = 0;
+
+    #endregion
     #endregion
 
     protected override bool IsIdServerAuthoritative => true;
@@ -215,15 +263,21 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             hasSimFlow = true;
             simulationFlow = simController.SimulationFlow;
 
-            dirtyPorts = new HashSet<string>(simulationFlow.fullPortIdToPort.Count);
-            lastSentPortValues = new Dictionary<string, float>(dirtyPorts.Count);
+            dirtyPorts = new HashSet<uint>(simulationFlow.fullPortIdToPort.Count);
+            lastSentPortValues = new Dictionary<uint, float>(dirtyPorts.Count);
             foreach (KeyValuePair<string, Port> kvp in simulationFlow.fullPortIdToPort)
+            {
+                _ = GetPortNetId(kvp.Key); //ensure this port is registered
                 if (kvp.Value.valueType == PortValueType.CONTROL || NetworkLifecycle.Instance.IsHost())
                     kvp.Value.ValueUpdatedInternally += _ => { Common_OnPortUpdated(kvp.Value); };
+            }
 
-            dirtyFuses = new HashSet<string>(simulationFlow.fullFuseIdToFuse.Count);
+            dirtyFuses = new HashSet<uint>(simulationFlow.fullFuseIdToFuse.Count);
             foreach (KeyValuePair<string, Fuse> kvp in simulationFlow.fullFuseIdToFuse)
+            {
+                _ = GetFuseNetId(kvp.Key); //ensure this fuse is registered
                 kvp.Value.StateUpdated += _ => { Common_OnFuseUpdated(kvp.Value); };
+            }
 
             firebox = simController.firebox;
             coalPile = simController.coalPile;
@@ -428,31 +482,39 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return;
         foreach (string portId in simulationFlow.fullPortIdToPort.Keys)
         {
-            dirtyPorts.Add(portId);
+            var netId = GetPortNetId(portId);
+            dirtyPorts.Add(netId);
         }
 
         foreach (string fuseId in simulationFlow.fullFuseIdToFuse.Keys)
-            dirtyFuses.Add(fuseId);
+        {
+            var netId = GetFuseNetId(fuseId);
+            dirtyFuses.Add(netId);
+        }
     }
 
     public bool Server_ValidateClientSimFlowPacket(ServerPlayer player, CommonTrainPortsPacket packet)
     {
         // Only allow control ports to be updated by clients
         if (hasSimFlow)
-            foreach (string portId in packet.PortIds)
+            foreach (uint portNetId in packet.PortIds)
+            {
+
+                var portId = GetPort(portNetId);
                 if (simulationFlow.TryGetPort(portId, out Port port))
                 {
                     if (port.valueType != PortValueType.CONTROL)
                     {
-                        NetworkLifecycle.Instance.Server.LogWarning($"Player {player.Username} tried to send a non-control port! ({portId} on [{TrainCar?.ID}, {NetId}])");
+                        NetworkLifecycle.Instance.Server.LogWarning($"Player {player.Username} tried to send a non-control port! ([{portId}, {portNetId}] on [{CurrentID}, {NetId}])");
                         Common_DirtyPorts(packet.PortIds);
                         return false;
                     }
                 }
                 else
                 {
-                    NetworkLifecycle.Instance.Server.LogWarning($"Player {player.Username} sent portId: {portId}, value type: {port.valueType}, but the port was not found");
+                    NetworkLifecycle.Instance.Server.LogWarning($"Player {player.Username} sent portId: {portNetId}, value type: {port.valueType}, but the port was not found");
                 }
+            }
 
         // Only allow the player to update ports on the car they are in/near
         if (player.CarId == packet.NetId)
@@ -724,40 +786,39 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         NetworkLifecycle.Instance.Client.SendHandbrakePositionChanged(NetId, brakeSystem.handbrakePosition);
     }
 
-    public void Common_DirtyPorts(string[] portIds)
+    public void Common_DirtyPorts(uint[] portNetIds)
     {
         if (!hasSimFlow)
             return;
 
-        foreach (string portId in portIds)
+        foreach (uint portNetId in portNetIds)
         {
+            var portId = GetPort(portNetId);
             if (!simulationFlow.TryGetPort(portId, out Port _))
             {
-
-                Multiplayer.LogWarning($"Tried to dirty port {portId} on UNKNOWN but it doesn't exist!");
-                Multiplayer.LogWarning($"Tried to dirty port {portId} on {TrainCar.ID} but it doesn't exist!");
+                Multiplayer.LogWarning($"Tried to dirty port [{portId}, {portNetId}] on {CurrentID} but port doesn't exist!");
                 continue;
             }
 
-            dirtyPorts.Add(portId);
+            dirtyPorts.Add(portNetId);
         }
     }
 
-    public void Common_DirtyFuses(string[] fuseIds)
+    public void Common_DirtyFuses(uint[] fuseNetIds)
     {
         if (!hasSimFlow)
             return;
 
-        foreach (string fuseId in fuseIds)
+        foreach (uint fuseNetId in fuseNetIds)
         {
+            var fuseId = GetFuse(fuseNetId);
             if (!simulationFlow.TryGetFuse(fuseId, out Fuse _))
             {
-                Multiplayer.LogWarning($"Tried to dirty port {fuseId} on UNKOWN but it doesn't exist!");
-                Multiplayer.LogWarning($"Tried to dirty port {fuseId} on {TrainCar.ID} but it doesn't exist!");
+                Multiplayer.LogWarning($"Tried to dirty port [{fuseId}, {fuseNetId}] on {CurrentID} but it doesn't exist!");
                 continue;
             }
 
-            dirtyFuses.Add(fuseId);
+            dirtyFuses.Add(fuseNetId);
         }
     }
 
@@ -767,15 +828,16 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return;
 
         int i = 0;
-        string[] portIds = dirtyPorts.ToArray();
+        uint[] portIds = dirtyPorts.ToArray();
         float[] portValues = new float[portIds.Length];
-        foreach (string portId in dirtyPorts)
+        foreach (uint portNetId in dirtyPorts)
         {
+            var portId = GetPort(portNetId);
             if (simulationFlow.TryGetPort(portId, out Port port))
             {
                 float value = port.Value;
                 portValues[i] = value;
-                lastSentPortValues[portId] = value;
+                lastSentPortValues[portNetId] = value;
             }
             else
             {
@@ -796,15 +858,16 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return;
 
         int i = 0;
-        string[] fuseIds = dirtyFuses.ToArray();
+        uint[] fuseIds = dirtyFuses.ToArray();
         bool[] fuseValues = new bool[fuseIds.Length];
 
-        foreach (string fuseId in dirtyFuses)
+        foreach (uint fuseNetId in dirtyFuses)
         {
+            var fuseId = GetFuse(fuseNetId);
             if (simulationFlow.TryGetFuse(fuseId, out Fuse fuse))
                 fuseValues[i] = fuse.State;
             else
-                Multiplayer.LogWarning($"SendFuses() [{CurrentID}, {NetId}] Failed to find fuse \"{fuseId}\"");
+                Multiplayer.LogWarning($"Failed to send fuse \"{fuseId}\" for [{CurrentID}, {NetId}]");
 
             i++;
         }
@@ -835,21 +898,22 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (float.IsNaN(port.prevValue) && float.IsNaN(port.Value))
             return;
 
-        bool hasLastSent = lastSentPortValues.TryGetValue(port.id, out float lastSentValue);
+        var netId = GetPortNetId(port.id);
+        bool hasLastSent = lastSentPortValues.TryGetValue(netId, out float lastSentValue);
         float delta = Mathf.Abs(lastSentValue - port.Value);
 
         if (port.valueType == PortValueType.STATE)
         {
             if (!hasLastSent || lastSentValue != port.Value)
             {
-                dirtyPorts.Add(port.id);
+                dirtyPorts.Add(netId);
             }
         }
         else
         {
             if (!hasLastSent || delta > MAX_PORT_DELTA || (port.Value == 0 && lastSentValue != 0))
             {
-                dirtyPorts.Add(port.id);
+                dirtyPorts.Add(netId);
             }
         }
     }
@@ -871,8 +935,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         if (UnloadWatcher.isUnloading || NetworkLifecycle.Instance.IsProcessingPacket)
             return;
-
-        dirtyFuses.Add(fuse.id);
+        var netId = GetFuseNetId(fuse.id);
+        dirtyFuses.Add(netId);
     }
 
     public void Common_UpdatePorts(CommonTrainPortsPacket packet)
@@ -882,7 +946,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         for (int i = 0; i < packet.PortIds.Length; i++)
         {
-            if (simulationFlow.TryGetPort(packet.PortIds[i], out Port port))
+            var portId = GetPort(packet.PortIds[i]);
+            if (simulationFlow.TryGetPort(portId, out Port port))
             {
                 float value = packet.PortValues[i];
 
@@ -893,7 +958,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             }
             else
             {
-                Multiplayer.LogWarning($"Common_UpdatePorts() [{CurrentID}, {NetId}] Failed to find port \"{packet.PortIds[i]}\", Value: {packet.PortValues[i]}");
+                Multiplayer.LogWarning($"Failed to update port [\"portId\", {packet.PortIds[i]}] with value \"{packet.PortValues[i]}\" for [{CurrentID}, {NetId}]");
             }
         }
     }
@@ -904,10 +969,13 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return;
 
         for (int i = 0; i < packet.FuseIds.Length; i++)
-            if (simulationFlow.TryGetFuse(packet.FuseIds[i], out Fuse fuse))
+        {
+            var fuseId = GetFuse(packet.FuseIds[i]);
+            if (simulationFlow.TryGetFuse(fuseId, out Fuse fuse))
                 fuse.ChangeState(packet.FuseValues[i]);
             else
-                Multiplayer.LogWarning($"UpdateFuses() [{CurrentID}, {NetId}] Failed to find fuse \"{packet.FuseIds[i]}\", Value: {packet.FuseValues[i]}");
+                Multiplayer.LogWarning($"Failed to update fuse [\"fuseId\", {packet.FuseIds[i]}] with value \"{packet.FuseValues[i]}\" for [{CurrentID}, {NetId}]");
+        }
     }
 
     public void Common_ReceiveCouplerInteraction(CommonCouplerInteractionPacket packet)
@@ -1338,6 +1406,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                 if (TrainCar.rb != null)
                 {
                     TrainCar.rb.MovePosition(worldPos);
+
                     //TrainCar.rb.MoveRotation(movementPart.Rotation); // removed due to motion sickness issues
                 }
 

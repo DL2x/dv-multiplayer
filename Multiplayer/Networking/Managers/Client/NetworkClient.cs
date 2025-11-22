@@ -1441,7 +1441,7 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableOrdered);
     }
 
-    public void SendPorts(ushort netId, string[] portIds, float[] portValues)
+    public void SendPorts(ushort netId, uint[] portIds, float[] portValues)
     {
         SendPacketToServer(new CommonTrainPortsPacket
         {
@@ -1460,7 +1460,7 @@ public class NetworkClient : NetworkManager
         */
     }
 
-    public void SendFuses(ushort netId, string[] fuseIds, bool[] fuseValues)
+    public void SendFuses(ushort netId, uint[] fuseIds, bool[] fuseValues)
     {
         SendPacketToServer(new CommonTrainFusesPacket
         {
