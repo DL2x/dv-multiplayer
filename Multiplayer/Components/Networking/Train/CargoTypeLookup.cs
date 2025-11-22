@@ -66,6 +66,10 @@ public class CargoTypeLookup : SingletonBehaviour<CargoTypeLookup>
 
     public bool TryGetNetId(CargoType_v2 cargoType, out uint netId)
     {
+        netId = 0;
+        if ( cargoType == null)
+            return false;
+
         if (cargoTypeV2ToHash.TryGetValue(cargoType, out netId))
             return true;
 
