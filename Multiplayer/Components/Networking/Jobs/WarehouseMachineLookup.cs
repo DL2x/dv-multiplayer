@@ -56,7 +56,7 @@ public class WarehouseMachineLookup : SingletonBehaviour<WarehouseMachineLookup>
         {
             netId = GenerateNetId(machine.ID);
             var temp = netId;
-            Multiplayer.LogDebug(() => $"Trying to get NetID for WarehouseMachine on track {machine?.WarehouseTrack?.ID}, machineID: {machine?.ID}, netId: {temp}");
+            //Multiplayer.LogDebug(() => $"Trying to get NetID for WarehouseMachine on track {machine?.WarehouseTrack?.ID}, machineID: {machine?.ID}, netId: {temp}");
 
             if (netIdToWarehouseMachine.ContainsKey(netId))
                 return true;

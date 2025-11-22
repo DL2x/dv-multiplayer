@@ -1,7 +1,6 @@
 using DV.Optimizers;
 using HarmonyLib;
 using Multiplayer.Components.Networking;
-using Multiplayer.Components.Networking.Train;
 using UnityEngine;
 
 namespace Multiplayer.Patches.Train;
@@ -40,20 +39,20 @@ public static class ScriptStripperRuntimePatch
         {
             if(!colliders[i].TryGetComponent<LocoResourceReceiver>(out _))
                 Object.Destroy(colliders[i]);
-            else
-            {
-                Multiplayer.LogDebug(() => $"ScriptStripperRuntimePatch.Strip() Keeping collider {colliders[i].gameObject.GetPath()} for {trainCar.ID}, has LocoResourceReceiver component.");
-            }
+            //else
+            //{
+            //    Multiplayer.LogDebug(() => $"ScriptStripperRuntimePatch.Strip() Keeping collider {colliders[i].gameObject.GetPath()} for {trainCar.ID}, has LocoResourceReceiver component.");
+            //}
         }
 
         for (int i = 0; i < scripts.Length; i++)
         {
             if (!scripts[i].GetType().Equals(typeof(LocoResourceReceiver)))
                 Object.Destroy(scripts[i]);
-            else
-            {
-                Multiplayer.LogDebug(() => $"ScriptStripperRuntimePatch.Strip() Keeping script {scripts[i].gameObject.GetPath()} for {trainCar.ID}, is LocoResourceReceiver component.");
-            }
+            //else
+            //{
+            //    Multiplayer.LogDebug(() => $"ScriptStripperRuntimePatch.Strip() Keeping script {scripts[i].gameObject.GetPath()} for {trainCar.ID}, is LocoResourceReceiver component.");
+            //}
         }
 
         return false;

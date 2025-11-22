@@ -20,7 +20,7 @@ public static class TaskPatch
             return;
 
 
-        Multiplayer.LogDebug(()=>$"Task.SetState() called for jobId: {__instance.Job.ID}, taskType: {__instance.InstanceTaskType}, newState: {newState}");
+        //Multiplayer.LogDebug(()=>$"Task.SetState() called for jobId: {__instance.Job.ID}, taskType: {__instance.InstanceTaskType}, newState: {newState}");
 
         if (!NetworkedTask.TryGetNetId(__instance, out var taskNetId) ||taskNetId == 0)
         {

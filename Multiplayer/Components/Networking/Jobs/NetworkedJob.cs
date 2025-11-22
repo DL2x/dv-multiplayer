@@ -180,7 +180,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         {
             pendingJobTasks.Remove(job);
 
-            Multiplayer.LogDebug(() => $"NetworkedJob.Initialize(): Found {taskList.Count} pending tasks for jobId {job.ID}");
+            //Multiplayer.LogDebug(() => $"NetworkedJob.Initialize(): Found {taskList.Count} pending tasks for jobId {job.ID}");
 
             foreach (var task in taskList)
                 CreateNetworkedTask(task);
@@ -188,7 +188,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
 
         tasksInitialized = true;
 
-        Multiplayer.LogDebug(() => $"NetworkedJob.Initialize(): Initialized NetworkedJob for jobId {job.ID} with {Job.tasks.Count} tasks");
+        //Multiplayer.LogDebug(() => $"NetworkedJob.Initialize(): Initialized NetworkedJob for jobId {job.ID} with {Job.tasks.Count} tasks");
     }
 
     private void AddToCache()
