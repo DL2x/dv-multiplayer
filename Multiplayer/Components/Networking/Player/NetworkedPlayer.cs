@@ -80,6 +80,11 @@ public class NetworkedPlayer : MonoBehaviour
         targetMoveDir = Vector2.zero;
     }
 
+    protected void OnDestroy()
+    {
+        Settings.OnSettingsUpdated -= OnSettingsUpdated;
+    }
+
     private void OnSettingsUpdated(Settings settings)
     {
         nameTag.ShowUsername(settings.ShowNameTags);
@@ -124,8 +129,13 @@ public class NetworkedPlayer : MonoBehaviour
             // Create base orientation aligned with world up but facing car's forward direction
             Quaternion baseRotation = Quaternion.LookRotation(horizontalForward, worldUp);
 
+            // Calculate the relative rotation: how much is the player rotated relative to the car?
+            float carYaw = baseRotation.eulerAngles.y;
+            float playerYaw = targetRotation.eulerAngles.y;
+            float relativeYaw = playerYaw - carYaw;
+
             // Apply the desired Y rotation (player's facing direction) on top of this base rotation
-            Quaternion targetWorldRotation = baseRotation * Quaternion.Euler(0, targetRotation.eulerAngles.y, 0);
+            Quaternion targetWorldRotation = baseRotation * Quaternion.Euler(0, relativeYaw, 0);
 
             // Apply rotation in world space despite being a child transform
             selfTransform.rotation = Quaternion.Lerp(selfTransform.rotation, targetWorldRotation, t);
@@ -139,7 +149,7 @@ public class NetworkedPlayer : MonoBehaviour
         if (itemHeld != null)
         {
             itemHeld.transform.position = selfTransform.position + GetItemOffsetFromPlayer();
-            itemHeld.transform.rotation = selfTransform.rotation * (itemHoldRot ?? ItemPositionController.Instance.itemAnchor.localRotation);
+            itemHeld.transform.rotation = selfTransform.rotation * (itemHoldRot ?? Quaternion.identity);//ItemPositionController.Instance.itemAnchor.localRotation);
         }
     }
 

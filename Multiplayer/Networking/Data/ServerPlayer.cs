@@ -123,7 +123,8 @@ public class ServerPlayer : IDisposable
 
             return pos;
         }
-    }  
+    }
+
     public float WorldRotationY => CarId == 0 || !NetworkedTrainCar.TryGet(CarId, out NetworkedTrainCar car)
         ? RawRotationY
         : (Quaternion.Euler(0, RawRotationY, 0) * car.transform.rotation).eulerAngles.y;

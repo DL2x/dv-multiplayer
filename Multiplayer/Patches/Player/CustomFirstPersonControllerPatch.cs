@@ -54,7 +54,7 @@ public static class CustomFirstPersonControllerPatch
             return;
 
         Vector3 position = isOnCar ? PlayerManager.PlayerTransform.localPosition : PlayerManager.PlayerTransform.GetWorldAbsolutePosition();
-        float rotationY = (isOnCar ? PlayerManager.PlayerTransform.localEulerAngles : PlayerManager.PlayerTransform.eulerAngles).y;
+        float rotationY = PlayerManager.PlayerCamera.transform.eulerAngles.y;
 
         //bool positionOrRotationChanged = lastPosition != position || !Mathf.Approximately(lastRotationY, rotationY);
 
