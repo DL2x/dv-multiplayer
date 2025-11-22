@@ -171,6 +171,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonHandbrakePositionPacket, ITransportPeer>(OnCommonHandbrakePositionPacket);
         netPacketProcessor.SubscribeReusable<CommonPaintThemePacket, ITransportPeer>(OnCommonPaintThemePacket);
         netPacketProcessor.SubscribeReusable<ServerboundAddCoalPacket, ITransportPeer>(OnServerboundAddCoalPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundTenderCoalPacket, ITransportPeer>(OnServerboundTenderCoalPacket);
         netPacketProcessor.SubscribeReusable<ServerboundFireboxIgnitePacket, ITransportPeer>(OnServerboundFireboxIgnitePacket);
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, ITransportPeer>(OnCommonTrainPortsPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, ITransportPeer>(OnCommonTrainFusesPacket);
@@ -535,18 +536,6 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
 
         //LogDebug(()=> $"Sending Brake Pressures netId {netId}: {mainReservoirPressure}, {independentPipePressure}, {brakePipePressure}, {brakeCylinderPressure}");
-    }
-
-    public void SendFireboxState(ushort netId, float fireboxContents, bool fireboxOn)
-    {
-        SendPacketToAll(new ClientboundFireboxStatePacket
-        {
-            NetId = netId,
-            Contents = fireboxContents,
-            IsOn = fireboxOn
-        }, DeliveryMethod.ReliableOrdered, SelfPeer);
-
-        LogDebug(() => $"Sending Firebox States netId {netId}: {fireboxContents}, {fireboxOn}");
     }
 
     public void SendCargoState(NetworkedTrainCar netTraincar, bool isLoading, byte cargoModelIndex)
@@ -1322,7 +1311,28 @@ public class NetworkServer : NetworkManager
             if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= carLength * carLength)
                 networkedTrainCar.firebox?.fireboxCoalControlPort.ExternalValueUpdate(packet.CoalMassDelta);
         }
+    }
 
+    private void OnServerboundTenderCoalPacket(ServerboundTenderCoalPacket packet, ITransportPeer peer)
+    {
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
+            return;
+
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+            return;
+
+        // is value valid?
+        if (float.IsNaN(packet.CoalMassDelta))
+            return;
+
+        if (!NetworkLifecycle.Instance.IsHost(player))
+        {
+            float carLength = CarSpawner.Instance.carLiveryToCarLength[networkedTrainCar.TrainCar.carLivery];
+
+            //is player close enough to add/remove coal?
+            if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= carLength * carLength)
+                networkedTrainCar.coalPile?.coalConsumePort.ExternalValueUpdate(packet.CoalMassDelta);
+        }
     }
 
     private void OnServerboundFireboxIgnitePacket(ServerboundFireboxIgnitePacket packet, ITransportPeer peer)

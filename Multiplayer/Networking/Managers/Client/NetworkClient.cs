@@ -152,7 +152,6 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundDestroyTrainCarPacket>(OnClientboundDestroyTrainCarPacket);
         netPacketProcessor.SubscribeReusable<ClientboundTrainsetPhysicsPacket>(OnClientboundTrainPhysicsPacket);
         netPacketProcessor.SubscribeReusable<CommonCouplerInteractionPacket>(OnCommonCouplerInteractionPacket);
-        //netPacketProcessor.SubscribeReusable<CommonTrainCouplePacket>(OnCommonTrainCouplePacket);
         netPacketProcessor.SubscribeReusable<CommonTrainUncouplePacket>(OnCommonTrainUncouplePacket);
         netPacketProcessor.SubscribeReusable<CommonHoseConnectedPacket>(OnCommonHoseConnectedPacket);
         netPacketProcessor.SubscribeReusable<CommonHoseDisconnectedPacket>(OnCommonHoseDisconnectedPacket);
@@ -165,7 +164,6 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket>(OnCommonSimFlowPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket>(OnCommonTrainFusesPacket);
         netPacketProcessor.SubscribeReusable<ClientboundBrakeStateUpdatePacket>(OnClientboundBrakeStateUpdatePacket);
-        netPacketProcessor.SubscribeReusable<ClientboundFireboxStatePacket>(OnClientboundFireboxStatePacket);
 
         netPacketProcessor.SubscribeReusable<ClientboundCargoStatePacket>(OnClientboundCargoStatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundCargoHealthUpdatePacket>(OnClientboundCargoHealthUpdatePacket);
@@ -814,15 +812,6 @@ public class NetworkClient : NetworkManager
         //LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.MainReservoirPressure}, {packet.IndependentPipePressure}, {packet.BrakePipePressure}, {packet.BrakeCylinderPressure}");
     }
 
-    private void OnClientboundFireboxStatePacket(ClientboundFireboxStatePacket packet)
-    {
-        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
-            return;
-
-
-        networkedTrainCar.Client_ReceiveFireboxStateUpdate(packet.Contents, packet.IsOn);
-    }
-
     private void OnClientboundCargoStatePacket(ClientboundCargoStatePacket packet)
     {
         if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
@@ -1429,6 +1418,15 @@ public class NetworkClient : NetworkManager
     public void SendAddCoal(ushort netId, float coalMassDelta)
     {
         SendPacketToServer(new ServerboundAddCoalPacket
+        {
+            NetId = netId,
+            CoalMassDelta = coalMassDelta
+        }, DeliveryMethod.ReliableOrdered);
+    }
+
+    public void SendTenderCoalPileInteraction(ushort netId, float coalMassDelta)
+    {
+        SendPacketToServer(new ServerboundTenderCoalPacket
         {
             NetId = netId,
             CoalMassDelta = coalMassDelta
