@@ -23,8 +23,14 @@ public class NetworkedPlayer : MonoBehaviour
         //todo: there's some minor inconsistency with return values and may be related to:
         // - the direction/rotation of the camera
         // - player loading status (maybe posistion hasn't settled yet)
-        itemAnchorOffset = PlayerManager.PlayerTransform.InverseTransformPoint(ItemPositionController.Instance.itemAnchor.position);
-        Multiplayer.LogDebug(() => $"NetworkedPlayer.CaptureItemAnchorOffset() itemAnchorOffset: {itemAnchorOffset}");
+        if (VRManager.IsVREnabled())
+        {
+        }
+        else
+        {
+            itemAnchorOffset = PlayerManager.PlayerTransform.InverseTransformPoint(ItemPositionController.Instance.itemAnchor.position);
+            Multiplayer.LogDebug(() => $"NetworkedPlayer.CaptureItemAnchorOffset() itemAnchorOffset: {itemAnchorOffset}");
+        }
     }
 
     #endregion
