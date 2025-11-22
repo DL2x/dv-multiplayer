@@ -16,7 +16,6 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 using static CashRegisterModule;
-using static DV.Interaction.Inputs.InputManager;
 
 namespace Multiplayer.Components.Networking.World;
 
@@ -96,14 +95,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     private ResourceType[] resourceTypes = [];
 
-    private GrabHandlerHingeJoint carSelectorGrab;
-    private GrabHandlerHingeJoint faucetPositionerGrab;
+    private RotaryBase carSelectorGrab;
+    private LeverBase faucetPositionerGrab;
     private HingeJointAngleFix faucetPositioner;
     private SteppedJoint faucetCrankSteppedJoint;
 
     private readonly Dictionary<ResourceType, (RotaryAmplitudeChecker amplitudeChecker, LocoResourceModule module, Action<int> leverHandler)> leverStateLookup = [];
-    private readonly Dictionary<ResourceType, GrabHandlerHingeJoint> grabbedHandlerLookup = [];
-    private readonly Dictionary<ResourceType, LeverNonVR> leverLookup = [];
+    private readonly Dictionary<ResourceType, LeverBase> grabbedHandlerLookup = [];
+    private readonly Dictionary<ResourceType, LeverBase> leverLookup = [];
     private readonly Dictionary<ResourceType, NetworkedPluggableObject> resourceToPluggableObject = [];
     private readonly Dictionary<ResourceType, LocoResourceModule> resourceTypeToLocoResourceModule = [];
 
@@ -197,7 +196,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         if (carSelectorGrab != null)
         {
             carSelectorGrab.Grabbed -= CarSelectorGrabbed;
-            carSelectorGrab.UnGrabbed -= CarSelectorUnGrabbed;
+            carSelectorGrab.Ungrabbed -= CarSelectorUnGrabbed;
         }
 
         if (Station?.pitstop != null)
@@ -208,7 +207,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         if (faucetPositionerGrab != null)
         {
             faucetPositionerGrab.Grabbed -= FaucetCrankGrabbed;
-            faucetPositionerGrab.UnGrabbed -= FaucetCrankUnGrabbed;
+            faucetPositionerGrab.Ungrabbed -= FaucetCrankUnGrabbed;
         }
 
         if (faucetCrankSteppedJoint != null)
@@ -464,21 +463,21 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         }
 
         //Wait for levers an knobs to load
-        yield return new WaitUntil(() => GetComponentInChildren<GrabHandlerHingeJoint>(true) != null);
-        carSelectorGrab = GetComponentInChildren<GrabHandlerHingeJoint>(true);
+        yield return new WaitUntil(() => GetComponentInChildren<RotaryBase>(true) != null);
+        carSelectorGrab = GetComponentInChildren<RotaryBase>(true);
 
         if (carSelectorGrab != null)
         {
             Multiplayer.LogDebug(() => $"NetworkedPitStopStation.Init() Grab Handler found: {carSelectorGrab != null}, Name: {carSelectorGrab.name}");
             carSelectorGrab.Grabbed += CarSelectorGrabbed;
-            carSelectorGrab.UnGrabbed += CarSelectorUnGrabbed;
+            carSelectorGrab.Ungrabbed += CarSelectorUnGrabbed;
 
             Station.pitstop.CarSelected += CarSelected;
         }
 
         // Water tower positioner handle
         var faucetGo = transform.parent.FindChildrenByName("FaucetCrank").FirstOrDefault();
-        faucetPositionerGrab = faucetGo?.GetComponentInChildren<GrabHandlerHingeJoint>(true);
+        faucetPositionerGrab = faucetGo?.GetComponentInChildren<LeverBase>(true);
         faucetPositioner = faucetGo?.GetComponentInChildren<HingeJointAngleFix>(true);
         faucetCrankSteppedJoint = faucetGo?.GetComponentInChildren<SteppedJoint>(true);
 
@@ -486,7 +485,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         {
             Multiplayer.LogDebug(() => $"NetworkedPitStopStation.Init() Grab Handler found: {carSelectorGrab != null}, Name: {carSelectorGrab.name}");
             faucetPositionerGrab.Grabbed += FaucetCrankGrabbed;
-            faucetPositionerGrab.UnGrabbed += FaucetCrankUnGrabbed;
+            faucetPositionerGrab.Ungrabbed += FaucetCrankUnGrabbed;
             faucetCrankSteppedJoint.PositionChanged += FaucetCrankPositionChanged;
         }
 
@@ -534,8 +533,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                 }
 
                 var checker = resourceModule.GetComponentInChildren<RotaryAmplitudeChecker>();
-                var grab = resourceModule.GetComponentInChildren<GrabHandlerHingeJoint>();
-                var lever = resourceModule.GetComponentInChildren<LeverNonVR>();
+                var grab = resourceModule.GetComponentInChildren<LeverBase>();
+                var lever = resourceModule.GetComponentInChildren<LeverBase>();
                 if (checker != null && grab != null)
                 {
 
@@ -707,7 +706,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     /// <summary>
     /// Handles grab interactions for the car selector knob.
     /// </summary>
-    private void CarSelectorGrabbed()
+    private void CarSelectorGrabbed(ControlImplBase _)
     {
         if (NetworkLifecycle.Instance.IsProcessingPacket || (NetworkLifecycle.Instance.IsHost() && processingAsHost))
             return;
@@ -723,7 +722,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     /// <summary>
     /// Handles end of grab (release) interactions for the car selector knob.
     /// </summary>
-    private void CarSelectorUnGrabbed()
+    private void CarSelectorUnGrabbed(ControlImplBase _)
     {
         if (NetworkLifecycle.Instance.IsProcessingPacket || (NetworkLifecycle.Instance.IsHost() && processingAsHost))
             return;
@@ -783,7 +782,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     /// <summary>
     /// Handles grab interactions for the faucet positioning handle (water towers).
     /// </summary>
-    private void FaucetCrankGrabbed()
+    private void FaucetCrankGrabbed(ControlImplBase _)
     {
         if (NetworkLifecycle.Instance.IsProcessingPacket || (NetworkLifecycle.Instance.IsHost() && processingAsHost))
             return;
@@ -806,7 +805,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     /// <summary>
     /// Handles end of grab (release) interactions for the faucet positioning handle (water towers).
     /// </summary>
-    private void FaucetCrankUnGrabbed()
+    private void FaucetCrankUnGrabbed(ControlImplBase _)
     {
         if (NetworkLifecycle.Instance.IsProcessingPacket || (NetworkLifecycle.Instance.IsHost() && processingAsHost))
             return;
@@ -932,13 +931,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             bool grabbed = (resource.FillingState != LocoResourceModuleFillingState.None);
             bool isLocallyGrabbed = isResourceGrabbedDict.TryGetValue(resource.ResourceType, out var localGrabbed) && localGrabbed;
 
-            leverLookup.TryGetValue(resource.ResourceType, out LeverNonVR lever);
-            grabbedHandlerLookup.TryGetValue(resource.ResourceType, out GrabHandlerHingeJoint grab);
+            leverLookup.TryGetValue(resource.ResourceType, out LeverBase lever);
+            grabbedHandlerLookup.TryGetValue(resource.ResourceType, out LeverBase grab);
 
             if (!isLocallyGrabbed)
             {
                 lever?.BlockControl(grabbed);
-                grab?.SetMovingDisabled(grabbed);
+                if (lever != null)
+                    lever.InteractionAllowed = !grabbed;
 
                 if (grabbed)
                     grab?.ForceEndInteraction();
@@ -998,9 +998,9 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
     /// <param name="packet">The packet containing interaction data.</param>
     public void ProcessInteractionPacketAsClient(CommonPitStopInteractionPacket packet)
     {
-        GrabHandlerHingeJoint grab = null;
+        LeverBase grab = null;
         RotaryAmplitudeChecker amplitudeChecker = null;
-        LeverNonVR lever = null;
+        LeverBase lever = null;
         LocoResourceModule resourceModule = null;
 
         // Validate interaction type
@@ -1082,7 +1082,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                 if (!isLocallyGrabbed)
                 {
                     lever?.BlockControl(grabbed);
-                    grab?.SetMovingDisabled(grabbed);
+                    if (lever != null)
+                        lever.InteractionAllowed = !grabbed;
 
                     if (grabbed)
                         grab?.ForceEndInteraction();
@@ -1120,12 +1121,16 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
             case PitStopStationInteractionType.CarSelectorGrab:
                 //block interaction
-                carSelectorGrab?.SetMovingDisabled(true);
+                carSelectorGrab?.BlockControl(true);
+                if (carSelectorGrab != null)
+                    carSelectorGrab.InteractionAllowed = false;
                 break;
 
             case PitStopStationInteractionType.CarSelectorUngrab:
                 //allow interaction
-                carSelectorGrab?.SetMovingDisabled(false);
+                carSelectorGrab?.BlockControl(false);
+                if (carSelectorGrab != null)
+                    carSelectorGrab.InteractionAllowed = true;
                 SetCarSelection((int)packet.Value);
                 break;
 
@@ -1135,13 +1140,17 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
             case PitStopStationInteractionType.FaucetGrab:
                 //block interaction
-                faucetPositionerGrab?.SetMovingDisabled(true);
+                faucetPositionerGrab?.BlockControl(true);
+                if (faucetPositionerGrab != null)
+                    faucetPositionerGrab.InteractionAllowed = false;
                 break;
 
             case PitStopStationInteractionType.FaucetUngrab:
                 //allow interaction
-                faucetPositionerGrab?.SetMovingDisabled(false);
-                
+                faucetPositionerGrab?.BlockControl(false);
+                if (faucetPositionerGrab != null)
+                    faucetPositionerGrab.InteractionAllowed = true;
+
                 SetFaucetRotation((int)packet.Value);
 
                 break;
