@@ -255,8 +255,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
     public void OnPlayerEnteredActivationRegion(ServerPlayer player)
     {
-        if (Station.pitstop.IsCarInPitStop())
-        {
             // Ensure all resource data exists
             InitialiseData();
 
@@ -299,7 +297,6 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
             // Send current state
             NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, faucetPos, stateData, plugData, player.Peer);
-        }
     }
 
     public void OnPlayerEnteredCullingRegion(ServerPlayer player)
