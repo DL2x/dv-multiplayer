@@ -13,6 +13,8 @@ public static class CustomFirstPersonControllerPatch
 
     private static CustomFirstPersonController fps;
 
+    private static bool lastOnCar;
+    private static ushort lastCarNetId;
     private static Vector3 lastPosition;
     private static float lastRotationY;
     private static bool sentFinalPosition;
@@ -27,6 +29,7 @@ public static class CustomFirstPersonControllerPatch
     {
         fps = __instance;
         isOnCar = PlayerManager.Car != null;
+        car = PlayerManager.Car;
         NetworkLifecycle.Instance.OnTick += OnTick;
         PlayerManager.CarChanged += OnCarChanged;
     }
@@ -53,21 +56,27 @@ public static class CustomFirstPersonControllerPatch
         if(UnloadWatcher.isUnloading)
             return;
 
+        if (isOnCar && car == null)
+        {
+            car = PlayerManager.Car;
+            isOnCar = car != null;
+        }
+
         Vector3 position = isOnCar ? PlayerManager.PlayerTransform.localPosition : PlayerManager.PlayerTransform.GetWorldAbsolutePosition();
         float rotationY = PlayerManager.PlayerCamera.transform.eulerAngles.y;
 
-        //bool positionOrRotationChanged = lastPosition != position || !Mathf.Approximately(lastRotationY, rotationY);
+        ushort carNetID = isOnCar ? car.GetNetId() : (ushort)0;
 
-        bool positionOrRotationChanged = Vector3.Distance(lastPosition, position) > 0 || Math.Abs(lastRotationY - rotationY) > ROTATION_THRESHOLD;
+        bool positionOrRotationChanged = lastOnCar != isOnCar || (isOnCar && (lastCarNetId != carNetID)) || Vector3.Distance(lastPosition, position) > 0 || Math.Abs(lastRotationY - rotationY) > 0.2f;//ROTATION_THRESHOLD;
 
         if (!positionOrRotationChanged && sentFinalPosition)
             return;
 
+        lastOnCar = isOnCar;
+        lastCarNetId = carNetID;
         lastPosition = position;
         lastRotationY = rotationY;
         sentFinalPosition = !positionOrRotationChanged;
-
-        ushort carNetID = isOnCar ? car.GetNetId() : (ushort)0;
 
         NetworkLifecycle.Instance.Client.SendPlayerPosition(lastPosition, PlayerManager.PlayerTransform.InverseTransformDirection(fps.m_MoveDir), lastRotationY, carNetID, isJumping, isOnCar, isJumping || sentFinalPosition);
         isJumping = false;
