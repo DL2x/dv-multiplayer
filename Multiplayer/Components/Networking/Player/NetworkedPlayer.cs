@@ -11,7 +11,7 @@ namespace Multiplayer.Components.Networking.Player;
 public class NetworkedPlayer : MonoBehaviour
 {
     #region Static Setup
-    private static Vector3 itemAnchorOffset;
+    private static Vector3 itemAnchorOffset = new(0.2f, 1.5f, 0.4f);
 
     /// <summary>
     /// Captures the standard offset position for held items relative to the player transform
