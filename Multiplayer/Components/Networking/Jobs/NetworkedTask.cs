@@ -16,6 +16,11 @@ public class NetworkedTask : IdMonoBehaviour<ushort, NetworkedTask>
         return b;
     }
 
+    public static bool TryGet(Task task, out NetworkedTask networkedTask)
+    {
+        return taskToNetworkedTask.TryGetValue(task, out networkedTask);
+    }
+
     public static bool TryGet(ushort netId, out Task task)
     {
         task = null;
@@ -45,6 +50,10 @@ public class NetworkedTask : IdMonoBehaviour<ushort, NetworkedTask>
 
     public Task Task { get; private set; }
 
+    private float lastStartTime;
+    private float lastFinishTime;
+    private TaskState lastState;
+
     public void Initialize(Task task, ushort netId = 0)
     {
         if (task == null)
@@ -72,5 +81,17 @@ public class NetworkedTask : IdMonoBehaviour<ushort, NetworkedTask>
 
         if (Task != null)
             taskToNetworkedTask.Remove(Task);
+    }
+
+    public void SetState(TaskState newState)
+    {
+        if (lastState == newState && lastStartTime == Task.taskStartTime && lastFinishTime == Task.taskFinishTime)
+            return;
+
+        lastState = newState;
+        lastStartTime = Task.taskStartTime;
+        lastFinishTime = Task.taskFinishTime;
+
+        NetworkLifecycle.Instance.Server.SendTaskUpdate(NetId, newState, Task.taskStartTime, Task.taskFinishTime);
     }
 }

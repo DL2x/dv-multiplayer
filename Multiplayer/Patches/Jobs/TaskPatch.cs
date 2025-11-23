@@ -21,14 +21,13 @@ public static class TaskPatch
 
 
         //Multiplayer.LogDebug(()=>$"Task.SetState() called for jobId: {__instance.Job.ID}, taskType: {__instance.InstanceTaskType}, newState: {newState}");
-
-        if (!NetworkedTask.TryGetNetId(__instance, out var taskNetId) ||taskNetId == 0)
+        if(!NetworkedTask.TryGet(__instance, out var networkedTask))
         {
-            Multiplayer.LogError($"Task.SetState() could not find task index for jobId: {__instance.Job.ID}, taskType: {__instance.InstanceTaskType}");
+            Multiplayer.LogError($"Task.SetState() could not find NetworkedTask for jobId: {__instance.Job.ID}, taskType: {__instance.InstanceTaskType}");
             return;
         }
 
-        NetworkLifecycle.Instance.Server.SendTaskUpdate(taskNetId, newState, __instance.taskStartTime, __instance.taskFinishTime);
+        networkedTask.SetState(newState);
     }
 
     [HarmonyPatch(nameof(Task.SetJobBelonging))]
