@@ -1,6 +1,7 @@
 using DV.CabControls;
 using DV.Customization.Paint;
 using DV.Damage;
+using DV.HUD;
 using DV.Logic.Job;
 using DV.MultipleUnit;
 using DV.Simulation.Brake;
@@ -114,6 +115,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return netId;
 
         netId = StringHashing.Fnv1aHash(portId);
+
+        Multiplayer.LogDebug(() => $"GetPortNetId({portId}) Registering with {netId}");
+
         netIdToPort[netId] = portId;
         portToNetId[portId] = netId;
 
@@ -158,6 +162,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private bool hasSimFlow;
     private SimulationFlow simulationFlow;
+    SimController simController;
     public FireboxSimController firebox;
     public CoalPileSimController coalPile;
     private readonly Dictionary<TrainDamage, TrainDamage.HealthChanged> trainDamageDelegates = [];
@@ -190,6 +195,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private ServerPlayer frontInteractionPlayer;
     private ServerPlayer rearInteractionPlayer;
 
+    private readonly Dictionary<uint, ServerPlayer> portAuthority = [];
+
     #endregion
 
     #region Client Variables
@@ -207,7 +214,13 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private uint kinematicCycles = 0;
 
+    private readonly Dictionary<uint, bool> portNetIdToBlockState = [];
+    private readonly Dictionary<uint, ControlImplBase> portNetIdToControl = [];
+    private readonly Dictionary<ControlImplBase, uint> controlToPortNetId = [];
     #endregion
+
+    #region Common Variables
+
     #endregion
 
     protected override bool IsIdServerAuthoritative => true;
@@ -257,11 +270,17 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({CurrentID}, {NetId}) Couplers complete");
 
-        SimController simController = GetComponent<SimController>();
+        simController = GetComponent<SimController>();
         if (simController != null)
         {
             hasSimFlow = true;
             simulationFlow = simController.SimulationFlow;
+
+            TrainCar.InteriorLoaded += OnTrainCarInteriorLoaded;
+            TrainCar.InteriorAboutToBeUnloaded += OnTrainCarInteriorUnloaded;
+
+            if (TrainCar.loadedInterior != null)
+                OnTrainCarInteriorLoaded(TrainCar.loadedInterior.gameObject);
 
             dirtyPorts = new HashSet<uint>(simulationFlow.fullPortIdToPort.Count);
             lastSentPortValues = new Dictionary<uint, float>(dirtyPorts.Count);
@@ -269,7 +288,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             {
                 _ = GetPortNetId(kvp.Key); //ensure this port is registered
                 if (kvp.Value.valueType == PortValueType.CONTROL || NetworkLifecycle.Instance.IsHost())
+                {
+                    Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({CurrentID}, {NetId}) Subscribing to port {kvp.Key}");
                     kvp.Value.ValueUpdatedInternally += _ => { Common_OnPortUpdated(kvp.Value); };
+                }
             }
 
             dirtyFuses = new HashSet<uint>(simulationFlow.fullFuseIdToFuse.Count);
@@ -358,6 +380,115 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         NetworkLifecycle.Instance?.Client.SendTrainSyncRequest(NetId);
     }
+
+    private void OnTrainCarInteriorLoaded(GameObject interior)
+    {
+        Multiplayer.LogDebug(()=> $"OnTrainCarInteriorLoaded() {CurrentID}, interior is null: {interior == null}");
+
+        StartCoroutine(WaitForInterior());
+    }
+
+    private IEnumerator WaitForInterior()
+    {
+        float time = Time.time;
+        InteriorControlsManager interiorControlsManager = null;
+
+        yield return new WaitUntil
+        (
+            ()=>
+            {
+                return TrainCar.loadedInterior != null || Time.time - time > 2000f;
+            }
+        );
+
+        yield return new WaitForFixedUpdate();
+
+        if (TrainCar.loadedInterior == null)
+        {
+            Multiplayer.LogError($"TrainCar {CurrentID} failed to load an interior");
+            yield break;
+        }
+
+        time = Time.time;
+
+        yield return new WaitUntil
+        (
+            ()=>
+            {
+                return TrainCar.loadedInterior.TryGetComponent<InteriorControlsManager>(out interiorControlsManager) || Time.time - time > 2000f;
+            }
+        );
+
+        yield return new WaitForFixedUpdate();
+
+        if (!interiorControlsManager.Initialized)
+        {
+            interiorControlsManager.OnInitialized += HookControls;
+            yield break;
+        }
+
+        yield return new WaitForSecondsRealtime(2f);
+
+        HookControls(interiorControlsManager);
+    }
+
+    private void HookControls(InteriorControlsManager interiorControlsManager)
+    {
+        interiorControlsManager.OnInitialized -= HookControls;
+
+        // Find all control overrides
+        foreach (var control in interiorControlsManager.controls.Values)
+        {
+            var controlPortId = control.overridableBaseControl?.portId;
+
+            if (string.IsNullOrEmpty(controlPortId))
+            {
+                Multiplayer.LogDebug(() => $"HookControls() Control, {NetId}] has no controlPortId on car {CurrentID}");
+                continue;
+            }
+
+            Multiplayer.LogDebug(() => $"HookControls() Control [{controlPortId}] found on car {CurrentID}");
+            var netId = GetPortNetId(controlPortId);
+
+
+            if (control.controlImplBase == null)
+            {
+                Multiplayer.LogDebug(() => $"HookControls() Control [{controlPortId}, {netId}] has no implementation on car {CurrentID}");
+                continue;
+            }
+
+            Multiplayer.LogDebug(() => $"HookControls() Control [{controlPortId}, {netId}] hooking events on car {CurrentID}, hash: {control.controlImplBase.GetHashCode()}, instance: {control.controlImplBase.GetInstanceID()}");
+
+            portNetIdToControl[netId] = control.controlImplBase;
+            controlToPortNetId[control.controlImplBase] = netId;
+
+            control.controlImplBase.Grabbed += Client_ControlGrabbed;
+            control.controlImplBase.Ungrabbed += Client_ControlUngrabbed;
+
+            if (portNetIdToBlockState.TryGetValue(netId, out var isBlocked) && isBlocked)
+            {
+                Multiplayer.LogDebug(() => $"WaitForInterior() Control [{controlPortId}, {netId}] is blocked on car {CurrentID}");
+            }
+        }
+    }
+
+    private void OnTrainCarInteriorUnloaded(GameObject interior)
+    {
+        Multiplayer.LogDebug(()=>$"OnTrainCarInteriorUnloaded() {CurrentID}");
+
+        foreach (var control in controlToPortNetId.Keys)
+        {
+            if (control == null)
+                continue;
+
+            control.Grabbed -= Client_ControlGrabbed;
+            control.Ungrabbed -= Client_ControlUngrabbed;
+        }
+
+        portNetIdToControl.Clear();
+        controlToPortNetId.Clear();
+    }
+
 
     public void OnDisable()
     {
@@ -744,6 +875,51 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         return true;
     }
 
+    public void Server_ReceiveAuthorityRequest(uint portNetId, ServerPlayer player, bool requestAuthority)
+    {
+        portAuthority.TryGetValue(portNetId, out var currentAuth);
+
+        if (requestAuthority)
+        {
+            if (currentAuth == null)
+            {
+                float carLength = CarSpawner.Instance.carLiveryToCarLength[TrainCar.carLivery];
+                if ((player.WorldPosition - transform.position).sqrMagnitude > carLength * carLength)
+                {
+                    NetworkLifecycle.Instance.Server.LogWarning($"Player \"{player.Username}\" attempted to gain authority for a control on car {CurrentID}, but they are too far away!");
+                    NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, portNetId, ControlAuthorityState.Denied, player);
+                    NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, portNetId, ControlAuthorityState.Released, player);
+                    return;
+                }
+
+                // No authority exists (or cleanup failed) - grant authority and communicate to all players
+                NetworkLifecycle.Instance.Server.LogDebug(() => $"Player \"{player.Username}\" granted authority for a control on car {CurrentID}");
+                portAuthority[portNetId] = player;
+                NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, portNetId, ControlAuthorityState.Blocked, excludePlayer: player);
+            }
+            else if (currentAuth != player)
+            {
+                NetworkLifecycle.Instance.Server.LogWarning($"Player \"{player.Username}\" attempted to gain authority for a control that's in use on car {CurrentID}");
+                NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, portNetId, ControlAuthorityState.Denied, player);
+            }
+        }
+        else
+        {
+            // Release request
+            if (currentAuth == player)
+            {
+                NetworkLifecycle.Instance.Server.LogDebug(()=>$"Player \"{player.Username}\" released authority for a control on car {CurrentID}");
+                portAuthority.Remove(portNetId);
+                NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, portNetId, ControlAuthorityState.Released);
+            }
+            else if(currentAuth != null)
+            {
+                NetworkLifecycle.Instance.Server.LogWarning($"Player \"{player.Username}\" attempted to release authority for a control that's not theirs on car {CurrentID}");
+                NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, portNetId, ControlAuthorityState.Denied, player);
+            }
+        }
+    }
+
     private void Server_OnPlayerDisconnect(ServerPlayer player)
     {
         //todo: resolve player disconnection during chain interaction
@@ -759,6 +935,13 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             {
                 rearInteracting = false;
             }
+        }
+
+        // Clean up blocked controls
+        foreach (var kvp in portAuthority.Where(kvp => kvp.Value == player))
+        {
+            portAuthority.Remove(kvp.Key);
+            NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, kvp.Key, ControlAuthorityState.Released);
         }
     }
     #endregion
@@ -893,6 +1076,13 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void Common_OnPortUpdated(Port port)
     {
+
+        if (port.valueType != PortValueType.CONTROL && !NetworkLifecycle.Instance.IsHost())
+        {
+            Multiplayer.LogDebug(() => $"Common_OnPortUpdated() Ignoring non-control port update for [{port.id}] on [{CurrentID}, {NetId}]");
+            return;
+        }
+
         if (UnloadWatcher.isUnloading || NetworkLifecycle.Instance.IsProcessingPacket)
             return;
         if (float.IsNaN(port.prevValue) && float.IsNaN(port.Value))
@@ -914,6 +1104,11 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             if (!hasLastSent || delta > MAX_PORT_DELTA || (port.Value == 0 && lastSentValue != 0))
             {
                 dirtyPorts.Add(netId);
+            }
+
+            if (port.valueType == PortValueType.CONTROL)
+            {
+             
             }
         }
     }
@@ -1561,6 +1756,69 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return;
         }
         //Multiplayer.LogDebug(() => $"9 Client_CouplerStateChange({state}) trainCar: [{TrainCar?.ID}, {NetId}]");
+    }
+
+    private void Client_ControlGrabbed(ControlImplBase control)
+    {
+        Multiplayer.LogDebug(() => $"Client_ControlGrabbed() Control {control.name}, car: {CurrentID}");
+        if (!controlToPortNetId.TryGetValue(control, out var portNetId))
+        {
+            Multiplayer.LogWarning($"Control \"{control.name}\" grabbed but netId not found on TrainCar \"{CurrentID}\", hash: {control.GetHashCode()}, instance: {control.GetInstanceID()}");
+            return;
+        }
+
+        if (portNetIdToBlockState.TryGetValue(portNetId, out var isBlocked) && isBlocked)
+        {
+            Multiplayer.LogDebug(() => $"Client_ControlGrabbed() Control [{control.name}, {portNetId}] is blocked on car {CurrentID}, ending interaction");
+            control.ForceEndInteraction();
+        }
+        else
+        {
+            Multiplayer.LogDebug(() => $"Client_ControlGrabbed() Control [{control.name}, {portNetId}] is not blocked on car {CurrentID}, requesting authority");
+            NetworkLifecycle.Instance.Client?.SendTrainControlAuthorityRequest(NetId, portNetId, true);
+        }
+    }
+
+    private void Client_ControlUngrabbed(ControlImplBase control)
+    {
+        Multiplayer.LogDebug(() => $"Client_ControlUngrabbed() Control {control.name}, car: {CurrentID}");
+        if (!controlToPortNetId.TryGetValue(control, out var portNetId))
+        {
+            Multiplayer.LogWarning($"Control \"{control.name}\" ungrabbed but netId not found on TrainCar \"{CurrentID}\"");
+            return;
+        }
+
+        if (!portNetIdToBlockState.ContainsKey(portNetId))
+            portNetIdToBlockState[portNetId] = false;
+
+        if (portNetIdToBlockState.TryGetValue(portNetId, out var isBlocked) && !isBlocked)
+        {
+            Multiplayer.LogDebug(() => $"Client_ControlUngrabbed() Control [{control.name}, {portNetId}] not blocked, releasing authority for car {CurrentID}");
+            NetworkLifecycle.Instance.Client?.SendTrainControlAuthorityRequest(NetId, portNetId, false);
+        }
+    }
+
+    public void Client_ReceiveAuthorityUpdate(uint portNetId, ControlAuthorityState state)
+    {
+        bool shouldBlock = state == ControlAuthorityState.Blocked || state == ControlAuthorityState.Denied;
+        portNetIdToBlockState[portNetId] = shouldBlock;
+
+        Multiplayer.LogDebug(() => $"Client_ReceiveAuthorityUpdate({portNetId}, {state}) for [{CurrentID}, {NetId}]");
+
+        if (!portNetIdToControl.TryGetValue(portNetId, out var control) || control == null)
+            return;
+
+        if (shouldBlock)
+        {
+            control.ForceEndInteraction();
+            control.BlockControl(true);
+            control.InteractionAllowed = false;
+        }
+        else
+        {
+            control.BlockControl(false);
+            control.InteractionAllowed = true;
+        }
     }
     #endregion
 }

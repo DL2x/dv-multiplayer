@@ -167,6 +167,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonMuConnectedPacket, ITransportPeer>(OnCommonMuConnectedPacket);
         netPacketProcessor.SubscribeReusable<CommonMuDisconnectedPacket, ITransportPeer>(OnCommonMuDisconnectedPacket);
         netPacketProcessor.SubscribeReusable<CommonCockFiddlePacket, ITransportPeer>(OnCommonCockFiddlePacket);
+        netPacketProcessor.SubscribeReusable<ServerboundTrainControlAuthorityPacket, ITransportPeer>(OnServerboundTrainControlAuthorityPacket);
         netPacketProcessor.SubscribeReusable<CommonBrakeCylinderReleasePacket, ITransportPeer>(OnCommonBrakeCylinderReleasePacket);
         netPacketProcessor.SubscribeReusable<CommonHandbrakePositionPacket, ITransportPeer>(OnCommonHandbrakePositionPacket);
         netPacketProcessor.SubscribeReusable<CommonPaintThemePacket, ITransportPeer>(OnCommonPaintThemePacket);
@@ -762,6 +763,24 @@ public class NetworkServer : NetworkManager
             DeliveryMethod.ReliableOrdered,
             true
         );
+    }
+
+    public void SendTrainControlAuthorityUpdate(ushort netId, uint portNetId, ControlAuthorityState state, ServerPlayer sendToPlayer = null, ServerPlayer excludePlayer = null)
+    {
+        var packet = new ClientboundTrainControlAuthorityUpdatePacket
+        {
+            NetId = netId,
+            PortNetId = portNetId,
+            State = state
+        };
+
+        if (sendToPlayer == null)
+            if (excludePlayer == null)
+                SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, excludeSelf: true);
+            else
+                SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, excludePlayer.Peer, true);
+        else
+            SendPacket(sendToPlayer.Peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
     public void SendJobsCreatePacket(NetworkedStationController networkedStation, NetworkedJob[] jobs, ITransportPeer peer = null)
@@ -1376,6 +1395,16 @@ public class NetworkServer : NetworkManager
         SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
+    private void OnServerboundTrainControlAuthorityPacket(ServerboundTrainControlAuthorityPacket packet, ITransportPeer peer)
+    {
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
+            return;
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+            return;
+
+        networkedTrainCar.Server_ReceiveAuthorityRequest(packet.PortNetId, player, packet.RequestAuthority);
+    }
+
     private void OnCommonTrainFusesPacket(CommonTrainFusesPacket packet, ITransportPeer peer)
     {
         SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
@@ -1654,8 +1683,7 @@ public class NetworkServer : NetworkManager
 
         Log($"Cash Register With Modules Action received for {netCashRegister.GetObjectPath()}, Action: {packet.Action}, Amount: {packet.Amount}");
         netCashRegister.Server_ProcessCashRegisterAction(player, packet);
-
-
     }
+
     #endregion
 }

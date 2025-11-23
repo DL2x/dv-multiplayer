@@ -163,6 +163,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonPaintThemePacket>(OnCommonPaintThemePacket);
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket>(OnCommonSimFlowPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket>(OnCommonTrainFusesPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundTrainControlAuthorityUpdatePacket>(OnClientboundTrainControlAuthorityUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundBrakeStateUpdatePacket>(OnClientboundBrakeStateUpdatePacket);
 
         netPacketProcessor.SubscribeReusable<ClientboundCargoStatePacket>(OnClientboundCargoStatePacket);
@@ -799,6 +800,14 @@ public class NetworkClient : NetworkManager
             return;
 
         networkedTrainCar.Common_UpdateFuses(packet);
+    }
+
+    private void OnClientboundTrainControlAuthorityUpdatePacket(ClientboundTrainControlAuthorityUpdatePacket packet)
+    {
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+            return;
+
+        networkedTrainCar.Client_ReceiveAuthorityUpdate(packet.PortNetId,packet.State);
     }
 
     private void OnClientboundBrakeStateUpdatePacket(ClientboundBrakeStateUpdatePacket packet)
@@ -1595,6 +1604,20 @@ public class NetworkClient : NetworkManager
                 NetId = netId,
                 Action = action,
                 Amount = amount
+            },
+            DeliveryMethod.ReliableOrdered
+        );
+    }
+
+    public void SendTrainControlAuthorityRequest(ushort netId, uint portNetId, bool requestAuthority)
+    {
+        SendPacketToServer
+        (
+            new ServerboundTrainControlAuthorityPacket
+            {
+                NetId = netId,
+                PortNetId = portNetId,
+                RequestAuthority = requestAuthority
             },
             DeliveryMethod.ReliableOrdered
         );
