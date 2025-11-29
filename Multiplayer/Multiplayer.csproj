@@ -3,7 +3,7 @@
         <TargetFramework>net48</TargetFramework>
         <LangVersion>latest</LangVersion>
         <RootNamespace>Multiplayer</RootNamespace>
-        <InformationalVersion>0.1.12.9</InformationalVersion>
+        <InformationalVersion>0.1.13.0</InformationalVersion>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
@@ -102,6 +102,7 @@
         <Reference Include="UnityEngine.TextRenderingModule" />
         <Reference Include="UnityEngine.UnityWebRequestModule" />
         <Reference Include="UnityEngine.InputLegacyModule" />
+        <Reference Include="VRTK" />
     </ItemGroup>
     <Target Name="PostBuildMacros">
         <GetAssemblyIdentity AssemblyFiles="$(TargetPath)">

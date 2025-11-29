@@ -4,8 +4,8 @@
         <TargetFramework>net48</TargetFramework>
         <LangVersion>latest</LangVersion>
         <RootNamespace>MPAPI</RootNamespace>
-        <InformationalVersion>0.1.0.0</InformationalVersion>
-        <Version>0.1.0.0</Version>
+        <InformationalVersion>1.0.0.0</InformationalVersion>
+        <Version>1.0.0.0</Version>
 
         <!-- NuGet Package Configuration -->
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -17,9 +17,10 @@
         <PackageProjectUrl>https://github.com/AMacro/dv-multiplayer/wiki/API-Overview</PackageProjectUrl>
         <RepositoryUrl>https://github.com/AMacro/dv-multiplayer</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
         <PackageReleaseNotes>Initial release of DV Multiplayer API</PackageReleaseNotes>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
 
         <!-- Documentation -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -68,6 +69,10 @@
         <Reference Include="UnityEngine.TextRenderingModule" />
         <Reference Include="UnityEngine.UnityWebRequestModule" />
         <Reference Include="UnityEngine.InputLegacyModule" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
