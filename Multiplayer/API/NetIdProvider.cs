@@ -1,4 +1,5 @@
 using DV.CabControls;
+using DV.Customization.Paint;
 using DV.Logic.Job;
 using DV.ThingTypes;
 using DV.Utils;
@@ -28,8 +29,8 @@ internal class NetIdProvider : SingletonBehaviour<NetIdProvider>, INetIdProvider
         RegisterHandler<TrainCar>(NetworkedTrainCar.TryGetNetId, NetworkedTrainCar.TryGet);
         RegisterHandler<Car>(NetworkedTrainCar.TryGetNetId, NetworkedTrainCar.TryGet);
 
-        //RegisterUIntHandler<CargoType>(CargoTypeLookup.Instance.TryGetNetId, CargoTypeLookup.Instance.TryGet);
         RegisterHandler<CargoType_v2>(CargoTypeLookup.Instance.TryGetNetId, CargoTypeLookup.Instance.TryGet);
+        RegisterHandler<PaintTheme>(PaintThemeLookup.Instance.TryGetNetId, PaintThemeLookup.Instance.TryGet);
 
         RegisterHandler<Junction>(NetworkedJunction.TryGetNetId, NetworkedJunction.TryGet);
         RegisterHandler<TurntableRailTrack>(NetworkedTurntable.TryGetNetId, NetworkedTurntable.TryGet);

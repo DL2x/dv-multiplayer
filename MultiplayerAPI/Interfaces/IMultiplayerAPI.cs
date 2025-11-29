@@ -1,3 +1,4 @@
+using DV.Customization.Paint;
 using DV.Logic.Job;
 using MPAPI.Types;
 using System;
@@ -105,18 +106,19 @@ public interface IMultiplayerAPI
     bool TryGetObjectFromNetId<T>(uint netId, out T obj) where T : class;
 
     /// <summary>
-    /// Registers a PaintTheme and returns its ID.
+    /// Registers a PaintTheme and returns its netId.
     /// </summary>
-    /// <param name="assetName">The string representing the `PaintTheme.AssetName`.</param>
+    /// <param name="theme">The <see cref="PaintTheme"/> to be registered.</param>
     /// <returns>Non-zero, unique Id if the theme was successfully registered, otherwise 0.</returns>
     /// <remarks>PaintThemes must be registered each time the client or server starts, registration is not persistent across sessions.</remarks>
-    uint RegisterPaintTheme(string assetName);
+    uint RegisterPaintTheme(PaintTheme theme);
 
     /// <summary>
     /// Unregisters a PaintTheme.
     /// </summary>
-    /// <param name="themeId">The Id of the PaintTheme to be unregistered.</param>
-    void UnregisterPaintTheme(uint themeId);
+    /// <param name="theme">The <see cref="PaintTheme"/> to be unregistered.</param>
+    /// <remarks>Base game PaintThemes cannot be unregistered.</remarks>
+    void UnregisterPaintTheme(PaintTheme theme);
 
     /// <summary>
     /// Registers a <see cref="TaskNetworkData{T}"/> serialiser/deserialiser for a custom <see cref="DV.Logic.Job.Task"/> type for multiplayer synchronisation.

@@ -3,60 +3,145 @@ using DV.Utils;
 using JetBrains.Annotations;
 using Multiplayer.Utils;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
-
 
 namespace Multiplayer.Components.Networking.Train;
 
 public class PaintThemeLookup : SingletonBehaviour<PaintThemeLookup>
 {
     private readonly Dictionary<uint, string> hashToThemeName = [];
+    private readonly Dictionary<string, uint> themeNameToHash = [];
     private readonly Dictionary<uint, string> hashToBaseThemeName = [];
+    private readonly HashSet<string> baseThemeNamesSet = [];
+
+    private bool moddedThemesSearched = false;
+
+    [UsedImplicitly]
+    public new static string AllowAutoCreate()
+    {
+        return $"[{nameof(PaintThemeLookup)}]";
+    }
 
     protected override void Awake()
     {
         base.Awake();
-        var themeNames = Resources.LoadAll<Object>("").Where(x => x is PaintTheme)
-            .Select(x => ((PaintTheme)x).AssetName)
-            .ToArray();
 
-        foreach (var themeName in themeNames)
+        var themes = Resources.LoadAll<PaintTheme>("");
+
+        foreach (var theme in themes)
         {
-            var id = RegisterTheme(themeName);
-            if (id != 0)
-                hashToBaseThemeName[id] = themeName;
+            if (theme != null && !string.IsNullOrEmpty(theme.AssetName))
+            {
+                var id = RegisterTheme(theme);
+                if (id != 0)
+                    hashToBaseThemeName[id] = theme.AssetName;
+            }
         }
+
+        baseThemeNamesSet.UnionWith(hashToBaseThemeName.Values);
     }
 
-    public PaintTheme GetPaintTheme(uint themeId)
+    #region Public Methods
+    public bool TryGetNetId(PaintTheme theme, out uint netId)
     {
-        PaintTheme theme = null;
+        netId = 0;
 
-        var themeName = GetThemeNameFromId(themeId);
+        if (theme == null)
+            return false;
 
-        if (themeName != null)
-            PaintTheme.TryLoad(themeName, out theme);
+        if (themeNameToHash.TryGetValue(theme.AssetName, out netId))
+            return true;
 
-        return theme;
+        netId = GetThemeId(theme.AssetName);
+
+        if (hashToThemeName.ContainsKey(netId))
+            return true;
+
+        // Skin Manager might not have been updated for Multiplayer yet, or another mod may have added themes
+        // Try to find themes added by mods
+        FindModdedThemes();
+
+        if (hashToThemeName.ContainsKey(netId))
+            return true;
+
+        netId = 0;
+        return false;
     }
 
-    public string GetThemeNameFromId(uint themeId)
+    public bool TryGet(uint themeId, out PaintTheme paintTheme)
     {
-        hashToThemeName.TryGetValue(themeId, out string themeName);
+        paintTheme = null;
 
-        return themeName;
+        if (!hashToThemeName.TryGetValue(themeId, out string themeName))
+        {
+            // Skin Manager might not have been updated for Multiplayer yet, or another mod may have added themes
+            // Try to find themes added by mods
+            FindModdedThemes();
+
+            hashToThemeName.TryGetValue(themeId, out themeName);
+        }
+
+        if (themeName == null)
+            return false;
+
+        return PaintTheme.TryLoad(themeName, out paintTheme);
     }
 
-    public uint GetThemeId(PaintTheme theme)
+    public uint RegisterTheme(PaintTheme theme)
     {
-        if(theme == null)
+        if (theme == null || string.IsNullOrEmpty(theme.AssetName))
             return 0;
 
-        return GetThemeId(theme.AssetName);
+        var hash = GetThemeId(theme.AssetName);
+
+        if (hash == 0 || hash == uint.MaxValue)
+            return 0;
+
+        if (hashToThemeName.TryGetValue(hash, out var existingTheme))
+        {
+            // Check for hash collision
+            if (existingTheme != theme.AssetName)
+            {
+                Multiplayer.LogWarning($"Hash collision detected! Theme '{theme.AssetName}' has same hash as '{existingTheme}': {hash}.");
+                return 0;
+            }
+            else
+            {
+                Multiplayer.LogWarning($"Theme '{theme.AssetName}' is already registered with Id: {hash}.");
+                return hash;
+            }
+        }
+
+        hashToThemeName[hash] = theme.AssetName;
+        themeNameToHash[theme.AssetName] = hash;
+        Multiplayer.Log($"PaintTheme '{theme.AssetName}' registered with netId: {hash}.");
+
+        return hash;
     }
 
-    public uint GetThemeId(string themeName)
+    public void UnregisterTheme(PaintTheme theme)
+    {
+        if (theme == null || string.IsNullOrEmpty(theme.AssetName))
+            return;
+
+        var hash = GetThemeId(theme.AssetName);
+
+        if (hashToBaseThemeName.ContainsKey(hash))
+        {
+            Multiplayer.LogWarning($"Tried to unregister a base-game theme '{theme.AssetName}'.");
+            return;
+        }
+
+        if (hashToThemeName.Remove(hash))
+            themeNameToHash.Remove(theme.AssetName);
+        else
+            Multiplayer.LogWarning($"Tried to unregister theme '{theme.AssetName}', but theme is not registered.");
+    }
+    #endregion
+
+    #region Helper Methods
+
+    private uint GetThemeId(string themeName)
     {
         if (string.IsNullOrEmpty(themeName))
             return 0;
@@ -64,50 +149,26 @@ public class PaintThemeLookup : SingletonBehaviour<PaintThemeLookup>
         return StringHashing.Fnv1aHash(themeName);
     }
 
-    public uint RegisterTheme(string themeName)
+    private void FindModdedThemes()
     {
-        if (string.IsNullOrEmpty(themeName))
-            return 0;
-
-        var hash = GetThemeId(themeName);
-
-        if (hashToThemeName.ContainsKey(hash))
-        {
-            Multiplayer.LogWarning($"Theme '{themeName}' is already registered with id: {hash}.");
-            return hash;
-        }
-
-        hashToThemeName[hash] = themeName;
-
-        Multiplayer.Log($"Theme '{themeName}' registered with id: {hash}.");
-
-        return hash;
-    }
-
-    public void UnregisterTheme(string themeName)
-    {
-        var hash = GetThemeId(themeName);
-
-        if(hashToBaseThemeName.ContainsKey(hash))
-        {
-            Multiplayer.LogWarning($"Tried to unregister a base-game theme '{themeName}'.");
+        if (moddedThemesSearched)
             return;
+
+        // Find all themes excluding base themes and register non-base themes
+        var themes = Object.FindObjectsOfType<PaintTheme>();
+
+        foreach (var theme in themes)
+        {
+            if (theme != null &&
+                !string.IsNullOrEmpty(theme.AssetName) &&
+                !baseThemeNamesSet.Contains(theme.AssetName))
+            {
+                RegisterTheme(theme);
+            }
         }
 
-        if (hashToThemeName.TryGetValue(hash, out _))
-        {
-            hashToThemeName.Remove(hash);
-        }
-        else
-        {
-            Multiplayer.LogWarning($"Tried to unregister theme '{themeName}', but theme is not registered.");
-        }
+        moddedThemesSearched = true;
     }
-    
 
-    [UsedImplicitly]
-    public new static string AllowAutoCreate()
-    {
-        return $"[{nameof(PaintThemeLookup)}]";
-    }
+    #endregion
 }

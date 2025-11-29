@@ -1,40 +1,41 @@
+using DV;
+using DV.Customization.Paint;
 using DV.InventorySystem;
 using DV.Logic.Job;
 using DV.Scenarios.Common;
 using DV.ServicePenalty;
 using DV.ThingTypes;
 using DV.WeatherSystem;
-using DV;
 using Humanizer;
-using LiteNetLib.Utils;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using MPAPI.Interfaces.Packets;
 using MPAPI.Types;
 using Multiplayer.API;
+using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
-using Multiplayer.Components.Networking;
-using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.Data.Train;
+using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
 using Multiplayer.Networking.Packets.Clientbound.Train;
 using Multiplayer.Networking.Packets.Clientbound.World;
-using Multiplayer.Networking.Packets.Clientbound;
-using Multiplayer.Networking.Packets.Common.Train;
 using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Common.Train;
+using Multiplayer.Networking.Packets.Serverbound;
 using Multiplayer.Networking.Packets.Serverbound.Jobs;
 using Multiplayer.Networking.Packets.Serverbound.Train;
-using Multiplayer.Networking.Packets.Serverbound;
 using Multiplayer.Networking.Packets.Unconnected;
 using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
-using System;
 using UnityEngine;
 
 namespace Multiplayer.Networking.Managers.Server;
@@ -1309,6 +1310,22 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonPaintThemePacket(CommonPaintThemePacket packet, ITransportPeer peer)
     {
+        // TODO: Add validation to ensure player is allowed to change paint themes
+
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
+            return;
+
+        if (!PaintThemeLookup.Instance.TryGet(packet.PaintThemeId, out PaintTheme paint) || paint == null)
+        {
+            LogWarning($"Received paint theme change for {netTrainCar?.CurrentID}, but paint theme id '{packet.PaintThemeId}' does not exist.");
+            return;
+        }
+
+        Log($"Received paint theme change for {netTrainCar?.CurrentID}, theme '{paint.AssetName}'");
+
+        LogDebug(() => $"OnCommonPaintThemePacket() [{netTrainCar?.CurrentID}, {packet.NetId}], area: {packet.TargetArea}, paint: [{paint?.AssetName}, {packet.PaintThemeId}]");
+        netTrainCar?.Common_ReceivePaintThemeUpdate(packet.TargetArea, paint);
+
         SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 

@@ -1120,7 +1120,11 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         Multiplayer.LogDebug(() => $"Common_OnPaintThemeChange() target: {paintController.TargetArea}, theme: {paintController.CurrentTheme.name}");
 
-        var themeId = PaintThemeLookup.Instance.GetThemeId(paintController.CurrentTheme);
+        if (!PaintThemeLookup.Instance.TryGetNetId(paintController.CurrentTheme, out var themeId))
+        {
+            Multiplayer.LogWarning($"Common_OnPaintThemeChange() could not find themeId for theme {paintController.CurrentTheme.name} on [{CurrentID}, {NetId}]");
+            return;
+        }
 
         Multiplayer.LogDebug(() => $"Common_OnPaintThemeChange() sending [{CurrentID},{NetId}], target: {paintController.TargetArea}, theme: [{paintController.CurrentTheme.name}, {themeId}]");
         NetworkLifecycle.Instance?.Client.SendPaintThemeChangePacket(NetId, paintController.TargetArea, themeId);
@@ -1530,12 +1534,11 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         if (target == TrainCarPaint.Target.Interior)
         {
-            Multiplayer.LogWarning($"Received Paint Theme update for [{CurrentID}, {NetId}], targeting Interior");
+            Multiplayer.LogDebug(() => $"Received Paint Theme update for [{CurrentID}, {NetId}], targeting Interior");
             targetPaint = TrainCar.PaintInterior;
         }
         else if (target == TrainCarPaint.Target.Exterior)
         {
-            Multiplayer.LogWarning($"Received Paint Theme update for [{CurrentID}, {NetId}], targeting Exterior");
             targetPaint = TrainCar.PaintExterior;
         }
 

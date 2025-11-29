@@ -1,3 +1,4 @@
+using DV.Customization.Paint;
 using DV.Logic.Job;
 using MPAPI.Interfaces;
 using MPAPI.Types;
@@ -36,7 +37,6 @@ public class APIProvider : IMultiplayerAPI
         return NetIdProvider.Instance.TryGetNetId<T>(obj, out netId);
     }
 
-
     public bool TryGetNetId<T>(T obj, out uint netId) where T : class
     {
         return NetIdProvider.Instance.TryGetNetId<T>(obj, out netId);
@@ -57,11 +57,11 @@ public class APIProvider : IMultiplayerAPI
         ModCompatibilityManager.Instance.RegisterCompatibility(modId, compatibility);
     }
 
-    public uint RegisterPaintTheme(string assetName)
+    public uint RegisterPaintTheme(PaintTheme theme)
     {
-        if (string.IsNullOrEmpty(assetName))
+        if (theme == null || string.IsNullOrEmpty(theme.AssetName))
         {
-            Multiplayer.LogWarning("APIProvider.RegisterPaintTheme() called with empty assetName");
+            Multiplayer.LogWarning("APIProvider.RegisterPaintTheme() called with null theme or empty AssetName");
             return 0;
         }
 
@@ -71,14 +71,14 @@ public class APIProvider : IMultiplayerAPI
             return 0;
         }
 
-        return PaintThemeLookup.Instance.RegisterTheme(assetName);
+        return PaintThemeLookup.Instance.RegisterTheme(theme);
     }
 
-    public void UnregisterPaintTheme(uint themeId)
+    public void UnregisterPaintTheme(PaintTheme theme)
     {
-        if (themeId == 0)
+        if (theme == null || string.IsNullOrEmpty(theme.AssetName))
         {
-            Multiplayer.LogWarning("APIProvider.UnregisterPaintTheme() called with themeId 0");
+            Multiplayer.LogWarning("APIProvider.UnregisterPaintTheme() called with null theme or empty AssetName");
             return;
         }
 
@@ -87,6 +87,8 @@ public class APIProvider : IMultiplayerAPI
             Multiplayer.LogWarning("APIProvider.UnregisterPaintTheme() called when server or client is not running");
             return;
         }
+
+        PaintThemeLookup.Instance.UnregisterTheme(theme);
     }
 
     #region Task Serialisation

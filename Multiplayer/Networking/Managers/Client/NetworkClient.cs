@@ -1155,21 +1155,13 @@ public class NetworkClient : NetworkManager
         if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
             return;
 
-        PaintTheme paint = PaintThemeLookup.Instance.GetPaintTheme(packet.PaintThemeId);
-
-        if (paint == null)
+        if (!PaintThemeLookup.Instance.TryGet(packet.PaintThemeId, out PaintTheme paint) || paint == null)
         {
             LogWarning($"Received paint theme change for {netTrainCar?.CurrentID}, but paint theme id '{packet.PaintThemeId}' does not exist.");
             return;
         }
 
         Log($"Received paint theme change for {netTrainCar?.CurrentID}, theme '{paint.AssetName}'");
-
-        //if (!Enum.IsDefined(typeof(TrainCarPaint.Target), packet.TargetArea))
-        //{
-        //    LogWarning($"TrainCarPaint Target {packet.TargetArea} is not defined!");
-        //    return;
-        //}
 
         LogDebug(() => $"OnCommonPaintThemePacket() [{netTrainCar?.CurrentID}, {packet.NetId}], area: {packet.TargetArea}, paint: [{paint?.AssetName}, {packet.PaintThemeId}]");
         netTrainCar?.Common_ReceivePaintThemeUpdate(packet.TargetArea, paint);
