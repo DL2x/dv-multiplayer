@@ -847,9 +847,9 @@ public class NetworkServer : NetworkManager
         }
     }
 
-    public void SendPitStopBulkDataPacket(ushort netId, int carCount, int carIndex, int faucetNotch, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData , ITransportPeer peer = null)
+    public void SendPitStopBulkDataPacket(ushort netId, int carCount, int carIndex, int faucetNotch, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData , ServerPlayer player)
     {
-        LogDebug(() => $"SendPitStopBulkDataPacket({netId}, {carCount}, {carIndex}, {faucetNotch}, {stationData.Count()}, {plugData.Count()}, {peer?.Id})");
+        LogDebug(() => $"SendPitStopBulkDataPacket({netId}, {carCount}, {carIndex}, {faucetNotch}, {stationData.Count()}, {plugData.Count()}, {player})");
 
         var packet = new ClientboundPitStopBulkUpdatePacket
         {
@@ -861,10 +861,8 @@ public class NetworkServer : NetworkManager
             PlugData = plugData,
         };
 
-        if (peer == null)
-            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered);
-        else
-            SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
+        if (player.Peer != SelfPeer)
+            SendPacket(player.Peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
     public void SendPitStopInteractionPacket(ServerPlayer player, CommonPitStopInteractionPacket packet)
@@ -883,7 +881,7 @@ public class NetworkServer : NetworkManager
     public void SendCashRegisterAction(CommonCashRegisterWithModulesActionPacket packet, ITransportPeer peer = null)
     {
         if (peer == null)
-            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
+            SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, true);
         else
             SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
     }
@@ -1362,10 +1360,8 @@ public class NetworkServer : NetworkManager
 
         if (!NetworkLifecycle.Instance.IsHost(player))
         {
-            float carLength = CarSpawner.Instance.carLiveryToCarLength[networkedTrainCar.TrainCar.carLivery];
-
             //is player close enough to add coal?
-            if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= carLength * carLength)
+            if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= networkedTrainCar.CarLengthSq)
                 networkedTrainCar.firebox?.fireboxCoalControlPort.ExternalValueUpdate(packet.CoalMassDelta);
         }
     }
@@ -1384,10 +1380,8 @@ public class NetworkServer : NetworkManager
 
         if (!NetworkLifecycle.Instance.IsHost(player))
         {
-            float carLength = CarSpawner.Instance.carLiveryToCarLength[networkedTrainCar.TrainCar.carLivery];
-
             //is player close enough to add/remove coal?
-            if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= carLength * carLength)
+            if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= networkedTrainCar.CarLengthSq)
                 networkedTrainCar.coalPile?.coalConsumePort.ExternalValueUpdate(packet.CoalMassDelta);
         }
     }
@@ -1403,8 +1397,7 @@ public class NetworkServer : NetworkManager
         if (!NetworkLifecycle.Instance.IsHost(player))
         {
             //is player close enough to ignite firebox?
-            float carLength = CarSpawner.Instance.carLiveryToCarLength[networkedTrainCar.TrainCar.carLivery];
-            if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= carLength * carLength)
+            if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= networkedTrainCar.CarLengthSq)
                 networkedTrainCar.firebox?.Ignite();
         }
     }

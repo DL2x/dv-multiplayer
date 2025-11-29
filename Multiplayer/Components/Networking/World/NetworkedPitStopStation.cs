@@ -1,7 +1,5 @@
 using DV.CabControls;
-using DV.CabControls.NonVR;
 using DV.CashRegister;
-using DV.Interaction;
 using DV.Optimizers;
 using DV.ThingTypes;
 using Multiplayer.Networking.Data;
@@ -295,7 +293,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             Multiplayer.LogDebug(() => $"NetworkedPitStopStation.OnPlayerEnteredActivationRegion() [{StationName}] faucetPos: {faucetPos}");
 
             // Send current state
-            NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, faucetPos, stateData, plugData, player.Peer);
+            NetworkLifecycle.Instance.Server.SendPitStopBulkDataPacket(NetId, Station.pitstop.carList.Count, carIndex, faucetPos, stateData, plugData, player);
     }
 
     public void OnPlayerEnteredCullingRegion(ServerPlayer player)
@@ -340,7 +338,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
                 new CommonPitStopInteractionPacket
                 {
                     NetId = packet.NetId,
-                    InteractionType = (byte)PitStopStationInteractionType.Reject
+                    InteractionType = PitStopStationInteractionType.Reject
                 }
             );
         }
@@ -388,8 +386,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
         CommonPitStopInteractionPacket packet = new()
         {
-            NetId = this.NetId,
-            InteractionType = (byte)PitStopStationInteractionType.ResourceUpdate,
+            NetId = NetId,
+            InteractionType = PitStopStationInteractionType.ResourceUpdate,
             ResourceType = (int)module.resourceType,
             Value = module.Data.unitsToBuy
         };

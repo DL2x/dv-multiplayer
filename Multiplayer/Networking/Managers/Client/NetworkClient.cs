@@ -193,7 +193,6 @@ public class NetworkClient : NetworkManager
 
         netPacketProcessor.SubscribeReusable<CommonCashRegisterWithModulesActionPacket>(OnCommonCashRegisterWithModulesActionPacket);
 
-        
     }
 
     // Allow mods to register their own packets
@@ -807,7 +806,7 @@ public class NetworkClient : NetworkManager
         if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
 
-        networkedTrainCar.Client_ReceiveAuthorityUpdate(packet.PortNetId,packet.State);
+        networkedTrainCar.Client_ReceiveAuthorityUpdate(packet.PortNetId, packet.State);
     }
 
     private void OnClientboundBrakeStateUpdatePacket(ClientboundBrakeStateUpdatePacket packet)
@@ -1099,7 +1098,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundPitStopBulkUpdatePacket(ClientboundPitStopBulkUpdatePacket packet)
     {
-        LogDebug(() => $"OnClientboundPitStopBulkUpdatePacket() NetId: {packet.NetId}, CarCount: {packet.CarCount}, CarSelection: { packet.CarSelection}, FaucetNotch: {packet.FaucetNotch}, ResourceData Count: {packet.ResourceData.Length}, PlugData: {packet.PlugData.Length}");
+        LogDebug(() => $"OnClientboundPitStopBulkUpdatePacket() NetId: {packet.NetId}, CarCount: {packet.CarCount}, CarSelection: {packet.CarSelection}, FaucetNotch: {packet.FaucetNotch}, ResourceData Count: {packet.ResourceData.Length}, PlugData: {packet.PlugData.Length}");
 
         if (!NetworkedPitStopStation.Get(packet.NetId, out var netPitStop))
         {
@@ -1537,13 +1536,13 @@ public class NetworkClient : NetworkManager
 
     public void SendPitStopInteractionPacket(ushort netId, PitStopStationInteractionType interaction, ResourceType? resource, float state)
     {
-        LogDebug(()=>$"SendPitStopInteractionPacket({netId}, [{interaction}], {resource}, {state})");
+        LogDebug(() => $"SendPitStopInteractionPacket({netId}, [{interaction}], {resource}, {state})");
 
         int res = resource == null ? 0 : (int)resource;
         SendPacketToServer(new CommonPitStopInteractionPacket
         {
             NetId = netId,
-            InteractionType = (byte)interaction,
+            InteractionType = interaction,
             ResourceType = res,
             Value = state
         }, DeliveryMethod.ReliableOrdered);
@@ -1559,7 +1558,7 @@ public class NetworkClient : NetworkManager
         sbyte socketIndex = -1
     )
     {
-        LogDebug(()=>$"SendPitStopPlugInteractionPacket({netId}, {interaction}, pos: {position}, rot: {rotation}, trainNetId: {trainCarNetId}, socketIndex: {socketIndex})");
+        LogDebug(() => $"SendPitStopPlugInteractionPacket({netId}, {interaction}, pos: {position}, rot: {rotation}, trainNetId: {trainCarNetId}, socketIndex: {socketIndex})");
 
         SendNetSerializablePacketToServer(new CommonPitStopPlugInteractionPacket
         {
@@ -1575,7 +1574,7 @@ public class NetworkClient : NetworkManager
 
     public void SendItemsChangePacket(List<ItemUpdateData> items)
     {
-        Log($"Sending SendItemsChangePacket with {items.Count()} items");
+        Log($"Sending CommonItemChangePacket with {items.Count()} items");
         //SendPacketToServer(new CommonItemChangePacket { Items = items },
         //    DeliveryMethod.ReliableUnordered);
 
