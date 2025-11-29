@@ -98,7 +98,7 @@ public class CargoTypeLookup : SingletonBehaviour<CargoTypeLookup>
         hashToCargoTypeV2[hash] = cargoType;
         netId = hash;
 
-        Multiplayer.Log($"CargoType '{cargoType.id}' registered with netId: {netId}");
+        //Multiplayer.Log($"CargoType '{cargoType.id}' registered with netId: {netId}");
 
         return true;
     }
