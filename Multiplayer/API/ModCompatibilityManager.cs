@@ -38,6 +38,7 @@ public class ModCompatibilityManager : SingletonBehaviour<ModCompatibilityManage
         RegisterCompatibility("DVLangHelper", MultiplayerCompatibility.Client);
         RegisterCompatibility("LightingOverhaul", MultiplayerCompatibility.Client);
         RegisterCompatibility("dv-improved-job-overview", MultiplayerCompatibility.Client);
+        RegisterCompatibility("dv_f_spammer", MultiplayerCompatibility.Client);
 
         //Json entries will override hardcoded entries
         ReadModJsons();
