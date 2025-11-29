@@ -42,11 +42,12 @@ public class CargoTypeLookup : SingletonBehaviour<CargoTypeLookup>
         if (hashToCargoTypeV2.TryGetValue(netId, out cargoType))
             return true;
 
-        Multiplayer.LogWarning($"CargoTypeLookup: Could not find CargoType_v2 for netId {netId}");
         RebuildCache();
 
         if (hashToCargoTypeV2.TryGetValue(netId, out cargoType))
             return true;
+
+        Multiplayer.LogWarning($"CargoTypeLookup: Could not find CargoType for netId {netId}");
 
         cargoType = CargoType.None.ToV2();
         return false;
@@ -67,14 +68,14 @@ public class CargoTypeLookup : SingletonBehaviour<CargoTypeLookup>
     public bool TryGetNetId(CargoType_v2 cargoType, out uint netId)
     {
         netId = 0;
-        if ( cargoType == null)
+        if (cargoType == null)
             return false;
 
         if (cargoTypeV2ToHash.TryGetValue(cargoType, out netId))
             return true;
 
         uint hash = StringHashing.Fnv1aHash(cargoType.id);
-        Multiplayer.LogDebug(() => $"Registering cargo type '{cargoType.id}', netId: {hash}");
+        Multiplayer.LogDebug(()=> $"Registering cargo type '{cargoType.id}', netId: {hash}");
 
         if (hash == 0 || hash == uint.MaxValue)
         {
@@ -83,10 +84,22 @@ public class CargoTypeLookup : SingletonBehaviour<CargoTypeLookup>
             return false;
         }
 
+        if (hashToCargoTypeV2.TryGetValue(hash, out var existingCargoType))
+        {
+            if (existingCargoType.id != cargoType.id)
+            {
+                Multiplayer.LogError($"Hash collision detected! Cargo type '{cargoType.id}' has same hash as '{existingCargoType.id}': {hash}.");
+                netId = 0;
+                return false;
+            }
+        }
+
         cargoTypeV2ToHash[cargoType] = hash;
         hashToCargoTypeV2[hash] = cargoType;
-
         netId = hash;
+
+        Multiplayer.Log($"CargoType '{cargoType.id}' registered with netId: {netId}");
+
         return true;
     }
 
