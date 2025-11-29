@@ -1,3 +1,4 @@
+using DV;
 using DV.CabControls;
 using DV.Customization.Paint;
 using DV.Damage;
@@ -101,6 +102,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private const int MAX_COUPLER_ITERATIONS = 10;
     private const float MAX_PORT_DELTA = 0.001f;
     private const uint MIN_KINEMATIC_CYCLES = 10;
+    private const float DISTANCE_TOLERANCE = 2f;
+    private const float MAX_PAINT_DISTANCE_SQ = (CommsRadioPaintjob.SIGNAL_RANGE + DISTANCE_TOLERANCE) * (CommsRadioPaintjob.SIGNAL_RANGE + DISTANCE_TOLERANCE);
 
     #region Port and Fuse Map
 
@@ -148,6 +151,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     }
     #endregion
 
+    public float CarLengthSq => CarSpawner.Instance.carLiveryToCarLength[TrainCar.carLivery] * CarSpawner.Instance.carLiveryToCarLength[TrainCar.carLivery];
 
     public string CurrentID { get; private set; }
     public TrainCar TrainCar;
@@ -170,6 +174,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private HashSet<uint> dirtyPorts;
     private Dictionary<uint, float> lastSentPortValues;
     private HashSet<uint> dirtyFuses;
+    private readonly HashSet<TrainCarPaint> dirtyPaints = [];
     private readonly Dictionary<string, float> lastSentTrainDamages = [];
 
     private bool handbrakeDirty;
@@ -383,7 +388,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void OnTrainCarInteriorLoaded(GameObject interior)
     {
-        Multiplayer.LogDebug(()=> $"OnTrainCarInteriorLoaded() {CurrentID}, interior is null: {interior == null}");
+        Multiplayer.LogDebug(() => $"OnTrainCarInteriorLoaded() {CurrentID}, interior is null: {interior == null}");
 
         StartCoroutine(WaitForInterior());
     }
@@ -395,7 +400,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         yield return new WaitUntil
         (
-            ()=>
+            () =>
             {
                 return TrainCar.loadedInterior != null || Time.time - time > 2000f;
             }
@@ -413,7 +418,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         yield return new WaitUntil
         (
-            ()=>
+            () =>
             {
                 return TrainCar.loadedInterior.TryGetComponent<InteriorControlsManager>(out interiorControlsManager) || Time.time - time > 2000f;
             }
@@ -474,7 +479,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private void OnTrainCarInteriorUnloaded(GameObject interior)
     {
-        Multiplayer.LogDebug(()=>$"OnTrainCarInteriorUnloaded() {CurrentID}");
+        Multiplayer.LogDebug(() => $"OnTrainCarInteriorUnloaded() {CurrentID}");
 
         foreach (var control in controlToPortNetId.Keys)
         {
@@ -653,8 +658,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         // Some ports can be updated by the player even if they are not in the car, like doors and windows.
         // Only deny the request if the player is more than 5 meters away from any point of the car.
-        float carLength = CarSpawner.Instance.carLiveryToCarLength[TrainCar.carLivery];
-        if ((player.WorldPosition - transform.position).sqrMagnitude <= carLength * carLength)
+        if ((player.WorldPosition - transform.position).sqrMagnitude <= CarLengthSq)
             return true;
 
         NetworkLifecycle.Instance.Server.LogWarning($"Player {player.Username} tried to send a sim flow packet for a car they are not in!");
@@ -883,8 +887,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         {
             if (currentAuth == null)
             {
-                float carLength = CarSpawner.Instance.carLiveryToCarLength[TrainCar.carLivery];
-                if ((player.WorldPosition - transform.position).sqrMagnitude > carLength * carLength)
+                if ((player.WorldPosition - transform.position).sqrMagnitude > CarLengthSq)
                 {
                     NetworkLifecycle.Instance.Server.LogWarning($"Player \"{player.Username}\" attempted to gain authority for a control on car {CurrentID}, but they are too far away!");
                     NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, portNetId, ControlAuthorityState.Denied, player);
@@ -908,16 +911,53 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             // Release request
             if (currentAuth == player)
             {
-                NetworkLifecycle.Instance.Server.LogDebug(()=>$"Player \"{player.Username}\" released authority for a control on car {CurrentID}");
+                NetworkLifecycle.Instance.Server.LogDebug(() => $"Player \"{player.Username}\" released authority for a control on car {CurrentID}");
                 portAuthority.Remove(portNetId);
                 NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, portNetId, ControlAuthorityState.Released);
             }
-            else if(currentAuth != null)
+            else if (currentAuth != null)
             {
                 NetworkLifecycle.Instance.Server.LogWarning($"Player \"{player.Username}\" attempted to release authority for a control that's not theirs on car {CurrentID}");
                 NetworkLifecycle.Instance.Server.SendTrainControlAuthorityUpdate(NetId, portNetId, ControlAuthorityState.Denied, player);
             }
         }
+    }
+
+    public void Server_ValidatePaintThemeChange(TrainCarPaint.Target target, PaintTheme theme, ServerPlayer player)
+    {
+        var playerPos = TrainCar.transform.InverseTransformPoint(player.WorldPosition);
+        Vector3 localClosestPoint = TrainCar.Bounds.ClosestPoint(playerPos);
+        Vector3 worldClosestPoint = TrainCar.transform.TransformPoint(localClosestPoint);
+
+        if ((player.WorldPosition - worldClosestPoint).sqrMagnitude > MAX_PAINT_DISTANCE_SQ)
+        {
+            NetworkLifecycle.Instance.Server.LogWarning($"Player \"{player.Username}\" attempted to change the paint theme for car {CurrentID}, but they are too far away!");
+
+            var paintControllers = GetComponents<TrainCarPaint>();
+            int i = 0;
+            while (i < paintControllers.Length)
+            {
+                if (paintControllers[i].TargetArea == target)
+                    break;
+
+                i++;
+            }
+
+            if (i >= paintControllers.Length)
+                return;
+
+            if (!PaintThemeLookup.Instance.TryGetNetId(paintControllers[i].CurrentTheme, out var themeNetId))
+            {
+                Multiplayer.LogWarning($"ValidatePaintThemeChange could not find themeNetId for theme {paintControllers[i].CurrentTheme.AssetName} on [{CurrentID}, {NetId}]");
+                return;
+            }
+
+            NetworkLifecycle.Instance.Server.SendPaintThemeChange(this, target, themeNetId, player);
+
+            return;
+        }
+
+        Common_ReceivePaintThemeUpdate(target, theme);
     }
 
     private void Server_OnPlayerDisconnect(ServerPlayer player)
@@ -956,6 +996,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         Common_SendHandbrakePosition();
         Common_SendFuses();
         Common_SendPorts();
+        Common_SendPaintThemes();
     }
 
     private void Common_SendHandbrakePosition()
@@ -1060,6 +1101,29 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         NetworkLifecycle.Instance.Client.SendFuses(NetId, fuseIds, fuseValues);
     }
 
+    private void Common_SendPaintThemes()
+    {
+        if (dirtyPaints.Count == 0)
+            return;
+
+        //Multiplayer.LogDebug(() => $"Common_SendPaintThemes() target: {paintController.TargetArea}, theme: {paintController.CurrentTheme.name}");
+        foreach (var paintController in dirtyPaints)
+        {
+            if (!PaintThemeLookup.Instance.TryGetNetId(paintController.CurrentTheme, out var themeNetId))
+            {
+                Multiplayer.LogWarning($"Common_SendPaintThemes() could not find themeId for theme {paintController.CurrentTheme.name} on [{CurrentID}, {NetId}]");
+                return;
+            }
+
+            if (NetworkLifecycle.Instance.IsHost())
+                NetworkLifecycle.Instance.Server.SendPaintThemeChange(this, paintController.targetArea, themeNetId);
+            else
+                NetworkLifecycle.Instance.Client.SendPaintThemeChange(this, paintController.targetArea, themeNetId);
+        }
+        
+        dirtyPaints.Clear();
+    }
+
     private void Common_OnHandbrakePositionChanged((float, bool) data)
     {
         if (NetworkLifecycle.Instance.IsProcessingPacket)
@@ -1108,32 +1172,27 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
             if (port.valueType == PortValueType.CONTROL)
             {
-             
+
             }
         }
     }
 
     private void Common_OnPaintThemeChange(TrainCarPaint paintController)
     {
+        if (UnloadWatcher.isUnloading || NetworkLifecycle.Instance.IsProcessingPacket)
+            return;
+
         if (paintController == null)
             return;
 
-        Multiplayer.LogDebug(() => $"Common_OnPaintThemeChange() target: {paintController.TargetArea}, theme: {paintController.CurrentTheme.name}");
-
-        if (!PaintThemeLookup.Instance.TryGetNetId(paintController.CurrentTheme, out var themeId))
-        {
-            Multiplayer.LogWarning($"Common_OnPaintThemeChange() could not find themeId for theme {paintController.CurrentTheme.name} on [{CurrentID}, {NetId}]");
-            return;
-        }
-
-        Multiplayer.LogDebug(() => $"Common_OnPaintThemeChange() sending [{CurrentID},{NetId}], target: {paintController.TargetArea}, theme: [{paintController.CurrentTheme.name}, {themeId}]");
-        NetworkLifecycle.Instance?.Client.SendPaintThemeChangePacket(NetId, paintController.TargetArea, themeId);
+        dirtyPaints.Add(paintController);
     }
 
     private void Common_OnFuseUpdated(Fuse fuse)
     {
         if (UnloadWatcher.isUnloading || NetworkLifecycle.Instance.IsProcessingPacket)
             return;
+
         var netId = GetFuseNetId(fuse.id);
         dirtyFuses.Add(netId);
     }
@@ -1539,10 +1598,11 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         }
         else if (target == TrainCarPaint.Target.Exterior)
         {
+            Multiplayer.LogDebug(() => $"Received Paint Theme update for [{CurrentID}, {NetId}], targeting Exterior");
             targetPaint = TrainCar.PaintExterior;
         }
 
-        if (targetPaint == null || !targetPaint.IsSupported(paint))
+        if (targetPaint == null /*|| !targetPaint.IsSupported(paint)*/  )
         {
             Multiplayer.LogWarning($"Received Paint Theme update for [{CurrentID}, {NetId}], but {paint?.AssetName} is not supported");
             return;

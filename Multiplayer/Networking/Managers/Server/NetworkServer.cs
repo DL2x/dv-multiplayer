@@ -580,6 +580,23 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableOrdered, SelfPeer);
     }
 
+    public void SendPaintThemeChange(NetworkedTrainCar netTraincar, TrainCarPaint.Target targetArea, uint themeNetId, ServerPlayer sendToPlayer = null)
+    {
+        var packet = new CommonPaintThemePacket
+        {
+            NetId = netTraincar.NetId,
+            TargetArea = targetArea,
+            PaintThemeId = themeNetId
+        };
+
+        Log($"Sending paint theme change for {netTraincar.CurrentID}");
+
+        if (sendToPlayer != null)
+            SendPacket(sendToPlayer.Peer, packet, DeliveryMethod.ReliableUnordered);
+        else
+            SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, true);
+    }
+
     public void SendWarehouseControllerUpdate(ushort netId, bool isLoading, ushort jobNetId, ushort carNetId, uint cargoTypeNetId, WarehouseMachineController.TextPreset preset)
     {
         LogDebug(() => $"SendWarehouseControllerUpdate({netId}, {isLoading}, {jobNetId}, {carNetId}, {cargoTypeNetId}, {preset})");
@@ -1310,7 +1327,8 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonPaintThemePacket(CommonPaintThemePacket packet, ITransportPeer peer)
     {
-        // TODO: Add validation to ensure player is allowed to change paint themes
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
+            return;
 
         if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar netTrainCar))
             return;
@@ -1324,9 +1342,10 @@ public class NetworkServer : NetworkManager
         Log($"Received paint theme change for {netTrainCar?.CurrentID}, theme '{paint.AssetName}'");
 
         LogDebug(() => $"OnCommonPaintThemePacket() [{netTrainCar?.CurrentID}, {packet.NetId}], area: {packet.TargetArea}, paint: [{paint?.AssetName}, {packet.PaintThemeId}]");
-        netTrainCar?.Common_ReceivePaintThemeUpdate(packet.TargetArea, paint);
 
-        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
+        netTrainCar?.Server_ValidatePaintThemeChange(packet.TargetArea, paint, player);
+
+        //SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
     private void OnServerboundAddCoalPacket(ServerboundAddCoalPacket packet, ITransportPeer peer)

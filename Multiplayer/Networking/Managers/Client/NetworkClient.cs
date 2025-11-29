@@ -1583,9 +1583,11 @@ public class NetworkClient : NetworkManager
                 DeliveryMethod.ReliableOrdered);
     }
 
-    public void SendPaintThemeChangePacket(ushort netId, TrainCarPaint.Target targetArea, uint themeId)
+    public void SendPaintThemeChange(NetworkedTrainCar netTraincar, TrainCarPaint.Target targetArea, uint themeId)
     {
-        SendPacketToServer(new CommonPaintThemePacket { NetId = netId, TargetArea = targetArea, PaintThemeId = themeId }, DeliveryMethod.ReliableUnordered);
+        Log($"Sending paint theme change for {netTraincar.CurrentID}");
+
+        SendPacketToServer(new CommonPaintThemePacket { NetId = netTraincar.NetId, TargetArea = targetArea, PaintThemeId = themeId }, DeliveryMethod.ReliableUnordered);
     }
 
     public void SendCashRegisterAction(ushort netId, CashRegisterAction action, double amount = 0.0f)
