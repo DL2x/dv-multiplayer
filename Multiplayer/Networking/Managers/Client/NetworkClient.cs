@@ -1,3 +1,4 @@
+using DV;
 using DV.Common;
 using DV.Customization.Paint;
 using DV.Damage;
@@ -16,25 +17,25 @@ using MPAPI.Interfaces.Packets;
 using MPAPI.Types;
 using Multiplayer.API;
 using Multiplayer.Components.MainMenu;
+using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Player;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.UI;
 using Multiplayer.Components.Networking.World;
-using Multiplayer.Components.Networking;
 using Multiplayer.Components.SaveGame;
-using Multiplayer.Networking.Data.Train;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.Data.Train;
+using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
 using Multiplayer.Networking.Packets.Clientbound.Train;
 using Multiplayer.Networking.Packets.Clientbound.World;
-using Multiplayer.Networking.Packets.Clientbound;
-using Multiplayer.Networking.Packets.Common.Train;
 using Multiplayer.Networking.Packets.Common;
+using Multiplayer.Networking.Packets.Common.Train;
+using Multiplayer.Networking.Packets.Serverbound;
 using Multiplayer.Networking.Packets.Serverbound.Jobs;
 using Multiplayer.Networking.Packets.Serverbound.Train;
-using Multiplayer.Networking.Packets.Serverbound;
 using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Patches.SaveGame;
 using Multiplayer.Utils;
@@ -192,6 +193,8 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundPitStopBulkUpdatePacket>(OnClientboundPitStopBulkUpdatePacket);
 
         netPacketProcessor.SubscribeReusable<CommonCashRegisterWithModulesActionPacket>(OnCommonCashRegisterWithModulesActionPacket);
+
+        netPacketProcessor.SubscribeReusable<CommonGenericSwitchStatePacket>(OnCommonGenericSwitchStatePacket);
 
     }
 
@@ -1179,6 +1182,17 @@ public class NetworkClient : NetworkManager
         netCashRegister.Client_ProcessCashRegisterAction(packet.Action, packet.Amount);
     }
 
+    private void OnCommonGenericSwitchStatePacket(CommonGenericSwitchStatePacket packet)
+    {
+        if (!NetworkedGenericSwitch.TryGet(packet.NetId, out NetworkedGenericSwitch netSwitch))
+        {
+            LogWarning($"Received Generic Switch State for switch {packet.NetId}, but switch does not exist!");
+            return;
+        }
+
+        netSwitch.Client_ReceiveSwitchState(packet.IsOn);
+    }
+
     #endregion
 
     #region Senders
@@ -1616,5 +1630,17 @@ public class NetworkClient : NetworkManager
         );
     }
 
+    public void SendGenericSwitchState(uint netId, bool isOn)
+    {
+        SendPacketToServer
+        (
+            new CommonGenericSwitchStatePacket
+            {
+                NetId = netId,
+                IsOn = isOn
+            },
+            deliveryMethod: DeliveryMethod.ReliableOrdered
+        );
+    }
     #endregion
 }

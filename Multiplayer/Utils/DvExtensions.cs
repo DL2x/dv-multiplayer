@@ -1,3 +1,5 @@
+using DV.Interaction;
+using DV.KeyboardInput;
 using DV.Localization;
 using DV.UI;
 using DV.UIFramework;
@@ -134,10 +136,32 @@ public static class DvExtensions
         return result;
     }
 
+    public static bool PlayerCanReach(this GameObject item, ServerPlayer player, float extraRange = 0f)
+    {
+        return PlayerCanReach (item.transform, player, extraRange);
+    }
+
+    public static bool PlayerCanReach(this Transform item, ServerPlayer player, float extraRange = 0f)
+    {
+        float reachRange = AKeyboardInput.XZ_SQR_REACH_RANGE + GrabberRaycasterDV.FPS_INTERACTION_RANGE_SQR + (extraRange * extraRange);
+
+        var delta = player.WorldPosition - item.transform.position;
+
+        if (Mathf.Abs(delta.y) > AKeyboardInput.Y_REACH_RANGE)
+            return false;
+
+        delta.y = 0f;
+
+        float sqrMag = (delta).sqrMagnitude;
+
+        return sqrMag <= reachRange;
+    }
+
     public static Vector3 GetWorldAbsolutePosition(this GameObject go)
     {
         return go.transform.GetWorldAbsolutePosition();
     }
+
     public static Vector3 GetWorldAbsolutePosition(this Transform transform)
     {
         return transform.position - WorldMover.currentMove;

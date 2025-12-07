@@ -187,6 +187,8 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeNetSerializable<CommonPitStopPlugInteractionPacket, ITransportPeer>(OnCommonPitStopPlugInteractionPacket);
 
         netPacketProcessor.SubscribeReusable<CommonCashRegisterWithModulesActionPacket, ITransportPeer>(OnCommonCashRegisterWithModulesActionPacket);
+
+        netPacketProcessor.SubscribeReusable<CommonGenericSwitchStatePacket, ITransportPeer>(OnCommonGenericSwitchStatePacket);
     }
 
     //allow mods to register their own packets
@@ -884,6 +886,20 @@ public class NetworkServer : NetworkManager
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, true);
         else
             SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
+    }
+
+    public void SendGenericSwitchState(uint netId, bool isOn, ServerPlayer player = null)
+    {
+        var packet = new CommonGenericSwitchStatePacket
+        {
+            NetId = netId,
+            IsOn = isOn
+        };
+
+        if (player != null)
+            SendPacket(player.Peer, packet, DeliveryMethod.ReliableOrdered);
+        else
+            SendPacketToAll(packet, deliveryMethod: DeliveryMethod.ReliableOrdered, true);
     }
 
     public void SendChat(string message, ServerPlayer exclude = null)
@@ -1712,6 +1728,23 @@ public class NetworkServer : NetworkManager
 
         Log($"Cash Register With Modules Action received for {netCashRegister.GetObjectPath()}, Action: {packet.Action}, Amount: {packet.Amount}");
         netCashRegister.Server_ProcessCashRegisterAction(player, packet);
+    }
+
+    private void OnCommonGenericSwitchStatePacket(CommonGenericSwitchStatePacket packet, ITransportPeer peer)
+    {
+        if (!TryGetServerPlayer(peer, out var player))
+        {
+            LogWarning($"Received Generic Switch State, but player was not found");
+            return;
+        }
+
+        if (!NetworkedGenericSwitch.TryGet(packet.NetId, out NetworkedGenericSwitch netSwitch))
+        {
+            LogWarning($"Received Generic Switch State from \"{player.Username}\" for switch {packet.NetId}, but switch does not exist!");
+            return;
+        }
+
+        netSwitch.Server_ReceiveSwitchState(packet.IsOn, player);
     }
 
     #endregion
