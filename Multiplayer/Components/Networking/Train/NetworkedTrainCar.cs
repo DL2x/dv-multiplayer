@@ -104,6 +104,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private const uint MIN_KINEMATIC_CYCLES = 10;
     private const float DISTANCE_TOLERANCE = 2f;
     private const float MAX_PAINT_DISTANCE_SQ = (CommsRadioPaintjob.SIGNAL_RANGE + DISTANCE_TOLERANCE) * (CommsRadioPaintjob.SIGNAL_RANGE + DISTANCE_TOLERANCE);
+    private const float POSITION_UPDATE_THRESHOLD = 0.1f; // TrainCar must have a bigger delta to apply position update
 
     #region Port and Fuse Map
 
@@ -1631,9 +1632,6 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (!Client_Initialized)
             return;
 
-        if (TrainCar.isEligibleForSleep)
-            TrainCar.ForceOptimizationState(false);
-
         if (tick <= lastTickProcessed)
         {
             Multiplayer.LogWarning($"Received physics update for car {CurrentID} at tick {tick}, but last tick processed was {lastTickProcessed}");
@@ -1647,6 +1645,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             //Vector3 expectedPosition = movementPart.RigidbodySnapshot.Position + WorldMover.currentMove;
             //Multiplayer.LogDebug(() => $"Processing derailed physics for car {CurrentID} at tick {tick}, current position: {TrainCar.transform.position} expected position: {expectedPosition}");
 
+            if (TrainCar.isEligibleForSleep)
+                TrainCar.ForceOptimizationState(false);
+
             TrainCar.Derail();
             movementPart.RigidbodySnapshot.Apply(TrainCar.rb);
 
@@ -1656,25 +1657,35 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         }
         else
         {
+            // Only force awake if there's movement
+            if (Mathf.Abs(movementPart.Speed) > NetworkTrainsetWatcher.VELOCITY_THRESHOLD && TrainCar.isEligibleForSleep)
+                TrainCar.ForceOptimizationState(false);
+
             //move the car to the correct position first - maybe?
             if (movementPart.typeFlag.HasFlag(TrainsetMovementPart.MovementType.Position))
             {
                 Vector3 worldPos = movementPart.Position + WorldMover.currentMove;
 
-                if (TrainCar.rb != null)
+                // Only apply position update if change exceeds threshold (stops cariages from jittering while stationary)
+                float positionDelta = Vector3.Distance(TrainCar.transform.position, worldPos);
+
+                if (positionDelta > POSITION_UPDATE_THRESHOLD)
                 {
-                    TrainCar.rb.MovePosition(worldPos);
+                    if (TrainCar.rb != null)
+                    {
+                        TrainCar.rb.MovePosition(worldPos);
 
-                    //TrainCar.rb.MoveRotation(movementPart.Rotation); // removed due to motion sickness issues
+                        //TrainCar.rb.MoveRotation(movementPart.Rotation); // removed due to motion sickness issues
+                    }
+
+                    //clear the queues?
+                    Client_trainSpeedQueue.Clear();
+                    Client_trainRigidbodyQueue.Clear();
+                    client_bogie1Queue.Clear();
+                    client_bogie2Queue.Clear();
+
+                    TrainCar.stress.ResetTrainStress();
                 }
-
-                //clear the queues?
-                Client_trainSpeedQueue.Clear();
-                Client_trainRigidbodyQueue.Clear();
-                client_bogie1Queue.Clear();
-                client_bogie2Queue.Clear();
-
-                TrainCar.stress.ResetTrainStress();
             }
 
             Client_trainSpeedQueue.ReceiveSnapshot(movementPart.Speed, tick);
