@@ -1173,7 +1173,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
             if (port.valueType == PortValueType.CONTROL)
             {
-
+                dirtyPorts.Add(netId);
             }
         }
     }
