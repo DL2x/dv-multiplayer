@@ -45,10 +45,10 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
             if (UnloadWatcher.isUnloading || UnloadWatcher.isQuitting)
                 return;
 
-            if (set != null)
+            if (set != null && set.cars != null)
                 Server_TickSet(set, tick);
             else
-                Multiplayer.LogError($"Server_OnTick(): Trainset is null!");
+                Multiplayer.LogWarning($"Server_OnTick(): Trainset or cars are null. Set Id: {set?.id}, Cars: {set?.cars?.Count}");
         }
     }
     private void Server_TickSet(Trainset set, uint tick)
@@ -60,6 +60,11 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
         if (UnloadWatcher.isUnloading || UnloadWatcher.isQuitting)
             return;
 
+        if (set.firstCar == null || set.lastCar == null)
+        {
+            Multiplayer.LogWarning($"Trainset {set?.id} has null end cars! firstCar: {set?.firstCar != null}, lastCar: {set?.lastCar != null}");
+            return;
+        }
         cachedSendPacket.FirstNetId = set.firstCar.GetNetId();
         cachedSendPacket.LastNetId = set.lastCar.GetNetId();
 
