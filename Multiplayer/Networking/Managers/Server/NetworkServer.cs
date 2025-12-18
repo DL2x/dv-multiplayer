@@ -279,12 +279,9 @@ public class NetworkServer : NetworkManager
     {
         LogDebug(() => $"OnPeerDisconnected({peer.Id})");
         if (!peerToPlayer.TryGetValue(peer, out ServerPlayer player))
-        {
             LogWarning($"Peer {peer.GetType()}, peerId: {peer.Id} disconnected but no player found");
-            return;
-        }
-
-        Log($"Player {player.Username} disconnected: {disconnectReason}");
+        else
+            Log($"Player {player?.Username} disconnected: {disconnectReason}");
 
         if (WorldStreamingInit.isLoaded)
             SaveGameManager.Instance.UpdateInternalData();
@@ -294,17 +291,17 @@ public class NetworkServer : NetworkManager
         peerToPlayer.Remove(peer);
 
         SendPacketToAll
-            (
-                new ClientboundPlayerDisconnectPacket
-                {
-                    PlayerId = player.PlayerId
-                },
-                DeliveryMethod.ReliableUnordered
-            );
+        (
+            new ClientboundPlayerDisconnectPacket
+            {
+                PlayerId = player.PlayerId
+            },
+            DeliveryMethod.ReliableUnordered
+        );
 
         PlayerDisconnected?.Invoke(player);
 
-        player.Dispose();
+        player?.Dispose();
     }
 
     public override void OnNetworkLatencyUpdate(ITransportPeer peer, int latency)
