@@ -652,10 +652,10 @@ public class NetworkServer : NetworkManager
         SendPacketToAll
             (
             new ClientboundWindowsBrokenPacket
-        {
-            NetId = netId,
-            ForceDirection = forceDirection
-        }, DeliveryMethod.ReliableUnordered, SelfPeer);
+            {
+                NetId = netId,
+                ForceDirection = forceDirection
+            }, DeliveryMethod.ReliableUnordered, SelfPeer);
     }
 
     public void SendWindowsRepaired(ushort netId)
@@ -849,7 +849,7 @@ public class NetworkServer : NetworkManager
         }
     }
 
-    public void SendPitStopBulkDataPacket(ushort netId, int carCount, int carIndex, int faucetNotch, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData , ServerPlayer player)
+    public void SendPitStopBulkDataPacket(ushort netId, int carCount, int carIndex, int faucetNotch, LocoResourceModuleData[] stationData, PitStopPlugData[] plugData, ServerPlayer player)
     {
         LogDebug(() => $"SendPitStopBulkDataPacket({netId}, {carCount}, {carIndex}, {faucetNotch}, {stationData.Count()}, {plugData.Count()}, {player})");
 
@@ -1664,7 +1664,7 @@ public class NetworkServer : NetworkManager
             }, DeliveryMethod.ReliableOrdered);
         }
 
-        if(NetworkedPluggableObject.Get(packet.NetId, out NetworkedPluggableObject plug) && foundPlayer)
+        if (NetworkedPluggableObject.Get(packet.NetId, out NetworkedPluggableObject plug) && foundPlayer)
         {
             plug.ProcessInteractionPacketAsHost(packet, player);
         }

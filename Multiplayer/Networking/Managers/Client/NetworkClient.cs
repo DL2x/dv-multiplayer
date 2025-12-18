@@ -10,7 +10,6 @@ using DV.ThingTypes;
 using DV.UI;
 using DV.UserManagement;
 using DV.WeatherSystem;
-using DV;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using MPAPI.Interfaces.Packets;
@@ -246,10 +245,10 @@ public class NetworkClient : NetworkManager
         NetworkedItemManager.Instance.CheckInstance();
         Log($"WorldStreamingInit.LoadingFinished() CacheWorldItems()");
         NetworkedItemManager.Instance.CacheWorldItems();
-        Log($"WorldStreamingInit.LoadingFinished() InitialisePitStops()");
-        NetworkedPitStopStation.InitialisePitStops();
         Log($"WorldStreamingInit.LoadingFinished() InitialiseCashRegisters()");
         NetworkedCashRegisterWithModules.InitialiseCashRegisters();
+        Log($"WorldStreamingInit.LoadingFinished() InitialisePitStops()");
+        NetworkedPitStopStation.InitialisePitStops();
         Log($"WorldStreamingInit.LoadingFinished() SendReadyPacket()");
         CoroutineManager.Instance.StartCoroutine(WaitForReadyBlocks());
 
@@ -1555,6 +1554,7 @@ public class NetworkClient : NetworkManager
         int res = resource == null ? 0 : (int)resource;
         SendPacketToServer(new CommonPitStopInteractionPacket
         {
+            Tick = NetworkLifecycle.Instance.Tick,
             NetId = netId,
             InteractionType = interaction,
             ResourceType = res,
