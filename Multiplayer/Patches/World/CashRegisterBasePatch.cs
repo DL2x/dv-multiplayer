@@ -1,8 +1,10 @@
 using DV.CashRegister;
+using DV.InventorySystem;
 using HarmonyLib;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Utils;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -14,25 +16,29 @@ namespace Multiplayer.Patches.World;
 [HarmonyPatch(typeof(CashRegisterBase))]
 public class CashRegisterBasePatch
 {
-    [HarmonyPostfix]
-    [HarmonyPatch(nameof(CashRegisterBase.SetCash))]
-    private static void SetCash(CashRegisterBase __instance, double amount)
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(CashRegisterBase.AddCash))]
+    private static bool AddCash(CashRegisterBase __instance, double amount)
     {
         if (__instance is not CashRegisterWithModules cashRegisterWithModules)
-            return;
+            return true;
 
-        Multiplayer.LogDebug(() => $"SetCash() {__instance.GetObjectPath()}, Deposited: {amount}");
+        Multiplayer.LogDebug(() => $"AddCash() {__instance.GetObjectPath()}, Deposited: {amount}\r\n{Environment.StackTrace}");
 
         if (!NetworkedCashRegisterWithModules.TryGet(cashRegisterWithModules, out var netCashRegister))
         {
-            Multiplayer.LogWarning($"Attempting to SetCash, but NetworkedCashRegisterWithModules not found for {cashRegisterWithModules.GetObjectPath()}");
-            return;
+            Multiplayer.LogWarning($"Attempting to AddCash, but NetworkedCashRegisterWithModules not found for {cashRegisterWithModules.GetObjectPath()}");
+            return true;
         }
 
         if (netCashRegister.IsShopRegister)
-            return;
+            return true;
 
-        netCashRegister.SetCash(amount);
+        Inventory.Instance.AddMoney(amount);
+
+        CoroutineManager.Instance.StartCoroutine(netCashRegister.AddCash(amount));
+
+        return false;
     }
 
     [HarmonyPrefix]

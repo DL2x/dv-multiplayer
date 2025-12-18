@@ -3,6 +3,7 @@ using DV.Interaction;
 using DV.InventorySystem;
 using DV.Shops;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Utils;
 using System;
@@ -69,16 +70,21 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
     #region Server Variables
     bool processingAction = false;
+    CullingManager _cullingManager;
     #endregion
 
     #region Client Variables
+    public bool IsBusy => isBuying || isCancelling || isAddingCash || processingAction;
     bool isBuying;
     bool isCancelling;
+    bool isAddingCash;
     public bool IsShopRegister { get; set; } = false;
+
+    double pendingCashToAdd = 0;
     #endregion
 
     #region Common Variables
-    CashRegisterWithModules CashRegister; 
+    CashRegisterWithModules CashRegister;
     #endregion
 
     #region Unity
@@ -94,80 +100,128 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
     protected override void OnDestroy()
     {
         cashRegisterToNetworkedCashRegister.Remove(CashRegister);
+
+        if (_cullingManager != null)
+            _cullingManager.PlayerEnteredActivationRegion -= CullingManager_PlayerEnteredActivationRegion;
+
         base.OnDestroy();
     }
     #endregion
 
     #region Server
+
+    public void Server_InitCashRegister(CullingManager cullingManager)
+    {
+        if (!NetworkLifecycle.Instance.IsHost() || cullingManager == null)
+            return;
+
+        Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_InitCashRegister({CashRegister.GetObjectPath()})");
+        _cullingManager = cullingManager;
+
+        if (_cullingManager != null)
+            _cullingManager.PlayerEnteredActivationRegion += CullingManager_PlayerEnteredActivationRegion;
+    }
+
+    private void CullingManager_PlayerEnteredActivationRegion(ServerPlayer serverPlayer)
+    {
+        Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.CullingManager_PlayerEnteredActivationRegion({serverPlayer.Username}) deposited cash: {CashRegister.DepositedCash}");
+        if (CashRegister.DepositedCash > 0f)
+        {
+            NetworkLifecycle.Instance.Server.SendCashRegisterAction
+                (
+                    new CommonCashRegisterWithModulesActionPacket
+                    {
+                        NetId = NetId,
+                        Action = CashRegisterAction.SetFunds,
+                        Amount = CashRegister.DepositedCash
+                    },
+                    [serverPlayer]
+                );
+        }
+    }
+
     public void Server_ProcessCashRegisterAction(ServerPlayer player, CommonCashRegisterWithModulesActionPacket packet)
     {
-        float sqrDistance = (player.WorldPosition - transform.position).sqrMagnitude;
         bool success = false;
         CashRegisterAction response = CashRegisterAction.RejectGeneric;
 
         NetworkLifecycle.Instance.Server?.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount})");
-
-        if (sqrDistance > GrabberRaycasterDV.FPS_INTERACTION_RANGE_SQR * 2) //need to find the real distance, likely related to player capsual size
+        if (transform.PlayerCanReach(player, 1))
         {
-            NetworkLifecycle.Instance.Server?.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount}) {CashRegister.GetObjectPath()}. Player too far! Player pos: {player.WorldPosition}, register pos: {transform.position}, sqrMag: {sqrDistance}");
-            return;
-        }
-
-        processingAction = true;
-        switch (packet.Action)
-        {
-            case CashRegisterAction.Cancel:
+            processingAction = true;
+            switch (packet.Action)
+            {
+                case CashRegisterAction.Cancel:
                     CashRegister?.Cancel();
                     success = true;
 
-                break;
+                    break;
 
-            case CashRegisterAction.Buy:
+                case CashRegisterAction.Buy:
 
-                Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({packet.Action}) Player Money: {Inventory.Instance.PlayerMoney}, TotalCost: {CashRegister.GetTotalCost()}, TotalUnitsInBasket: {CashRegister.TotalUnitsInBasket()}");
+                    Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({packet.Action}) Player Money: {Inventory.Instance.PlayerMoney}, TotalCost: {CashRegister.GetTotalCost()}, TotalUnitsInBasket: {CashRegister.TotalUnitsInBasket()}");
 
-                if (CashRegister.TotalUnitsInBasket() <= 0)
-                {
-                    response = CashRegisterAction.RejectedNoItems;
-                }
-                else if (Inventory.Instance.PlayerMoney <= CashRegister.GetTotalCost())
-                {
-                    response = CashRegisterAction.RejectFunds;
-                }
-                else
-                {
-                   success = CashRegister?.Buy() ?? false;
-                }
-
-                Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({packet.Action}, {packet.Amount}) Response: {response}, Buy success: {success}, Player Money: {Inventory.Instance.PlayerMoney}, TotalCost: {CashRegister.GetTotalCost()}, TotalUnitsInBasket: {CashRegister.TotalUnitsInBasket()}");
-
-                break;
-                
-            case CashRegisterAction.SetFunds:
-                double spend = 0;
-
-                NetworkLifecycle.Instance.Server?.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount}) Wallet: {Inventory.Instance.PlayerMoney}");
-                if (packet.Amount > 0)
-                {
-                    if (Inventory.Instance.PlayerMoney >= packet.Amount)
-                        spend = packet.Amount;
+                    if (CashRegister.TotalUnitsInBasket() <= 0)
+                    {
+                        response = CashRegisterAction.RejectedNoItems;
+                    }
+                    else if (Inventory.Instance.PlayerMoney <= CashRegister.GetTotalCost())
+                    {
+                        response = CashRegisterAction.RejectFunds;
+                    }
                     else
-                        spend = Inventory.Instance.PlayerMoney;
+                    {
+                        success = CashRegister?.Buy() ?? false;
+                    }
 
-                    success = Inventory.Instance.RemoveMoney(spend);
+                    Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({packet.Action}, {packet.Amount}) Response: {response}, Buy success: {success}, Player Money: {Inventory.Instance.PlayerMoney}, TotalCost: {CashRegister.GetTotalCost()}, TotalUnitsInBasket: {CashRegister.TotalUnitsInBasket()}");
 
-                    if(success && player.PlayerId != NetworkLifecycle.Instance.Server.SelfId)
-                        CashRegister?.AddCash(spend);
-                }
-                else
-                {
-                    NetworkLifecycle.Instance.Server?.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount}) amount negative!");
-                }
-                break;
+                    break;
+
+                case CashRegisterAction.AddCash:
+
+                    double remainingCost = CashRegister.GetRemainingCost();
+
+                    if (remainingCost <= 0)
+                    {
+                        Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({packet.Action}) No remaining cost to add cash for.");
+                        processingAction = false;
+                        // No action needed, no response required
+                        return;
+                    }
+                    else if (CashRegister.TotalUnitsInBasket() <= 0)
+                    {
+                        Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({packet.Action}) No items in basket to add cash for.");
+                        response = CashRegisterAction.RejectedNoItems;
+                        success = false;
+                    }
+                    else
+                    {
+                        double amountToAdd = Math.Min(remainingCost, Inventory.Instance.PlayerMoney);
+
+                        Inventory.Instance.RemoveMoney(amountToAdd);
+                        CashRegister.SetCash(CashRegister.DepositedCash + amountToAdd);
+
+                        NetworkLifecycle.Instance.Server?.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({packet.Action}) Added cash: {amountToAdd}, New DepositedCash: {CashRegister.DepositedCash}, Player Money: {Inventory.Instance.PlayerMoney}");
+                        packet.Action = CashRegisterAction.SetFunds;
+                        packet.Amount = CashRegister.DepositedCash;
+                        success = true;
+                    }
+
+                    break;
+
+                case CashRegisterAction.SetFunds:
+                    //NetworkLifecycle.Instance.Server?.LogDebug(() => $"NetworkedCashRegisterWithModules.Server_ProcessAction({player.Username}, {packet.Action}, {packet.Amount}) Wallet: {Inventory.Instance.PlayerMoney}");
+                    break;
+            }
+        }
+        else
+        {
+            NetworkLifecycle.Instance.Server?.LogDebug(() => $"Player \"{player.Username}\" tried to interact with Cash Register , but they are too far away");
         }
 
         if (success)
-            NetworkLifecycle.Instance.Server.SendCashRegisterAction(packet);
+            NetworkLifecycle.Instance.Server.SendCashRegisterAction(packet, _cullingManager.ActivePlayers.ToArray());
         else
             NetworkLifecycle.Instance.Server.SendCashRegisterAction
                 (
@@ -177,7 +231,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
                         Action = response,
                         Amount = CashRegister.DepositedCash
                     },
-                    player.Peer
+                    [player]
                 );
 
         processingAction = false;
@@ -220,7 +274,7 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
                 CashRegister?.buyAudio?.Play(CashRegister.transform.position, 1f, 1f, 0f, 1f, 500f, default, null, CashRegister.transform, false, 0f, null);
 
-                foreach(var module in CashRegister.registerModules)
+                foreach (var module in CashRegister.registerModules)
                     module.ResetData();
 
                 CashRegister?.OnUnitsToBuyChanged();
@@ -232,7 +286,11 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
                 break;
 
+            case CashRegisterAction.AddCash:
+                break;
+
             case CashRegisterAction.SetFunds:
+                Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.Client_ProcessCashRegisterAction({action}, {amount}) Setting deposited cash.");
                 CashRegister?.SetCash(amount);
 
                 break;
@@ -240,12 +298,28 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
             case CashRegisterAction.RejectGeneric:
                 isBuying = false;
                 isCancelling = false;
-               
+
+                //if (isAddingCash)
+                //{
+                    //Inventory.Instance.AddMoney(pendingCashToAdd);
+                    pendingCashToAdd = 0;
+                //}
+
+                isAddingCash = false;
+
                 break;
 
             case CashRegisterAction.RejectFunds:
                 isBuying = false;
                 isCancelling = false;
+
+                //if (isAddingCash)
+                //{
+                    //Inventory.Instance.AddMoney(pendingCashToAdd);
+                    pendingCashToAdd = 0;
+                //}
+
+                isAddingCash = false;
 
                 CashRegister?.notEnoughMoneyAudio?.Play(CashRegister.transform.position, 1f, 1f, 0f, 1f, 500f, default, null, CashRegister.transform, false, 0f, null);
 
@@ -254,6 +328,14 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
             case CashRegisterAction.RejectedNoItems:
                 isBuying = false;
                 isCancelling = false;
+
+                //if (isAddingCash)
+                //{
+                    //Inventory.Instance.AddMoney(pendingCashToAdd);
+                    pendingCashToAdd = 0;
+                //}
+
+                isAddingCash = false;
 
                 foreach (var module in CashRegister.registerModules)
                     module.ResetData();
@@ -291,12 +373,13 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
 
     public IEnumerator Cancel()
     {
-        if (isBuying || isCancelling || NetworkLifecycle.Instance.IsProcessingPacket)
+        if (isBuying || isCancelling || isAddingCash || NetworkLifecycle.Instance.IsProcessingPacket)
             yield break;
 
         DisableInteraction();
 
         NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.Cancel);
+
         isCancelling = true;
         float timeOut = Time.time + NetworkLifecycle.Instance.Client.RPC_Timeout;
 
@@ -307,12 +390,30 @@ public class NetworkedCashRegisterWithModules : IdMonoBehaviour<ushort, Networke
         EnableInteraction();
     }
 
-    public void SetCash(double amount)
+    public IEnumerator AddCash(double amount)
     {
-        if (isBuying || isCancelling || processingAction || NetworkLifecycle.Instance.IsProcessingPacket)
-            return;
+        if (isBuying || isCancelling || isAddingCash || processingAction || NetworkLifecycle.Instance.IsProcessingPacket)
+            yield break;
 
-        NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.SetFunds, amount);
+        DisableInteraction();
+
+        Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.AddCash({amount}) Sending AddCash action.");
+        NetworkLifecycle.Instance.Client.SendCashRegisterAction(NetId, CashRegisterAction.AddCash);
+
+        isAddingCash = true;
+        pendingCashToAdd = amount;
+
+        float timeOut = Time.time + NetworkLifecycle.Instance.Client.RPC_Timeout;
+
+        Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.AddCash({amount}) Waiting");
+        yield return new WaitUntil(() => Time.time >= timeOut || isAddingCash == false);
+
+        Multiplayer.LogDebug(() => $"NetworkedCashRegisterWithModules.AddCash({amount}) Wait complete, time-out: {Time.time >= timeOut}, isAddingCash: {isAddingCash}");
+
+        pendingCashToAdd = 0;
+        isAddingCash = false;
+
+        EnableInteraction();
     }
 
     private void DisableInteraction()

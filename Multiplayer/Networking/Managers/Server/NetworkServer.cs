@@ -880,12 +880,13 @@ public class NetworkServer : NetworkManager
         SendNetSerializablePacket(player.Peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
-    public void SendCashRegisterAction(CommonCashRegisterWithModulesActionPacket packet, ITransportPeer peer = null)
+    public void SendCashRegisterAction(CommonCashRegisterWithModulesActionPacket packet, ServerPlayer[] players = null)
     {
-        if (peer == null)
+        if (players == null)
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, true);
         else
-            SendPacket(peer, packet, DeliveryMethod.ReliableOrdered);
+            foreach (var player in players)
+                SendPacket(player.Peer, packet, DeliveryMethod.ReliableOrdered);
     }
 
     public void SendGenericSwitchState(uint netId, bool isOn, ServerPlayer player = null)

@@ -28,6 +28,10 @@ public class CashRegisterWithModulesPatch
     [HarmonyPatch(nameof(CashRegisterWithModules.OnBuyPressed))]
     private static bool OnBuyPressed(CashRegisterWithModules __instance)
     {
+        var player = PlayerManager.PlayerTransform.position;
+        var reg = __instance.transform.position;
+        var sqrMag = (player - reg).sqrMagnitude;
+        Multiplayer.LogDebug(() => $"CashRegisterWithModules.OnBuyPressed() player pos: {player} register pos: {reg}, sqrMag: {sqrMag}");
         if (NetworkLifecycle.Instance.IsHost())
             return true;
 

@@ -5,6 +5,7 @@ public enum CashRegisterAction : byte
 {
     Cancel,
     Buy,
+    AddCash,
     SetFunds,
     RejectGeneric,
     RejectFunds,
