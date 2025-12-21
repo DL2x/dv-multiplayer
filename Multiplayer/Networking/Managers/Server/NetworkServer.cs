@@ -86,7 +86,13 @@ public class NetworkServer : NetworkManager
 
     private uint lastTick;
 
-    public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData) : base(settings)
+    public NetworkServer(
+     IDifficulty difficulty,
+     Settings settings,
+     bool singlePlayer,
+     LobbyServerData serverData,
+     TransportMode transportMode = TransportMode.Steamworks)
+     : base(settings, transportMode)
     {
         Log($"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
 

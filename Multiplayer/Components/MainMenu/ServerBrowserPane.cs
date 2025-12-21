@@ -10,6 +10,7 @@ using Multiplayer.Components.MainMenu.ServerBrowser;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.UI.Controls;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
 using Steamworks;
 using Steamworks.Data;
@@ -123,7 +124,7 @@ namespace Multiplayer.Components.MainMenu
 
         public void Update()
         {
-            SteamClient.RunCallbacks();
+            if (DVSteamworks.Success)  SteamClient.RunCallbacks();
 
             //Handle server refresh interval
             timePassed += Time.deltaTime;
@@ -180,8 +181,9 @@ namespace Multiplayer.Components.MainMenu
             if (DVSteamworks.Success)
                 return;
 
-            Multiplayer.Log($"Steam not detected, prompt for restart.");
-            MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Please restart the game with Steam running", () => { });
+            Multiplayer.Log($"Steam not detected");
+            MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Using LiteNet instead", () => { });
+            return;
         }
 
         private void CleanUI()
@@ -679,7 +681,7 @@ namespace Multiplayer.Components.MainMenu
             {
                 connectionState = ConnectionState.AttemptingSteamRelay;
                 string hostId = ((Lobby)joinedLobby).Owner.Id.Value.ToString();
-                NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, OnDisconnect);
+                NetworkLifecycle.Instance.StartClient(address, portNumber, password, false, TransportMode.LiteNetLib, OnDisconnect);
                 return;
             }
 
@@ -718,7 +720,9 @@ namespace Multiplayer.Components.MainMenu
 
             Multiplayer.Log($"AttemptIPv6() starting attempt");
             connectionState = ConnectionState.AttemptingIPv6;
-            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
+            var transport = direct ? TransportMode.LiteNetLib : TransportMode.Steamworks;
+            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, transport, OnDisconnect);
+
 
         }
 

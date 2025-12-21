@@ -10,6 +10,7 @@ using DV.ThingTypes;
 using DV.UI;
 using DV.UserManagement;
 using DV.WeatherSystem;
+using DV.Platform.Steam;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using MPAPI.Interfaces.Packets;
@@ -73,7 +74,7 @@ public class NetworkClient : NetworkManager
     // Allow mods to add to the wait Queue
     private readonly List<string> readyBlocks = [];
 
-    public NetworkClient(Settings settings, bool singlePlayer) : base(settings)
+    public NetworkClient(Settings settings, bool singlePlayer, TransportMode transportMode = TransportMode.Steamworks) : base(settings, transportMode)
     {
         isSinglePlayer = singlePlayer;
         ClientPlayerManager = new ClientPlayerManager();

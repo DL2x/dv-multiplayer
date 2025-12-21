@@ -8,6 +8,7 @@ using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Managers.Client;
 using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Networking.Managers;
+using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
 using System.Collections.Generic;
 using System.Collections;
@@ -147,11 +148,17 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         return true;
     }
 
-    public void StartClient(string address, int port, string password, bool isSinglePlayer, Action<DisconnectReason, string> onDisconnect)
+    public void StartClient(string address, int port, string password, bool isSinglePlayer,
+    Action<DisconnectReason, string> onDisconnect)
+    => StartClient(address, port, password, isSinglePlayer, TransportMode.Steamworks, onDisconnect);
+
+    public void StartClient(string address, int port, string password, bool isSinglePlayer,
+        TransportMode transportMode,
+        Action<DisconnectReason, string> onDisconnect = null)
     {
         if (Client != null)
             throw new InvalidOperationException("NetworkManager already exists!");
-        NetworkClient client = new(Multiplayer.Settings, isSinglePlayer);
+        NetworkClient client = new(Multiplayer.Settings, isSinglePlayer, transportMode);
         client.Start(address, port, password, isSinglePlayer, onDisconnect);
 
         Client = client;

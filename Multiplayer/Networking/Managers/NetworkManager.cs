@@ -8,6 +8,7 @@ using Multiplayer.Networking.TransportLayers;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using DV.Platform.Steam;
 
 namespace Multiplayer.Networking.Managers;
 
@@ -28,10 +29,20 @@ public abstract class NetworkManager
     public bool IsProcessingPacket { get; private set; }
 
     protected NetworkManager(Settings settings)
+    : this(settings, TransportMode.Auto)
+    {
+    }
+
+    protected NetworkManager(Settings settings, TransportMode transportMode)
     {
         netPacketProcessor = new NetPacketProcessor();
-        //transport = new LiteNetLibTransport();
-        transport = new SteamWorksTransport();
+
+        transport = transportMode switch
+        {
+            TransportMode.LiteNetLib => new LiteNetLibTransport(),
+            TransportMode.Steamworks => new SteamWorksTransport(),
+            _ => DVSteamworks.Success ? new SteamWorksTransport() : new LiteNetLibTransport(),
+        };
 
         transport.OnConnectionRequest += OnConnectionRequest;
         transport.OnPeerConnected += OnPeerConnected;
@@ -46,8 +57,8 @@ public abstract class NetworkManager
         Settings.OnSettingsUpdated += OnSettingsUpdated;
 
         Subscribe();
-
     }
+
 
     private void RegisterNestedTypes()
     {
