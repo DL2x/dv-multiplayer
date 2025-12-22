@@ -36,6 +36,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Multiplayer.Networking.Managers.Server;
@@ -965,6 +966,39 @@ public class NetworkServer : NetworkManager
 
     #region Listeners
 
+
+    private static bool IsBuildCompatible(string clientBuild, string serverBuild)
+    {
+        // Historically LocalBuildInfo included store-specific buildbot metadata (e.g. Steam vs Oculus).
+        // For cross-store Direct-IP play we only require the numeric build number to match.
+        var c = ExtractBuildNumber(clientBuild);
+        var s = ExtractBuildNumber(serverBuild);
+
+        if (c > 0 && s > 0)
+            return c == s;
+
+        // Fallback to exact string comparison if we couldn't parse.
+        return string.Equals(clientBuild, serverBuild, StringComparison.Ordinal);
+    }
+
+    private static int ExtractBuildNumber(string build)
+    {
+        if (string.IsNullOrWhiteSpace(build))
+            return -1;
+
+        // Prefer a leading number (e.g. "123 - ...")
+        var m = Regex.Match(build, @"^\s*(\d+)");
+        if (m.Success && int.TryParse(m.Groups[1].Value, out var n))
+            return n;
+
+        // Otherwise, take the first number anywhere in the string.
+        m = Regex.Match(build, @"(\d+)");
+        if (m.Success && int.TryParse(m.Groups[1].Value, out n))
+            return n;
+
+        return -1;
+    }
+
     private void OnServerboundClientLoginPacket(ServerboundClientLoginPacket packet, IConnectionRequest request)
     {
         LogDebug(() => $"OnServerboundClientLoginPacket from {packet.Username}");
@@ -999,23 +1033,23 @@ public class NetworkServer : NetworkManager
         if (Multiplayer.Settings.Password != packet.Password)
         {
             LogWarning("Denied login due to invalid password!");
-            ClientboundLoginResponsePacket denyPacket = new()
+            ClientboundLoginResponsePacket denyInvalidPassword = new()
             {
                 ReasonKey = Locale.DISCONN_REASON__INVALID_PASSWORD_KEY
             };
-            request.Reject(WritePacket(denyPacket));
+            request.Reject(WritePacket(denyInvalidPassword));
             return;
         }
 
-        if (packet.BuildVersion != Multiplayer.LocalBuildInfo)
+        if (!IsBuildCompatible(packet.BuildVersion, Multiplayer.LocalBuildInfo))
         {
-            LogWarning($"Denied login to incorrect game version! Got: {packet.BuildVersion}, expected: {Multiplayer.LocalBuildInfo}");
-            ClientboundLoginResponsePacket denyPacket = new()
+            LogWarning($"Denied login due to incompatible game version! Client: '{packet.BuildVersion}', Server: '{Multiplayer.LocalBuildInfo}'");
+            ClientboundLoginResponsePacket denyIncompatibleVersion = new()
             {
                 ReasonKey = Locale.DISCONN_REASON__GAME_VERSION_KEY,
-                ReasonArgs = [Multiplayer.LocalBuildInfo, packet.BuildVersion.ToString()]
+                ReasonArgs = [Multiplayer.LocalBuildInfo, packet.BuildVersion?.ToString() ?? "null"]
             };
-            request.Reject(WritePacket(denyPacket));
+            request.Reject(WritePacket(denyIncompatibleVersion));
             return;
         }
 

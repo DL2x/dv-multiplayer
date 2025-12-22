@@ -53,6 +53,9 @@ protected NetworkManager(Settings settings, TransportMode transportMode)
         _ => new LiteNetLibTransport(),
     };
 
+    Multiplayer.Log($"[dv-multiplayer] Transport: {transport.GetType().Name} (mode {resolvedMode})");
+
+
     transport.OnConnectionRequest += OnConnectionRequest;
     transport.OnPeerConnected += OnPeerConnected;
     transport.OnPeerDisconnected += OnPeerDisconnected;
