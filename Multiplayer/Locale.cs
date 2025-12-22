@@ -49,9 +49,9 @@ namespace Multiplayer
         public static string SERVER_BROWSER__TITLE => Get(SERVER_BROWSER__TITLE_KEY);
         public const string SERVER_BROWSER__TITLE_KEY = $"{PREFIX_SERVER_BROWSER}/title";
         public static string SERVER_BROWSER__MANUAL_CONNECT => Get(SERVER_BROWSER__MANUAL_CONNECT_KEY);
-        public const string SERVER_BROWSER__MANUAL_CONNECT_KEY = $"{PREFIX_SERVER_BROWSER}/manual_connect";        
+        public const string SERVER_BROWSER__MANUAL_CONNECT_KEY = $"{PREFIX_SERVER_BROWSER}/manual_connect";
         public static string SERVER_BROWSER__HOST => Get(SERVER_BROWSER__HOST_KEY);
-        public const string SERVER_BROWSER__HOST_KEY = $"{PREFIX_SERVER_BROWSER}/host";                
+        public const string SERVER_BROWSER__HOST_KEY = $"{PREFIX_SERVER_BROWSER}/host";
         public static string SERVER_BROWSER__REFRESH => Get(SERVER_BROWSER__REFRESH_KEY);
         public const string SERVER_BROWSER__REFRESH_KEY = $"{PREFIX_SERVER_BROWSER}/refresh";
         public static string SERVER_BROWSER__JOIN => Get(SERVER_BROWSER__JOIN_KEY);
@@ -99,9 +99,17 @@ namespace Multiplayer
         public const string SERVER_HOST_PUBLIC_KEY = $"{PREFIX_SERVER_HOST}/public";
         public static string SERVER_HOST_VISIBILITY => Get(SERVER_HOST_PUBLIC_KEY);
         public const string SERVER_HOST_VISIBILITY_KEY = $"{PREFIX_SERVER_HOST}/visibility";
-       // public static string SERVER_HOST_VISIBILITY_MODES => Get(SERVER_HOST_VISIBILITY_MODES_KEY);
-        public static string[] SERVER_HOST_VISIBILITY_MODES = [$"{SERVER_HOST_VISIBILITY_MODES_KEY}/private" , $"{SERVER_HOST_VISIBILITY_MODES_KEY}/friends",$"{SERVER_HOST_VISIBILITY_MODES_KEY}/public"];
+        // public static string SERVER_HOST_VISIBILITY_MODES => Get(SERVER_HOST_VISIBILITY_MODES_KEY);
+        public static string[] SERVER_HOST_VISIBILITY_MODES = [$"{SERVER_HOST_VISIBILITY_MODES_KEY}/private", $"{SERVER_HOST_VISIBILITY_MODES_KEY}/friends", $"{SERVER_HOST_VISIBILITY_MODES_KEY}/public"];
         public const string SERVER_HOST_VISIBILITY_MODES_KEY = $"{PREFIX_SERVER_HOST}/visibility/modes";
+        public static string SERVER_HOST_TRANSPORT_MODE => Get(SERVER_HOST_TRANSPORT_MODE_KEY);
+        public const string SERVER_HOST_TRANSPORT_MODE_KEY = $"{PREFIX_SERVER_HOST}/transport_mode";
+
+        public const string SERVER_HOST_TRANSPORT_MODE__TOOLTIP_KEY = $"{PREFIX_SERVER_HOST}/transport_mode__tooltip";
+        public const string SERVER_HOST_TRANSPORT_MODE__TOOLTIP_DISABLED_KEY = $"{PREFIX_SERVER_HOST}/transport_mode__tooltip_disabled";
+
+        public static string[] SERVER_HOST_TRANSPORT_MODE_MODES = [$"{SERVER_HOST_TRANSPORT_MODE_MODES_KEY}/steam", $"{SERVER_HOST_TRANSPORT_MODE_MODES_KEY}/ip"/*, $"{SERVER_HOST_TRANSPORT_MODE_MODES_KEY}/both",*/];
+        public const string SERVER_HOST_TRANSPORT_MODE_MODES_KEY = $"{PREFIX_SERVER_HOST}/transport_mode/modes";
         public static string SERVER_HOST_DETAILS => Get(SERVER_HOST_DETAILS_KEY);
         public const string SERVER_HOST_DETAILS_KEY = $"{PREFIX_SERVER_HOST}/details";
         public static string SERVER_HOST_MAX_PLAYERS => Get(SERVER_HOST_MAX_PLAYERS_KEY);

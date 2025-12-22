@@ -30,46 +30,46 @@ public abstract class NetworkManager
 
     public TransportMode TransportMode { get; }
 
-protected NetworkManager(Settings settings)
-    : this(settings, TransportMode.Auto)
-{
-}
-
-protected NetworkManager(Settings settings, TransportMode transportMode)
-{
-    netPacketProcessor = new NetPacketProcessor();
-
-    // Resolve Auto to a concrete transport we can expose to callers (e.g. LobbyServerManager).
-    var resolvedMode = transportMode == TransportMode.Auto
-        ? (DVSteamworks.Success ? TransportMode.Steamworks : TransportMode.LiteNetLib)
-        : transportMode;
-
-    TransportMode = resolvedMode;
-
-    transport = resolvedMode switch
+    protected NetworkManager(Settings settings)
+        : this(settings, TransportMode.Auto)
     {
-        TransportMode.LiteNetLib => new LiteNetLibTransport(),
-        TransportMode.Steamworks => new SteamWorksTransport(),
-        _ => new LiteNetLibTransport(),
-    };
+    }
 
-    Multiplayer.Log($"[dv-multiplayer] Transport: {transport.GetType().Name} (mode {resolvedMode})");
+    protected NetworkManager(Settings settings, TransportMode transportMode)
+    {
+        netPacketProcessor = new NetPacketProcessor();
+
+        // Resolve Auto to a concrete transport we can expose to callers (e.g. LobbyServerManager).
+        var resolvedMode = transportMode == TransportMode.Auto
+            ? (DVSteamworks.Success ? TransportMode.Steamworks : TransportMode.LiteNetLib)
+            : transportMode;
+
+        TransportMode = resolvedMode;
+
+        transport = resolvedMode switch
+        {
+            TransportMode.LiteNetLib => new LiteNetLibTransport(),
+            TransportMode.Steamworks => new SteamWorksTransport(),
+            _ => new LiteNetLibTransport(),
+        };
+
+        Multiplayer.Log($"[dv-multiplayer] Transport: {transport.GetType().Name} (mode {resolvedMode})");
 
 
-    transport.OnConnectionRequest += OnConnectionRequest;
-    transport.OnPeerConnected += OnPeerConnected;
-    transport.OnPeerDisconnected += OnPeerDisconnected;
-    transport.OnNetworkReceive += OnNetworkReceive;
-    transport.OnNetworkError += OnNetworkError;
-    transport.OnNetworkLatencyUpdate += OnNetworkLatencyUpdate;
+        transport.OnConnectionRequest += OnConnectionRequest;
+        transport.OnPeerConnected += OnPeerConnected;
+        transport.OnPeerDisconnected += OnPeerDisconnected;
+        transport.OnNetworkReceive += OnNetworkReceive;
+        transport.OnNetworkError += OnNetworkError;
+        transport.OnNetworkLatencyUpdate += OnNetworkLatencyUpdate;
 
-    RegisterNestedTypes();
+        RegisterNestedTypes();
 
-    OnSettingsUpdated(settings);
-    Settings.OnSettingsUpdated += OnSettingsUpdated;
+        OnSettingsUpdated(settings);
+        Settings.OnSettingsUpdated += OnSettingsUpdated;
 
-    Subscribe();
-}
+        Subscribe();
+    }
 
 
     private void RegisterNestedTypes()

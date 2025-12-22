@@ -65,16 +65,16 @@ public class HostGamePane : MonoBehaviour
         ValidateInputs(null);
     }
 
-public void Start()
-{
-    Multiplayer.Log("HostGamePane Started");
-
-    if (!DVSteamworks.Success)
+    public void Start()
     {
-        // Oculus / non-Steam builds: we can still host, but only via Direct IP (LiteNetLib).
-        Multiplayer.Log("Steam not detected. Hosting will use Direct IP (LiteNetLib).");
+        Multiplayer.Log("HostGamePane Started");
+
+        if (!DVSteamworks.Success)
+        {
+            // Oculus / non-Steam builds: we can still host, but only via Direct IP (LiteNetLib).
+            Multiplayer.Log("Steam not detected. Hosting will use Direct IP (LiteNetLib).");
+        }
     }
-}
 
     public void OnEnable()
     {
@@ -278,41 +278,47 @@ public void Start()
 
         gameVisibility.ToggleInteractable(true);
 
-/*
- *  Network transport field
- */
-selectorPrefab.SetActive(false);
-go = GameObject.Instantiate(selectorPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta).transform, false);
-selectorPrefab.SetActive(true);
-networkMode = go.GetOrAddComponent<Selector>();
+        /*
+         *  Network transport field
+         */
+        selectorPrefab.SetActive(false);
+        go = GameObject.Instantiate(selectorPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta).transform, false);
+        selectorPrefab.SetActive(true);
+        networkMode = go.GetOrAddComponent<Selector>();
 
-// clean-up localization on the cloned selector
-if (networkMode.labelTMPro?.gameObject.TryGetComponent<I2.Loc.Localize>(out var locNetLabel) ?? false)
-    GameObject.DestroyImmediate(locNetLabel);
-if (networkMode.labelTMPro?.gameObject.TryGetComponent<DV.Localization.Localize>(out var locNetLabel2) ?? false)
-    GameObject.DestroyImmediate(locNetLabel2);
+        // clean-up localization on the cloned selector
+        if (networkMode.labelTMPro?.gameObject.TryGetComponent<I2.Loc.Localize>(out var locNetLabel) ?? false)
+            GameObject.DestroyImmediate(locNetLabel);
+        if (networkMode.labelTMPro?.gameObject.TryGetComponent<DV.Localization.Localize>(out var locNetLabel2) ?? false)
+            GameObject.DestroyImmediate(locNetLabel2);
 
-DestroyImmediate(go.GetComponent<SettingChangeSource>());
+        DestroyImmediate(go.GetComponent<SettingChangeSource>());
 
-go.name = "Network Mode";
-networkMode.initialized = false;
+        go.name = "NetworkMode";
+        networkMode.initialized = false;
 
-networkMode.LocalizedLabel = false;
-networkMode.SetLabel("Network");
-if (networkMode.labelTMPro != null)
-    networkMode.labelTMPro.text = "Network";
+        networkMode.LocalizedLabel = true;
+        networkMode.SetLabel(Locale.SERVER_HOST_TRANSPORT_MODE_KEY);
 
-networkMode.LocalizedValues = false;
-networkMode.SetValues(new System.Collections.Generic.List<string> { "Steam (Relay/Lobbies)", "Direct IP (UDP)" });
+        var locComp = networkMode.labelTMPro.GetComponent<Localize>();
+        locComp.key = Locale.SERVER_HOST_TRANSPORT_MODE_KEY;
+        locComp.UpdateLocalization();
 
-// Default: Steam on Steam builds, Direct IP otherwise
-networkMode.SetSelectedIndex(DVSteamworks.Success ? 0 : 1);
+        networkMode.LocalizedValues = true;
+        networkMode.SetValues(Locale.SERVER_HOST_TRANSPORT_MODE_MODES.ToList());
 
-// If Steam isn't available, force Direct IP
-networkMode.ToggleInteractable(DVSteamworks.Success);
+        // Default: Steam on Steam builds, Direct IP otherwise
+        networkMode.SetSelectedIndex(DVSteamworks.Success ? 0 : 1);
 
-go.SetActive(true);
-go.ResetTooltip();
+        // If Steam isn't available, force Direct IP
+        networkMode.ToggleInteractable(DVSteamworks.Success);
+
+        var tt = go.GetOrAddComponent<UIElementTooltip>();
+        tt.enabledKey = Locale.SERVER_HOST_TRANSPORT_MODE__TOOLTIP_KEY;
+        tt.disabledKey = Locale.SERVER_HOST_TRANSPORT_MODE__TOOLTIP_DISABLED_KEY;
+
+        go.SetActive(true);
+        go.ResetTooltip();
 
         /*
          *  Server details field 
@@ -471,7 +477,7 @@ go.ResetTooltip();
             string requiredMods = ModCompatibilityManager.Instance.GetRequiredMods();
             if (requiredMods == null)
             {
-                
+
                 incompatibleMods = true;
                 ValidateInputs(null);
                 return;
