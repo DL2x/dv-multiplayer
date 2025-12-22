@@ -74,6 +74,11 @@ public class NetworkClient : NetworkManager
     // Allow mods to add to the wait Queue
     private readonly List<string> readyBlocks = [];
 
+    // If the transport never reports a failure (e.g. unreachable host), fail the connection ourselves.
+    private const float CONNECT_TIMEOUT_SECONDS = 12f;
+    private bool loadingFinishedHooked;
+
+
     public NetworkClient(Settings settings, bool singlePlayer, TransportMode transportMode = TransportMode.Steamworks) : base(settings, transportMode)
     {
         isSinglePlayer = singlePlayer;
@@ -93,6 +98,8 @@ public class NetworkClient : NetworkManager
         //netManager.Start();
         base.Start();
 
+        EnsureLoadingFinishedHooked();
+
         ServerboundClientLoginPacket serverboundClientLoginPacket = new()
         {
             Username = Multiplayer.Settings.GetUserName(),
@@ -103,6 +110,7 @@ public class NetworkClient : NetworkManager
         };
         netPacketProcessor.Write(cachedWriter, serverboundClientLoginPacket);
         selfPeer = Connect(address, port, cachedWriter);
+        CoroutineManager.Instance.StartCoroutine(ConnectTimeoutWatchdog());
 
         isAlsoHost = NetworkLifecycle.Instance.IsServerRunning;
         originalSession = UserManager.Instance.CurrentUser.CurrentSession;
@@ -240,6 +248,37 @@ public class NetworkClient : NetworkManager
         }
     }
 
+    private void EnsureLoadingFinishedHooked()
+    {
+        if (loadingFinishedHooked)
+            return;
+
+        WorldStreamingInit.LoadingFinished += OnLoaded;
+        loadingFinishedHooked = true;
+    }
+
+    private IEnumerator ConnectTimeoutWatchdog()
+    {
+        float start = Time.realtimeSinceStartup;
+
+        while (selfPeer != null && selfPeer.ConnectionState == TransportConnectionState.Connecting)
+        {
+            if ((Time.realtimeSinceStartup - start) > CONNECT_TIMEOUT_SECONDS)
+            {
+                disconnectMessage = "Host Unreachable";
+                try { selfPeer.Disconnect(); } catch { }
+
+                // Make sure we unwind everything even if the transport never reports a disconnect.
+                NetworkLifecycle.Instance.Stop();
+
+                onDisconnect?.Invoke(DisconnectReason.ConnectionFailed, disconnectMessage);
+                yield break;
+            }
+
+            yield return null;
+        }
+    }
+
     private void OnLoaded()
     {
         Log($"WorldStreamingInit.LoadingFinished()");
@@ -254,6 +293,7 @@ public class NetworkClient : NetworkManager
         CoroutineManager.Instance.StartCoroutine(WaitForReadyBlocks());
 
         WorldStreamingInit.LoadingFinished -= OnLoaded;
+        loadingFinishedHooked = false;
     }
 
     private IEnumerator WaitForReadyBlocks()
@@ -296,7 +336,7 @@ public class NetworkClient : NetworkManager
             MainMenu.GoBackToMainMenu();
         }
 
-        onDisconnect(disconnectReason, disconnectMessage);
+        onDisconnect?.Invoke(disconnectReason, disconnectMessage);
     }
 
     public override void OnNetworkLatencyUpdate(ITransportPeer peer, int latency)
@@ -446,7 +486,7 @@ public class NetworkClient : NetworkManager
         Object.DontDestroyOnLoad(go);
 
         SceneSwitcher.SwitchToScene(DVScenes.Game);
-        WorldStreamingInit.LoadingFinished += OnLoaded;
+        EnsureLoadingFinishedHooked();
 
         TrainStress.globalIgnoreStressCalculation = true;
 

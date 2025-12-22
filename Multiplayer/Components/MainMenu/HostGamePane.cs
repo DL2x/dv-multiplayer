@@ -8,6 +8,7 @@ using DV;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Util;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
 using System.Linq;
 using System.Reflection;
@@ -41,6 +42,7 @@ public class HostGamePane : MonoBehaviour
 
     SliderDV maxPlayers;
     Selector gameVisibility;
+    Selector networkMode;
     ButtonDV startButton;
 
     public ISaveGame saveGame;
@@ -63,16 +65,16 @@ public class HostGamePane : MonoBehaviour
         ValidateInputs(null);
     }
 
-    public void Start()
+public void Start()
+{
+    Multiplayer.Log("HostGamePane Started");
+
+    if (!DVSteamworks.Success)
     {
-        Multiplayer.Log("HostGamePane Started");
-
-        if (DVSteamworks.Success)
-            return;
-
-        Multiplayer.Log($"Steam not detected, prompt for restart.");
-        MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Please restart the game with Steam running", () => { });
+        // Oculus / non-Steam builds: we can still host, but only via Direct IP (LiteNetLib).
+        Multiplayer.Log("Steam not detected. Hosting will use Direct IP (LiteNetLib).");
     }
+}
 
     public void OnEnable()
     {
@@ -276,6 +278,42 @@ public class HostGamePane : MonoBehaviour
 
         gameVisibility.ToggleInteractable(true);
 
+/*
+ *  Network transport field
+ */
+selectorPrefab.SetActive(false);
+go = GameObject.Instantiate(selectorPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta).transform, false);
+selectorPrefab.SetActive(true);
+networkMode = go.GetOrAddComponent<Selector>();
+
+// clean-up localization on the cloned selector
+if (networkMode.labelTMPro?.gameObject.TryGetComponent<I2.Loc.Localize>(out var locNetLabel) ?? false)
+    GameObject.DestroyImmediate(locNetLabel);
+if (networkMode.labelTMPro?.gameObject.TryGetComponent<DV.Localization.Localize>(out var locNetLabel2) ?? false)
+    GameObject.DestroyImmediate(locNetLabel2);
+
+DestroyImmediate(go.GetComponent<SettingChangeSource>());
+
+go.name = "Network Mode";
+networkMode.initialized = false;
+
+networkMode.LocalizedLabel = false;
+networkMode.SetLabel("Network");
+if (networkMode.labelTMPro != null)
+    networkMode.labelTMPro.text = "Network";
+
+networkMode.LocalizedValues = false;
+networkMode.SetValues(new System.Collections.Generic.List<string> { "Steam (Relay/Lobbies)", "Direct IP (UDP)" });
+
+// Default: Steam on Steam builds, Direct IP otherwise
+networkMode.SetSelectedIndex(DVSteamworks.Success ? 0 : 1);
+
+// If Steam isn't available, force Direct IP
+networkMode.ToggleInteractable(DVSteamworks.Success);
+
+go.SetActive(true);
+go.ResetTooltip();
+
         /*
          *  Server details field 
          */
@@ -303,8 +341,8 @@ public class HostGamePane : MonoBehaviour
         go.name = "Max Players";
         var labelGo = go.FindChildByName("[text label]");
 
-        if (labelGo?.gameObject.TryGetComponent<I2.Loc.Localize>(out loc) ?? false)
-            GameObject.DestroyImmediate(loc);
+        if (labelGo?.gameObject.TryGetComponent<I2.Loc.Localize>(out var locMaxLabel) ?? false)
+            GameObject.DestroyImmediate(locMaxLabel);
 
         DestroyImmediate(go.GetComponent<SettingChangeSource>());
 
@@ -393,7 +431,8 @@ public class HostGamePane : MonoBehaviour
         if (incompatibleMods)
             valid = false;
 
-        if (!DVSteamworks.Success)
+        // Steam transport requires Steam.
+        if (networkMode != null && networkMode.SelectedIndex == 0 && !DVSteamworks.Success)
             valid = false;
 
         if (serverName.text.Trim() == "" || serverName.text.Length > MAX_SERVER_NAME_LEN)
@@ -474,6 +513,11 @@ public class HostGamePane : MonoBehaviour
         }
         //Mark it as a real multiplayer game
         NetworkLifecycle.Instance.IsSinglePlayer = false;
+
+        // Tell the lifecycle which transport to use for the server.
+        NetworkLifecycle.Instance.HostTransportMode = (networkMode != null && networkMode.SelectedIndex == 1)
+            ? TransportMode.LiteNetLib
+            : TransportMode.Steamworks;
 
 
         var ContinueGameRequested = lcInstance.GetType().GetMethod("OnRunClicked", BindingFlags.NonPublic | BindingFlags.Instance);

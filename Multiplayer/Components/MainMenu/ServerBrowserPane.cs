@@ -84,6 +84,8 @@ namespace Multiplayer.Components.MainMenu
         private ConnectionState connectionState = ConnectionState.NotConnected;
         private Popup connectingPopup;
         private int attempt;
+        private float connectionStartTime;
+        private const float CONNECTION_TIMEOUT = 12f;
 
         private Lobby[] lobbies;
 
@@ -157,6 +159,19 @@ namespace Multiplayer.Components.MainMenu
                 UpdatePings();
                 pingTimer = 0f;
             }
+
+// Handle connection attempts that never resolve (e.g. unreachable host with no callbacks).
+if (connectingPopup != null &&
+    (connectionState == ConnectionState.AttemptingIPv4 ||
+     connectionState == ConnectionState.AttemptingIPv6 ||
+     connectionState == ConnectionState.AttemptingSteamRelay) &&
+    (Time.realtimeSinceStartup - connectionStartTime) > CONNECTION_TIMEOUT)
+{
+    Multiplayer.LogWarning($"Connection attempt timed out after {CONNECTION_TIMEOUT}s.");
+    NetworkLifecycle.Instance.Stop();
+    AttemptFail();
+    MainMenuThingsAndStuff.Instance?.ShowOkPopup("Host Unreachable (timeout).", () => { });
+}
 
             if (lobbyToJoin != null && connectionState == ConnectionState.NotConnected)
             {
@@ -675,13 +690,15 @@ namespace Multiplayer.Components.MainMenu
             Multiplayer.Log($"Initiating connection. Direct: {direct}, Address: {address}, Lobby: {selectedLobby?.Id.ToString()}");
 
             attempt = 0;
+            connectionStartTime = Time.realtimeSinceStartup;
             ShowConnectingPopup();
 
             if (!direct && joinedLobby != null)
             {
+                // Steam lobby join -> connect via Steam relay using the lobby owner's SteamID.
                 connectionState = ConnectionState.AttemptingSteamRelay;
                 string hostId = ((Lobby)joinedLobby).Owner.Id.Value.ToString();
-                NetworkLifecycle.Instance.StartClient(address, portNumber, password, false, TransportMode.LiteNetLib, OnDisconnect);
+                NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, TransportMode.Steamworks, OnDisconnect);
                 return;
             }
 
@@ -720,10 +737,7 @@ namespace Multiplayer.Components.MainMenu
 
             Multiplayer.Log($"AttemptIPv6() starting attempt");
             connectionState = ConnectionState.AttemptingIPv6;
-            var transport = direct ? TransportMode.LiteNetLib : TransportMode.Steamworks;
-            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, transport, OnDisconnect);
-
-
+                        SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, TransportMode.LiteNetLib, OnDisconnect);
         }
 
         //private void AttemptIPv6Punch()
@@ -773,7 +787,7 @@ namespace Multiplayer.Components.MainMenu
                 {
                     Multiplayer.Log($"AttemptIPv4() starting attempt");
                     connectionState = ConnectionState.AttemptingIPv4;
-                    SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
+                    SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, TransportMode.LiteNetLib, OnDisconnect);
                     return;
                 }
             }

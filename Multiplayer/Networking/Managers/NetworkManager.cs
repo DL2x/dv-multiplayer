@@ -28,36 +28,45 @@ public abstract class NetworkManager
     public bool IsRunning => transport.IsRunning;
     public bool IsProcessingPacket { get; private set; }
 
-    protected NetworkManager(Settings settings)
+    public TransportMode TransportMode { get; }
+
+protected NetworkManager(Settings settings)
     : this(settings, TransportMode.Auto)
+{
+}
+
+protected NetworkManager(Settings settings, TransportMode transportMode)
+{
+    netPacketProcessor = new NetPacketProcessor();
+
+    // Resolve Auto to a concrete transport we can expose to callers (e.g. LobbyServerManager).
+    var resolvedMode = transportMode == TransportMode.Auto
+        ? (DVSteamworks.Success ? TransportMode.Steamworks : TransportMode.LiteNetLib)
+        : transportMode;
+
+    TransportMode = resolvedMode;
+
+    transport = resolvedMode switch
     {
-    }
+        TransportMode.LiteNetLib => new LiteNetLibTransport(),
+        TransportMode.Steamworks => new SteamWorksTransport(),
+        _ => new LiteNetLibTransport(),
+    };
 
-    protected NetworkManager(Settings settings, TransportMode transportMode)
-    {
-        netPacketProcessor = new NetPacketProcessor();
+    transport.OnConnectionRequest += OnConnectionRequest;
+    transport.OnPeerConnected += OnPeerConnected;
+    transport.OnPeerDisconnected += OnPeerDisconnected;
+    transport.OnNetworkReceive += OnNetworkReceive;
+    transport.OnNetworkError += OnNetworkError;
+    transport.OnNetworkLatencyUpdate += OnNetworkLatencyUpdate;
 
-        transport = transportMode switch
-        {
-            TransportMode.LiteNetLib => new LiteNetLibTransport(),
-            TransportMode.Steamworks => new SteamWorksTransport(),
-            _ => DVSteamworks.Success ? new SteamWorksTransport() : new LiteNetLibTransport(),
-        };
+    RegisterNestedTypes();
 
-        transport.OnConnectionRequest += OnConnectionRequest;
-        transport.OnPeerConnected += OnPeerConnected;
-        transport.OnPeerDisconnected += OnPeerDisconnected;
-        transport.OnNetworkReceive += OnNetworkReceive;
-        transport.OnNetworkError += OnNetworkError;
-        transport.OnNetworkLatencyUpdate += OnNetworkLatencyUpdate;
+    OnSettingsUpdated(settings);
+    Settings.OnSettingsUpdated += OnSettingsUpdated;
 
-        RegisterNestedTypes();
-
-        OnSettingsUpdated(settings);
-        Settings.OnSettingsUpdated += OnSettingsUpdated;
-
-        Subscribe();
-    }
+    Subscribe();
+}
 
 
     private void RegisterNestedTypes()

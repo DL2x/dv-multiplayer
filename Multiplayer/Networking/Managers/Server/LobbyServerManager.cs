@@ -4,6 +4,7 @@ using LiteNetLib.Utils;
 using LiteNetLib;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;
+using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Packets.Unconnected;
 using Multiplayer.Utils;
@@ -86,8 +87,9 @@ public class LobbyServerManager : MonoBehaviour
         if (server == null || server.ServerData == null)
             yield break;
 
-        //Create a steam lobby
-        if (DVSteamworks.Success)
+        // Create a Steam lobby only when we're actually running the Steamworks transport.
+        // Otherwise clients joining via Steam relay will fail (server is Direct-IP/LiteNetLib).
+        if (DVSteamworks.Success && server.TransportMode == TransportMode.Steamworks)
         {
             CreateSteamLobby();
         }

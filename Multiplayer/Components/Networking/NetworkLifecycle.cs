@@ -29,6 +29,9 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
     public bool IsPublicGame { get; set; } = false;
     public bool IsSinglePlayer { get; set; } = true;
 
+    // Which transport to use when starting a server (set by the host UI).
+    public TransportMode HostTransportMode { get; set; } = TransportMode.Auto;
+
 
     public NetworkServer Server { get; private set; }
     public NetworkClient Client { get; private set; }
@@ -116,6 +119,11 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
     {
         int port = Multiplayer.Settings.Port;
 
+        // Resolve the requested host transport. Auto -> Steamworks when available, otherwise LiteNetLib.
+        var serverTransportMode = HostTransportMode == TransportMode.Auto
+            ? (DV.Platform.Steam.DVSteamworks.Success ? TransportMode.Steamworks : TransportMode.LiteNetLib)
+            : HostTransportMode;
+
         if (Server != null)
             throw new InvalidOperationException("NetworkManager already exists!");
 
@@ -128,7 +136,7 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         }
 
         Multiplayer.Log($"Starting server on port {port}");
-        NetworkServer server = new(difficulty, Multiplayer.Settings, IsSinglePlayer, serverData);
+        NetworkServer server = new(difficulty, Multiplayer.Settings, IsSinglePlayer, serverData, serverTransportMode);
 
         if (!server.Start(port))
             return false;
@@ -139,11 +147,12 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         var serverAPI = new ServerAPIProvider(server);
         MultiplayerAPI.RegisterServer(serverAPI);
 
-        StartClient(IPAddress.Loopback.ToString(), port, Multiplayer.Settings.Password, IsSinglePlayer, null);
+        StartClient(IPAddress.Loopback.ToString(), port, Multiplayer.Settings.Password, IsSinglePlayer, serverTransportMode, null);
 
         //reset for next game
         IsSinglePlayer = true;
         serverData = null;
+        HostTransportMode = TransportMode.Auto;
 
         return true;
     }
