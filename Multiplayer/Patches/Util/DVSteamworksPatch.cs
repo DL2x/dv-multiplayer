@@ -1,6 +1,7 @@
 using DV.Platform.Steam;
 using HarmonyLib;
 using Steamworks;
+using Multiplayer.Utils;
 
 
 namespace Multiplayer.Patches.Util;
@@ -12,7 +13,7 @@ public static class DVSteamworksPatch
     [HarmonyPostfix]
     public static void Awake()
     {
-        if (DVSteamworks.Success)
+        if (GameVersionDetector.IsSteam)
             SteamNetworkingUtils.InitRelayNetworkAccess();
     }
 }

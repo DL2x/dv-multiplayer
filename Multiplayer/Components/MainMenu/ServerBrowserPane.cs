@@ -126,7 +126,7 @@ namespace Multiplayer.Components.MainMenu
 
         public void Update()
         {
-            if (DVSteamworks.Success)  SteamClient.RunCallbacks();
+            if (GameVersionDetector.IsSteam)  SteamClient.RunCallbacks();
 
             //Handle server refresh interval
             timePassed += Time.deltaTime;
@@ -193,12 +193,15 @@ if (connectingPopup != null &&
 
         public void Start()
         {
-            if (DVSteamworks.Success)
+            if (GameVersionDetector.IsSteam)
                 return;
-
-            Multiplayer.Log($"Steam not detected");
-            MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Using LiteNet instead", () => { });
-            return;
+            
+            if (GameVersionDetector.IsOculus) {
+                MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Using LiteNet instead", () => { });
+                return;
+            }
+            // Cracked build gets mystery popup
+            MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Try restarting the game.", () => { });
         }
 
         private void CleanUI()
@@ -391,7 +394,7 @@ if (connectingPopup != null &&
             //buttonJoin.ToggleInteractable(false);
             buttonRefresh.ToggleInteractable(false);
 
-            if (DVSteamworks.Success)
+            if (GameVersionDetector.IsSteam)
                 ListActiveLobbies();
 
         }

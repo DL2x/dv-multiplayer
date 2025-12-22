@@ -121,7 +121,7 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
 
         // Resolve the requested host transport. Auto -> Steamworks when available, otherwise LiteNetLib.
         var serverTransportMode = HostTransportMode == TransportMode.Auto
-            ? (DV.Platform.Steam.DVSteamworks.Success ? TransportMode.Steamworks : TransportMode.LiteNetLib)
+            ? (GameVersionDetector.IsSteam ? TransportMode.Steamworks : TransportMode.LiteNetLib)
             : HostTransportMode;
 
         if (Server != null)

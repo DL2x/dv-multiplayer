@@ -89,7 +89,7 @@ public class LobbyServerManager : MonoBehaviour
 
         // Create a Steam lobby only when we're actually running the Steamworks transport.
         // Otherwise clients joining via Steam relay will fail (server is Direct-IP/LiteNetLib).
-        if (DVSteamworks.Success && server.TransportMode == TransportMode.Steamworks)
+        if (GameVersionDetector.IsSteam && server.TransportMode == TransportMode.Steamworks)
         {
             CreateSteamLobby();
         }

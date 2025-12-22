@@ -69,10 +69,21 @@ public class HostGamePane : MonoBehaviour
     {
         Multiplayer.Log("HostGamePane Started");
 
-        if (!DVSteamworks.Success)
+        if (GameVersionDetector.IsOculus)
         {
             // Oculus / non-Steam builds: we can still host, but only via Direct IP (LiteNetLib).
             Multiplayer.Log("Steam not detected. Hosting will use Direct IP (LiteNetLib).");
+        }
+
+        if (GameVersionDetector.IsCracked)
+        {
+            // Give cracked users mysterious warning
+            Multiplayer.Log("Steamworks not detected. Hosting may be unstable.");
+        }
+
+        if (GameVersionDetector.IsSteam)
+        {
+            Multiplayer.Log("Steam detected. Full hosting functionality available.");
         }
     }
 
@@ -308,10 +319,10 @@ public class HostGamePane : MonoBehaviour
         networkMode.SetValues(Locale.SERVER_HOST_TRANSPORT_MODE_MODES.ToList());
 
         // Default: Steam on Steam builds, Direct IP otherwise
-        networkMode.SetSelectedIndex(DVSteamworks.Success ? 0 : 1);
+        networkMode.SetSelectedIndex(GameVersionDetector.IsSteam ? 0 : 1);
 
         // If Steam isn't available, force Direct IP
-        networkMode.ToggleInteractable(DVSteamworks.Success);
+        networkMode.ToggleInteractable(GameVersionDetector.IsSteam);
 
         var tt = go.GetOrAddComponent<UIElementTooltip>();
         tt.enabledKey = Locale.SERVER_HOST_TRANSPORT_MODE__TOOLTIP_KEY;
@@ -438,7 +449,7 @@ public class HostGamePane : MonoBehaviour
             valid = false;
 
         // Steam transport requires Steam.
-        if (networkMode != null && networkMode.SelectedIndex == 0 && !DVSteamworks.Success)
+        if (networkMode != null && networkMode.SelectedIndex == 0 && GameVersionDetector.IsOculus)
             valid = false;
 
         if (serverName.text.Trim() == "" || serverName.text.Length > MAX_SERVER_NAME_LEN)

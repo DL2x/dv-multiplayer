@@ -30,7 +30,7 @@ public static class SteamworksUtils
 
         try
         {
-            if (!DVSteamworks.Success)
+            if (!GameVersionDetector.IsSteam)
                 return false;
 
             if (!SteamClient.IsValid || !SteamClient.SteamId.IsValid)
@@ -113,7 +113,7 @@ public static class SteamworksUtils
     {
         float time = Time.time;
 
-        Multiplayer.LogDebug(() => $"JoinFromCommandLine() {DVSteamworks.Success}");
+        Multiplayer.LogDebug(() => $"JoinFromCommandLine() {GameVersionDetector.IsSteam}");
 
         if (hasJoinedCL || BuildInfo.BUILD_DESTINATION != "steam")
             yield break;

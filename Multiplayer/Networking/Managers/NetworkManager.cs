@@ -8,7 +8,7 @@ using Multiplayer.Networking.TransportLayers;
 using System;
 using System.Net;
 using System.Net.Sockets;
-using DV.Platform.Steam;
+using Multiplayer.Utils;
 
 namespace Multiplayer.Networking.Managers;
 
@@ -41,7 +41,7 @@ public abstract class NetworkManager
 
         // Resolve Auto to a concrete transport we can expose to callers (e.g. LobbyServerManager).
         var resolvedMode = transportMode == TransportMode.Auto
-            ? (DVSteamworks.Success ? TransportMode.Steamworks : TransportMode.LiteNetLib)
+            ? (GameVersionDetector.IsSteam ? TransportMode.Steamworks : TransportMode.LiteNetLib)
             : transportMode;
 
         TransportMode = resolvedMode;
