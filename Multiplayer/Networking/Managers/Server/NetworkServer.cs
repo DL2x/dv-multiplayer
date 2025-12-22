@@ -279,15 +279,31 @@ public class NetworkServer : NetworkManager
     public override void OnPeerConnected(ITransportPeer peer)
     {
         LogDebug(() => $"OnPeerConnected({peer.Id})");
+
+        // Send the login-accept packet only once the peer is fully connected.
+        // Sending during the connection-request phase can be unreliable on some transports.
+        if (peerToPlayer.TryGetValue(peer, out var player))
+        {
+            var acceptPacket = new ClientboundLoginResponsePacket
+            {
+                Accepted = true,
+                PlayerId = player.PlayerId,
+            };
+
+            SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
+        }
     }
 
     public override void OnPeerDisconnected(ITransportPeer peer, DisconnectReason disconnectReason)
     {
         LogDebug(() => $"OnPeerDisconnected({peer.Id})");
-        if (!peerToPlayer.TryGetValue(peer, out ServerPlayer player))
-            LogWarning($"Peer {peer.GetType()}, peerId: {peer.Id} disconnected but no player found");
-        else
-            Log($"Player {player?.Username} disconnected: {disconnectReason}");
+        if (!peerToPlayer.TryGetValue(peer, out ServerPlayer player) || player == null)
+        {
+            LogWarning($"Peer {peer?.GetType()}, peerId: {peer?.Id} disconnected but no player found");
+            return;
+        }
+
+        Log($"Player {player.Username} disconnected: {disconnectReason}");
 
         if (WorldStreamingInit.isLoaded)
             SaveGameManager.Instance.UpdateInternalData();
@@ -341,7 +357,17 @@ public class NetworkServer : NetworkManager
     public override void OnConnectionRequest(NetDataReader requestData, IConnectionRequest request)
     {
         LogDebug(() => $"NetworkServer OnConnectionRequest");
-        netPacketProcessor.ReadAllPackets(requestData, request);
+        try
+        {
+            netPacketProcessor.ReadAllPackets(requestData, request);
+        }
+        catch (Exception e)
+        {
+            // If parsing/handling fails, we must reject the request; otherwise the client will sit
+            // in "connecting" forever and eventually hit our client-side watchdog timeout.
+            LogWarning($"Failed to process connection request from {request.RemoteEndPoint}: {e}");
+            try { request.Reject(); } catch { }
+        }
     }
 
     #endregion
@@ -1004,7 +1030,31 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        var validation = ModCompatibilityManager.Instance.ValidateClientMods(packet.Mods);
+        // Mods may be missing/truncated on some clients/transports.
+        // If the client didn't send a list at all, skip validation (best-effort, avoids false negatives).
+        var clientMods = packet.Mods;
+
+        ModValidationResult validation;
+        if (clientMods == null)
+        {
+            LogWarning("Client sent no mod list in login packet; skipping mod validation.");
+            validation = new ModValidationResult { IsValid = true };
+            clientMods = Array.Empty<ModInfo>();
+        }
+        else
+        {
+            try
+            {
+                validation = ModCompatibilityManager.Instance.ValidateClientMods(clientMods);
+            }
+            catch (Exception e)
+            {
+                // Don't leave the client hanging in "connecting" due to an exception here.
+                // Prefer allowing the client to join (best-effort) and log the problem.
+                LogWarning($"Mod validation failed (will allow join): {e.Message}");
+                validation = new ModValidationResult { IsValid = true };
+            }
+        }
         if (!validation.IsValid)
         {
 
@@ -1017,7 +1067,7 @@ public class NetworkServer : NetworkManager
                     sb.AppendLine($"\t{mod.Id} {mod.Version}, Status: {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
 
                 sb.AppendLine("\r\nClient Mods:");
-                foreach (ModInfo mod in packet.Mods)
+                foreach (ModInfo mod in clientMods)
                     sb.AppendLine($"\t{mod.Id} {mod.Version}, Status (if known): {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
 
                 sb.AppendLine("\r\nMissing Mods:");
@@ -1041,7 +1091,17 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        ITransportPeer peer = request.Accept();
+        ITransportPeer peer;
+        try
+        {
+            peer = request.Accept();
+        }
+        catch (Exception e)
+        {
+            LogWarning($"Accept() threw for {packet.Username}{(Multiplayer.Settings.LogIps ? $" at {request.RemoteEndPoint.Address}" : "")}: {e}");
+            request.Reject();
+            return;
+        }
 
         ServerPlayer serverPlayer = new
         (
@@ -1054,13 +1114,8 @@ public class NetworkServer : NetworkManager
         serverPlayers.Add(serverPlayer.PlayerId, serverPlayer);
         peerToPlayer.Add(peer, serverPlayer);
 
-        ClientboundLoginResponsePacket acceptPacket = new()
-        {
-            Accepted = true,
-            PlayerId = serverPlayer.PlayerId,
-        };
-
-        SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
+        // NOTE: We send the Accepted packet in OnPeerConnected, once the transport reports a fully
+        // connected peer. This avoids edge cases where the first connected packet gets dropped.
     }
 
     private void OnServerboundSaveGameDataRequestPacket(ServerboundSaveGameDataRequestPacket packet, ITransportPeer peer)

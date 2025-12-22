@@ -20,9 +20,26 @@ public class LiteNetLibTransport : ITransport, INetEventListener
     public event Action<IPEndPoint, SocketError> OnNetworkError;
     public event Action<ITransportPeer, int> OnNetworkLatencyUpdate;
  
+    // IMPORTANT: keep a *stable* ITransportPeer instance per NetPeer.
+    // Server/client code uses ITransportPeer as a dictionary key (peer -> state/player).
+    // Creating multiple wrappers for the same NetPeer makes lookups fail and causes
+    // "Peer disconnected but no player found" and client-side timeouts during login.
     private readonly Dictionary<NetPeer, LiteNetLibPeer> netPeerToPeer = [];
 
     private readonly NetManager netManager;
+
+    internal LiteNetLibPeer GetOrCreatePeer(NetPeer netPeer)
+    {
+        if (netPeer == null)
+            return null;
+
+        if (netPeerToPeer.TryGetValue(netPeer, out var peer) && peer != null)
+            return peer;
+
+        peer = new LiteNetLibPeer(netPeer);
+        netPeerToPeer[netPeer] = peer;
+        return peer;
+    }
 
     #region ITransport
     public LiteNetLibTransport()
@@ -68,11 +85,7 @@ public class LiteNetLibTransport : ITransport, INetEventListener
     public ITransportPeer Connect(string address, int port, NetDataWriter data)
     {
         var netPeer = netManager.Connect(address, port, data);
-        var peer = new LiteNetLibPeer(netPeer);
-
-        //Multiplayer.LogDebug(() => $"LiteNetLibTransport.Connect length: {data.Length}. packet: {BitConverter.ToString(data.Data)}");
-
-        netPeerToPeer[netPeer] = peer;
+        var peer = GetOrCreatePeer(netPeer);
         return peer;
     }
 
@@ -92,18 +105,14 @@ public class LiteNetLibTransport : ITransport, INetEventListener
 
     void INetEventListener.OnPeerConnected(NetPeer netPeer)
     {
-        var peer = new LiteNetLibPeer(netPeer);
-
-        netPeerToPeer[netPeer] = peer;
-
+        var peer = GetOrCreatePeer(netPeer);
         OnPeerConnected?.Invoke(peer);
     }
 
     void INetEventListener.OnPeerDisconnected(NetPeer netPeer, DisconnectInfo disconnectInfo)
     {
-        if(!netPeerToPeer.TryGetValue(netPeer, out var peer))
-            return;
-
+        // Even if we lost the mapping somehow, still surface the disconnect to upper layers.
+        var peer = GetOrCreatePeer(netPeer);
         OnPeerDisconnected?.Invoke(peer, disconnectInfo.Reason);
 
         netPeerToPeer.Remove(netPeer);
@@ -164,10 +173,8 @@ public class LiteNetLibTransport : ITransport, INetEventListener
             netPeerToPeer.Remove(pair.Key);
         }
     }
-    public void RegisterPeer(NetPeer netPeer, LiteNetLibPeer peer)
-    {
-        netPeerToPeer[netPeer] = peer;
-    }
+    // Intentionally no "RegisterPeer" / overwriting API: callers should use GetOrCreatePeer
+    // to ensure a stable wrapper instance per NetPeer.
 
 }
 
@@ -185,10 +192,7 @@ public class LiteNetLibConnectionRequest : IConnectionRequest
     public ITransportPeer Accept()
     {
         var netPeer = request.Accept();
-        var peer = new LiteNetLibPeer(netPeer);
-        transport.RegisterPeer(netPeer, peer);
-
-        return peer;
+        return transport.GetOrCreatePeer(netPeer);
     }
 
     public void Reject(NetDataWriter data = null)
