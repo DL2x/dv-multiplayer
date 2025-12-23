@@ -285,13 +285,17 @@ public class NetworkServer : NetworkManager
         // Sending during the connection-request phase can be unreliable on some transports.
         if (peerToPlayer.TryGetValue(peer, out var player))
         {
-            var acceptPacket = new ClientboundLoginResponsePacket
+            if (!player.LoginResponseSent)
             {
-                Accepted = true,
-                PlayerId = player.PlayerId,
-            };
+                var acceptPacket = new ClientboundLoginResponsePacket
+                {
+                    Accepted = true,
+                    PlayerId = player.PlayerId,
+                };
 
-            SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
+                SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
+                player.LoginResponseSent = true;
+            }
         }
     }
 
@@ -1148,8 +1152,18 @@ public class NetworkServer : NetworkManager
         serverPlayers.Add(serverPlayer.PlayerId, serverPlayer);
         peerToPlayer.Add(peer, serverPlayer);
 
-        // NOTE: We send the Accepted packet in OnPeerConnected, once the transport reports a fully
-        // connected peer. This avoids edge cases where the first connected packet gets dropped.
+        // Send Accepted immediately for transport compatibility.
+        // Steamworks can invoke OnPeerConnected before the first connection-request payload is processed,
+        // so relying on OnPeerConnected to send this can leave the client stuck on "connecting".
+        var acceptPacket = new ClientboundLoginResponsePacket
+        {
+            Accepted = true,
+            PlayerId = serverPlayer.PlayerId,
+        };
+        SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
+        serverPlayer.LoginResponseSent = true;
+
+        // OnPeerConnected still sends Accepted as a fallback if it hasn't been sent yet.
     }
 
     private void OnServerboundSaveGameDataRequestPacket(ServerboundSaveGameDataRequestPacket packet, ITransportPeer peer)
