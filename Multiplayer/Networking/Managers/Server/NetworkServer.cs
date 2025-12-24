@@ -30,6 +30,7 @@ using Multiplayer.Networking.Packets.Serverbound.Jobs;
 using Multiplayer.Networking.Packets.Serverbound.Train;
 using Multiplayer.Networking.Packets.Unconnected;
 using Multiplayer.Networking.TransportLayers;
+using Multiplayer.Patches.MainMenu;
 using Multiplayer.Utils;
 using System;
 using System.Collections.Generic;
@@ -975,13 +976,13 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        if (packet.BuildVersion != Multiplayer.LocalBuildInfo)
+        if (packet.BuildVersion != MainMenuControllerPatch.MenuProvider.BuildVersionString)
         {
-            LogWarning($"Denied login to incorrect game version! Got: {packet.BuildVersion}, expected: {Multiplayer.LocalBuildInfo}");
+            LogWarning($"Denied login to incorrect game version! Got: {packet.BuildVersion}, expected: {MainMenuControllerPatch.MenuProvider.BuildVersionString}");
             ClientboundLoginResponsePacket denyPacket = new()
             {
                 ReasonKey = Locale.DISCONN_REASON__GAME_VERSION_KEY,
-                ReasonArgs = [Multiplayer.LocalBuildInfo, packet.BuildVersion.ToString()]
+                ReasonArgs = [MainMenuControllerPatch.MenuProvider.BuildVersionString, packet.BuildVersion.ToString()]
             };
             request.Reject(WritePacket(denyPacket));
             return;
