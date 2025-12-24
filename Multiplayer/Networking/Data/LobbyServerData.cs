@@ -70,6 +70,7 @@ namespace Multiplayer.Networking.Data
 
 
         public void Dispose() { }
+
         public static int GetDifficultyFromString(string difficulty)
         {
             int diff = 0;

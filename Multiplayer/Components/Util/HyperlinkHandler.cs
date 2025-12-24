@@ -20,7 +20,7 @@ namespace Multiplayer.Components.Util
         private int hoveredLinkIndex = -1;
         private bool underlineLinks = true;
 
-        void Start()
+        protected void Start()
         {
             if (textComponent == null)
             {
@@ -36,7 +36,7 @@ namespace Multiplayer.Components.Util
             ApplyLinkStyling();
         }
 
-        void Update()
+        protected void Update()
         {
             int linkIndex = TMP_TextUtilities.FindIntersectingLink(textComponent, Input.mousePosition, canvasCamera);
 
@@ -71,7 +71,7 @@ namespace Multiplayer.Components.Util
             }
         }
 
-        private void ApplyLinkStyling()
+        public void ApplyLinkStyling()
         {
             string text = textComponent.text;
             string pattern = @"<link=""([^""]+)"">(.*?)<\/link>";

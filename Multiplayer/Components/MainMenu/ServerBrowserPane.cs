@@ -1,15 +1,17 @@
-using DV;
 using DV.Localization;
 using DV.Platform.Steam;
 using DV.UI;
 using DV.UIFramework;
 using DV.Utils;
 using LiteNetLib;
+using MPAPI.Types;
 using Multiplayer.API;
 using Multiplayer.Components.MainMenu.ServerBrowser;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.UI.Controls;
+using Multiplayer.Components.Util;
 using Multiplayer.Networking.Data;
+using Multiplayer.Patches.MainMenu;
 using Multiplayer.Utils;
 using Steamworks;
 using Steamworks.Data;
@@ -18,6 +20,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -62,6 +65,7 @@ namespace Multiplayer.Components.MainMenu
         //Misc GUI Elements
         private TextMeshProUGUI serverName;
         private TextMeshProUGUI detailsPane;
+        private HyperlinkHandler modHyperlinkHandler;
 
         //Remote server tracking
         private readonly List<IServerBrowserGameDetails> remoteServers = [];
@@ -300,6 +304,12 @@ namespace Multiplayer.Components.MainMenu
             // Set content size to fit text
             contentRT.sizeDelta = new Vector2(contentRT.sizeDelta.x - 50, detailsPane.preferredHeight);
 
+            // Enable hyperlink parsing
+            modHyperlinkHandler = textGO.GetOrAddComponent<HyperlinkHandler>();
+
+            modHyperlinkHandler.linkColor = new UnityEngine.Color(0.302f, 0.651f, 1f); // #4DA6FF
+            modHyperlinkHandler.linkHoverColor = new UnityEngine.Color(0.498f, 0.749f, 1f); // #7FBFFF
+
             // Update buttons on the multiplayer pane
             GameObject goDirectIP = this.gameObject.UpdateButton("ButtonTextIcon Overwrite", "ButtonTextIcon Manual", Locale.SERVER_BROWSER__MANUAL_CONNECT_KEY, null, Multiplayer.AssetIndex.multiplayerIcon);
             GameObject goJoin = this.gameObject.UpdateButton("ButtonTextIcon Save", "ButtonTextIcon Join", Locale.SERVER_BROWSER__JOIN_KEY, null, Multiplayer.AssetIndex.connectIcon);
@@ -405,7 +415,7 @@ namespace Multiplayer.Components.MainMenu
 
         private void DirectAction()
         {
-            if(connectionState != ConnectionState.NotConnected)
+            if (connectionState != ConnectionState.NotConnected)
                 return;
 
             buttonDirectIP.ToggleInteractable(false);
@@ -428,12 +438,12 @@ namespace Multiplayer.Components.MainMenu
             {
                 UpdateDetailsPane();
 
-                //Check if we can connect to this server
+                // Check if we can connect to this server
                 Multiplayer.Log($"Server: \"{selectedServer.GameVersion}\" \"{selectedServer.MultiplayerVersion}\"");
-                Multiplayer.Log($"Client: \"{Multiplayer.LocalBuildInfo}\" \"{Multiplayer.Ver}\"");
-                Multiplayer.Log($"Result: \"{selectedServer.GameVersion == Multiplayer.LocalBuildInfo}\" \"{selectedServer.MultiplayerVersion == Multiplayer.Ver}\"");
+                Multiplayer.Log($"Client: \"{MainMenuControllerPatch.MenuProvider.BuildVersionString}\" \"{Multiplayer.Ver}\"");
+                Multiplayer.Log($"Result: \"{selectedServer.GameVersion == MainMenuControllerPatch.MenuProvider.BuildVersionString}\" \"{selectedServer.MultiplayerVersion == Multiplayer.Ver}\"");
 
-                bool canConnect = selectedServer.GameVersion == Multiplayer.LocalBuildInfo &&
+                bool canConnect = selectedServer.GameVersion == MainMenuControllerPatch.MenuProvider.BuildVersionString &&
                                   selectedServer.MultiplayerVersion == Multiplayer.Ver;
 
                 buttonJoin.ToggleInteractable(canConnect);
@@ -459,28 +469,89 @@ namespace Multiplayer.Components.MainMenu
 
         private void UpdateDetailsPane()
         {
-            string details;
+            StringBuilder details = new();
+            StringBuilder modDetails = new("<alpha=#50>Mods:</color>");
 
+            var localMods = ModCompatibilityManager.Instance.GetLocalMods();
+
+            Multiplayer.LogDebug(() => $"Temp Mod Json: \"{tempReqMods}\"");
+            if (!string.IsNullOrEmpty(selectedServer.RequiredMods))
+            {
+                var modData = ModInfo.DeserializeRequiredMods(selectedServer.RequiredMods);
+
+                Multiplayer.LogDebug(() => $"Parsed {modData?.Length} mods from server \"{selectedServer?.Name}\"");
+
+                foreach (var mod in modData)
+                {
+                    ModInfo modMatch = localMods.FirstOrDefault(l => l.Id == mod.Id);
+
+                    Multiplayer.LogDebug(() => $"Checking mod \"{mod.Id}\" v\"{mod.Version}\" - Found: \"{modMatch.Id}\" v\"{modMatch.Version}\"");
+
+                    bool modFound = modMatch.Id == mod.Id;
+                    bool modVersionMatch = modFound && modMatch.Version == mod.Version;
+
+                    string status;
+                    if (modFound && modVersionMatch)
+                        status = "<color=\"green\">OK</color>";
+                    else if (modFound && !modVersionMatch)
+                        status = "<color=\"red\">Version Mismatch</color>";
+                    else
+                        status = "<color=\"red\">Missing</color>";
+
+                    var link = !string.IsNullOrEmpty(mod.Url) ? $"<link=\"{mod.Url}\">{mod.Id}</link>" : mod.Id;
+
+                    modDetails.Append($"<br><alpha=#50>{link} ({mod.Version}) - {status}</color>");
+                }
+                Multiplayer.LogDebug(() => $"Mod details for server \"{selectedServer.Name}\":\r\n{modDetails.ToString()}");
+
+                var extraMods = localMods.Where(l => !modData.Any(m => m.Id == l.Id)).ToArray();
+                Multiplayer.LogDebug(() => $"Found {extraMods.Length} extra mods on client for server \"{selectedServer.Name}\"");
+
+                if (extraMods.Length > 0)
+                {
+                    foreach (var mod in extraMods)
+                    {
+                        var compatibility = ModCompatibilityManager.Instance.GetCompatibility(mod);
+                        if (compatibility == MultiplayerCompatibility.Incompatible)
+                        {
+                            modDetails.Append($"<br><alpha=#50>{mod.Id} ({mod.Version}) - <color=\"red\">Incompatible</color></color>");
+                        }
+                        else if (compatibility == MultiplayerCompatibility.Undefined || compatibility == MultiplayerCompatibility.All)
+                        {
+                            modDetails.Append($"<br><alpha=#50>{mod.Id} ({mod.Version}) - <color=\"red\">Extra Mod</color></color>");
+                        }
+                    }
+                }
+            }
+            Multiplayer.LogDebug(() => $"Finished compiling mod details for server \"{selectedServer.Name}\"");
+            Multiplayer.LogDebug(() => $"Version: {MainMenuControllerPatch.MenuProvider.BuildVersionString}");
             if (selectedServer != null)
             {
                 serverName.text = selectedServer.Name;
 
                 //note: built-in localisations have a trailing colon e.g. 'Game mode:'
 
-                details = "<alpha=#50>" + LocalizationAPI.L("launcher/game_mode", []) + "</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>";
-                details += "<alpha=#50>" + LocalizationAPI.L("launcher/difficulty", []) + "</color> " + LobbyServerData.GetDifficultyFromInt(selectedServer.Difficulty) + "<br>";
-                details += "<alpha=#50>" + LocalizationAPI.L("launcher/in_game_time_passed", []) + "</color> " + selectedServer.TimePassed + "<br>";
-                details += "<alpha=#50>" + Locale.SERVER_BROWSER__PLAYERS + ":</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>";
-                details += "<alpha=#50>" + Locale.SERVER_BROWSER__PASSWORD_REQUIRED + ":</color> " + (selectedServer.HasPassword ? Locale.SERVER_BROWSER__YES : Locale.SERVER_BROWSER__NO) + "<br>";
-                details += "<alpha=#50>" + Locale.SERVER_BROWSER__MODS_REQUIRED + ":</color> " + (string.IsNullOrEmpty(selectedServer.RequiredMods) ? Locale.SERVER_BROWSER__NO : Locale.SERVER_BROWSER__YES) + "<br>";
-                details += "<br>";
-                details += "<alpha=#50>" + Locale.SERVER_BROWSER__GAME_VERSION + ":</color> " + (selectedServer.GameVersion != Multiplayer.LocalBuildInfo ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>";
-                details += "<alpha=#50>" + Locale.SERVER_BROWSER__MOD_VERSION + ":</color> " + (selectedServer.MultiplayerVersion != Multiplayer.Ver ? "<color=\"red\">" : "") + selectedServer.MultiplayerVersion + "</color><br>";
-                details += "<br>";
-                details += selectedServer.ServerDetails;
+                details.Append("<alpha=#50>" + LocalizationAPI.L("launcher/game_mode", []) + "</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>");
+                details.Append("<alpha=#50>" + LocalizationAPI.L("launcher/difficulty", []) + "</color> " + LobbyServerData.GetDifficultyFromInt(selectedServer.Difficulty) + "<br>");
+                details.Append("<alpha=#50>" + LocalizationAPI.L("launcher/in_game_time_passed", []) + "</color> " + selectedServer.TimePassed + "<br>");
+                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__PLAYERS + ":</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>");
+                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__PASSWORD_REQUIRED + ":</color> " + (selectedServer.HasPassword ? Locale.SERVER_BROWSER__YES : Locale.SERVER_BROWSER__NO) + "<br>");
+                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__MODS_REQUIRED + ":</color> " + (string.IsNullOrEmpty(selectedServer.RequiredMods) ? Locale.SERVER_BROWSER__NO : Locale.SERVER_BROWSER__YES) + "<br>");
+                details.Append("<br>");
+                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__GAME_VERSION + ":</color> " + (selectedServer.GameVersion != MainMenuControllerPatch.MenuProvider.BuildVersionString ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>");
+                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__MOD_VERSION + ":</color> " + (selectedServer.MultiplayerVersion != Multiplayer.Ver ? "<color=\"red\">" : "") + selectedServer.MultiplayerVersion + "</color><br>");
+                details.Append("<br>");
+                details.Append(selectedServer.ServerDetails);
+
+                if (selectedServer.ServerDetails != null && selectedServer.ServerDetails.Length > 0)
+                    details.Append("<br>");
+
+                details.Append(modDetails.ToString());
 
                 //Multiplayer.Log("Finished Prepping Data");
-                detailsPane.text = details;
+                detailsPane.text = details.ToString();
+
+                modHyperlinkHandler.ApplyLinkStyling();
             }
         }
 
@@ -968,7 +1039,7 @@ namespace Multiplayer.Components.MainMenu
                 }
             }
         }
-         
+
         private string ExtractDomainName(string input)
         {
             if (input.StartsWith("http://"))
@@ -1006,7 +1077,7 @@ namespace Multiplayer.Components.MainMenu
             if (joinResult == RoomEnter.Success)
             {
                 Multiplayer.Log($"Lobby joined ({lobby.Id})");
-                
+
                 joinedLobby = lobby;
                 lobbyToJoin = null;
 
