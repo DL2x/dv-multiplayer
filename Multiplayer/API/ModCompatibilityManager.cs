@@ -141,29 +141,13 @@ public class ModCompatibilityManager : SingletonBehaviour<ModCompatibilityManage
             return false;
 
         var message = $"{Locale.MAIN_MENU__INCOMPATIBLE_MODS} {string.Join(", ", incompatible)}";
-        
+
         MainMenuThingsAndStuff.Instance.ShowOkPopup(message, () => { });
 
         return true;
     }
 
-    // Returns a list of mods for use in the lobby data
-    public string GetRequiredMods()
-    {
-        List<string> requiredMods = [];
-
-        var local = GetLocalMods();
-
-        if (local == null)
-            return null;
-
-        foreach (var modInfo in local)
-            requiredMods.Add(modInfo.Id);
-
-        return string.Join(", ", requiredMods);
-    }
-
-    //Returns a list of mods installed and enabled, filtered for mods that are required for hosts and clients
+    // Returns a list of mods installed and enabled, filtered for mods that are required for hosts and clients
     public ModInfo[] GetLocalMods()
     {
         List<ModInfo> localMods = [];
@@ -199,7 +183,6 @@ public class ModCompatibilityManager : SingletonBehaviour<ModCompatibilityManage
             }
         }
         return localMods.ToArray();
-
     }
 
     [UsedImplicitly]

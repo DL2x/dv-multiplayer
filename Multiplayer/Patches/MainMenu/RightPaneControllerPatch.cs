@@ -50,7 +50,7 @@ public static class RightPaneController_Patch
         // Add the multiplayer pane to the menu controller
         __instance.menuController.controlledMenus.Add(multiplayerPane.GetComponent<UIMenu>());
         joinMenuIndex = __instance.menuController.controlledMenus.Count - 1;
-        UIMenuRequester mpButtonReq = MainMenuController_Awake_Patch.multiplayerButton.GetComponent<UIMenuRequester>();
+        UIMenuRequester mpButtonReq = MainMenuControllerPatch.MultiplayerButton.GetComponent<UIMenuRequester>();
         mpButtonReq.requestedMenuIndex = joinMenuIndex;
 
         // Clean up unnecessary components and child objects
@@ -72,7 +72,7 @@ public static class RightPaneController_Patch
         });
 
         // Activate the multiplayer button
-        MainMenuController_Awake_Patch.multiplayerButton.SetActive(true);
+        MainMenuControllerPatch.MultiplayerButton.SetActive(true);
         //Multiplayer.Log("At end!");
 
         // Check if the host pane already exists

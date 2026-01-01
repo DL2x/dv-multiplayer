@@ -47,7 +47,7 @@ namespace Multiplayer.Networking.Data
 
 
         [JsonProperty("required_mods")]
-        public string RequiredMods { get; set; }
+        public ModInfo[] RequiredMods { get; set; }
 
 
         [JsonProperty("game_version")]
@@ -70,6 +70,7 @@ namespace Multiplayer.Networking.Data
 
 
         public void Dispose() { }
+
         public static int GetDifficultyFromString(string difficulty)
         {
             int diff = 0;

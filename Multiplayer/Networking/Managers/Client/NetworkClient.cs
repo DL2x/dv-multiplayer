@@ -37,6 +37,7 @@ using Multiplayer.Networking.Packets.Serverbound;
 using Multiplayer.Networking.Packets.Serverbound.Jobs;
 using Multiplayer.Networking.Packets.Serverbound.Train;
 using Multiplayer.Networking.TransportLayers;
+using Multiplayer.Patches.MainMenu;
 using Multiplayer.Patches.SaveGame;
 using Multiplayer.Utils;
 using Newtonsoft.Json.Linq;
@@ -105,7 +106,7 @@ public class NetworkClient : NetworkManager
             Username = Multiplayer.Settings.GetUserName(),
             Guid = Multiplayer.Settings.GetGuid().ToByteArray(),
             Password = password,
-            BuildVersion = Multiplayer.LocalBuildInfo,
+            BuildVersion = MainMenuControllerPatch.MenuProvider.BuildVersionString,
             Mods = ModCompatibilityManager.Instance.GetLocalMods()
         };
         netPacketProcessor.Write(cachedWriter, serverboundClientLoginPacket);

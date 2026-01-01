@@ -1,23 +1,24 @@
+using DV;
 using DV.Common;
 using DV.Localization;
 using DV.Platform.Steam;
-using DV.UI.PresetEditors;
 using DV.UI;
+using DV.UI.PresetEditors;
 using DV.UIFramework;
-using DV;
+using Multiplayer.API;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Util;
 using Multiplayer.Networking.Data;
+using Multiplayer.Patches.MainMenu;
 using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Utils;
+using System;
 using System.Linq;
 using System.Reflection;
-using System;
 using TMPro;
+using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
-using UnityEngine;
-using Multiplayer.API;
 
 namespace Multiplayer.Components.MainMenu;
 
@@ -485,7 +486,7 @@ public class HostGamePane : MonoBehaviour
             serverData.MaxPlayers = (int)maxPlayers.value;
 
             // final check before we start the server
-            string requiredMods = ModCompatibilityManager.Instance.GetRequiredMods();
+            var requiredMods = ModCompatibilityManager.Instance.GetLocalMods();
             if (requiredMods == null)
             {
 
@@ -495,7 +496,7 @@ public class HostGamePane : MonoBehaviour
             }
 
             serverData.RequiredMods = requiredMods;
-            serverData.GameVersion = Multiplayer.LocalBuildInfo;
+            serverData.GameVersion = MainMenuControllerPatch.MenuProvider.BuildVersionString;
             serverData.MultiplayerVersion = Multiplayer.Ver;
 
             serverData.ServerDetails = details.text.Trim();
