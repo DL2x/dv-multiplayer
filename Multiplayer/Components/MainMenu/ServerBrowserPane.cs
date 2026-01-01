@@ -474,10 +474,9 @@ namespace Multiplayer.Components.MainMenu
 
             var localMods = ModCompatibilityManager.Instance.GetLocalMods();
 
-            Multiplayer.LogDebug(() => $"Temp Mod Json: \"{tempReqMods}\"");
-            if (!string.IsNullOrEmpty(selectedServer.RequiredMods))
+            if (selectedServer.RequiredMods != null && selectedServer.RequiredMods.Length > 0)
             {
-                var modData = ModInfo.DeserializeRequiredMods(selectedServer.RequiredMods);
+                var modData = selectedServer.RequiredMods; // ModInfo.DeserializeRequiredMods(selectedServer.RequiredMods);
 
                 Multiplayer.LogDebug(() => $"Parsed {modData?.Length} mods from server \"{selectedServer?.Name}\"");
 
@@ -536,7 +535,7 @@ namespace Multiplayer.Components.MainMenu
                 details.Append("<alpha=#50>" + LocalizationAPI.L("launcher/in_game_time_passed", []) + "</color> " + selectedServer.TimePassed + "<br>");
                 details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__PLAYERS + ":</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>");
                 details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__PASSWORD_REQUIRED + ":</color> " + (selectedServer.HasPassword ? Locale.SERVER_BROWSER__YES : Locale.SERVER_BROWSER__NO) + "<br>");
-                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__MODS_REQUIRED + ":</color> " + (string.IsNullOrEmpty(selectedServer.RequiredMods) ? Locale.SERVER_BROWSER__NO : Locale.SERVER_BROWSER__YES) + "<br>");
+                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__MODS_REQUIRED + ":</color> " + ((selectedServer.RequiredMods != null && selectedServer.RequiredMods.Length > 0) ? Locale.SERVER_BROWSER__NO : Locale.SERVER_BROWSER__YES) + "<br>");
                 details.Append("<br>");
                 details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__GAME_VERSION + ":</color> " + (selectedServer.GameVersion != MainMenuControllerPatch.MenuProvider.BuildVersionString ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>");
                 details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__MOD_VERSION + ":</color> " + (selectedServer.MultiplayerVersion != Multiplayer.Ver ? "<color=\"red\">" : "") + selectedServer.MultiplayerVersion + "</color><br>");

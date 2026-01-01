@@ -1,3 +1,4 @@
+using Multiplayer.Networking.Data;
 using System;
 
 namespace Multiplayer.Components.MainMenu;
@@ -24,7 +25,7 @@ public interface IServerBrowserGameDetails : IDisposable
     string TimePassed { get; set; }
     int CurrentPlayers { get; set; }
     int MaxPlayers { get; set; }
-    string RequiredMods { get; set; }
+    ModInfo[] RequiredMods { get; set; }
     string GameVersion { get; set; }
     string MultiplayerVersion { get; set; }
     string ServerDetails { get; set; }

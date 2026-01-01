@@ -430,7 +430,7 @@ public class HostGamePane : MonoBehaviour
             serverData.MaxPlayers = (int)maxPlayers.value;
 
             // final check before we start the server
-            string requiredMods = ModCompatibilityManager.Instance.GetRequiredMods();
+            var requiredMods = ModCompatibilityManager.Instance.GetLocalMods();
             if (requiredMods == null)
             {
                 incompatibleMods = true;

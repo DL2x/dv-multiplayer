@@ -147,17 +147,6 @@ public class ModCompatibilityManager : SingletonBehaviour<ModCompatibilityManage
         return true;
     }
 
-    // Returns a list of mods for use in the lobby data
-    public string GetRequiredMods()
-    {
-        var local = GetLocalMods();
-
-        if (local == null)
-            return null;
-
-        return Newtonsoft.Json.JsonConvert.SerializeObject(local);
-    }
-
     // Returns a list of mods installed and enabled, filtered for mods that are required for hosts and clients
     public ModInfo[] GetLocalMods()
     {
