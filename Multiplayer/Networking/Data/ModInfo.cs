@@ -98,8 +98,14 @@ public readonly struct ModInfo
         }
         catch (Exception e)
         {
-            Multiplayer.LogException("Failed to deserialize mod data", e);
-            return [];
+            // Try legacy format: comma-separated string of mod names
+            var modNames = json.Split(',')
+                .Select(m => m.Trim())
+                .Where(m => !string.IsNullOrEmpty(m))
+                .Select(m => new ModInfo(m, "Unknown", ""))
+                .ToArray();
+
+            return modNames;
         }
     }
 }
