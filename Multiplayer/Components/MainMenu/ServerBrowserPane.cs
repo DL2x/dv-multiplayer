@@ -71,10 +71,9 @@ namespace Multiplayer.Components.MainMenu
         private TextMeshProUGUI serverName;
         private TextMeshProUGUI detailsPane;
         private GameObject navigationButtonPrefab;
-        private Transform modsContainer;
+        private Transform detailsContent;
         private CollapsibleElement elementRequiredMods;
         private CollapsibleElement elementExtraMods;
-
 
         // Remote server tracking
         private readonly List<IServerBrowserGameDetails> remoteServers = [];
@@ -274,7 +273,8 @@ namespace Multiplayer.Components.MainMenu
             // Create Content
             GameObject.Destroy(serverScroll.FindChildByName("GRID VIEW").gameObject);
             GameObject content = new("Content", typeof(RectTransform), typeof(ContentSizeFitter), typeof(VerticalLayoutGroup));
-            content.transform.SetParent(viewport.transform, false);
+            detailsContent = content.transform;
+            detailsContent.SetParent(viewport.transform, false);
             ContentSizeFitter contentSF = content.GetComponent<ContentSizeFitter>();
             contentSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             VerticalLayoutGroup contentVLG = content.GetComponent<VerticalLayoutGroup>();
@@ -287,22 +287,17 @@ namespace Multiplayer.Components.MainMenu
             contentRT.offsetMin = Vector2.zero;
             contentRT.offsetMax = Vector2.zero;
             scrollRect.content = contentRT;
-
-            // Create TextMeshProUGUI object
-            GameObject textContainerGO = new("Details Container", typeof(HorizontalLayoutGroup));
-            textContainerGO.transform.SetParent(content.transform, false);
             contentRT.localPosition = new Vector3(contentRT.localPosition.x + 10, contentRT.localPosition.y, contentRT.localPosition.z);
 
-
+            // Create TextMeshProUGUI object
             GameObject textGO = new("Details Text", typeof(TextMeshProUGUI));
-            textGO.transform.SetParent(textContainerGO.transform, false);
-            HorizontalLayoutGroup textHLG = textGO.GetComponent<HorizontalLayoutGroup>();
+            textGO.transform.SetParent(contentRT.transform, false);
             detailsPane = textGO.GetComponent<TextMeshProUGUI>();
             detailsPane.textWrappingMode = TextWrappingModes.Normal;
             detailsPane.fontSize = 18;
             detailsPane.text = Locale.Get(Locale.SERVER_BROWSER__INFO_CONTENT_KEY, [AUTO_REFRESH_TIME, REFRESH_MIN_TIME]);// "Welcome to Derail Valley Multiplayer Mod!<br><br>The server list refreshes automatically every 30 seconds, but you can refresh manually once every 10 seconds.";
 
-            SetupModsGroup(content);
+            SetupModsGroup();
 
             // Adjust text RectTransform to fit content
             RectTransform textRT = textGO.GetComponent<RectTransform>();
@@ -314,7 +309,6 @@ namespace Multiplayer.Components.MainMenu
 
             // Set content size to fit text
             contentRT.sizeDelta = new Vector2(contentRT.sizeDelta.x - 50, detailsPane.preferredHeight);
-
 
             // Update buttons on the multiplayer pane
             GameObject goDirectIP = this.gameObject.UpdateButton("ButtonTextIcon Overwrite", "ButtonTextIcon Manual", Locale.SERVER_BROWSER__MANUAL_CONNECT_KEY, null, Multiplayer.AssetIndex.multiplayerIcon);
@@ -367,7 +361,7 @@ namespace Multiplayer.Components.MainMenu
             serverGridView.Clear();
         }
 
-        private void SetupModsGroup(GameObject content)
+        private void SetupModsGroup()
         {
             ManualController manualController = MainMenuControllerPatch.MainMenuControllerInstance.GetComponentInChildren<ManualController>(true);
             if (manualController == null)
@@ -375,14 +369,6 @@ namespace Multiplayer.Components.MainMenu
                 Multiplayer.LogError("SetupModsGroup() ManualController not found");
                 return;
             }
-
-            GameObject navigationPrefab = manualController.gameObject.FindChildByName("Navigation");
-            GameObject navigationGroup = Instantiate(navigationPrefab, content.transform);
-            navigationGroup.name = "Mods Container";
-            modsContainer = navigationGroup.transform;
-
-            foreach (GameObject child in navigationGroup.GetChildren())
-                GameObject.Destroy(child);
 
             navigationButtonPrefab = manualController.navigationButtonPrefab;
 
@@ -398,7 +384,7 @@ namespace Multiplayer.Components.MainMenu
         private CollapsibleElement CreateModElement(string label, CollapsibleElement parent = null)
         {
             // Container for required mods
-            RectTransform rt = Instantiate(navigationButtonPrefab, modsContainer).GetComponent<RectTransform>();
+            RectTransform rt = Instantiate(navigationButtonPrefab, detailsContent).GetComponent<RectTransform>();
 
             CollapsibleElement element = rt.GetComponent<CollapsibleElement>();
             CollapsibleElementVisualController controller = rt.GetComponent<CollapsibleElementVisualController>();
@@ -576,7 +562,7 @@ namespace Multiplayer.Components.MainMenu
                 details.Append(FORMAT_ALPHA + Locale.SERVER_BROWSER__PLAYERS + ":</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>");
                 details.Append(FORMAT_ALPHA + Locale.SERVER_BROWSER__PASSWORD_REQUIRED + ":</color> " + (selectedServer.HasPassword ? Locale.SERVER_BROWSER__YES : Locale.SERVER_BROWSER__NO) + "<br>");
                 details.Append(FORMAT_ALPHA + Locale.SERVER_BROWSER__GAME_VERSION + ":</color> " + (selectedServer.GameVersion != MainMenuControllerPatch.MenuProvider.BuildVersionString ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>");
-                details.Append(selectedServer.ServerDetails);
+                details.Append($"{FORMAT_ALPHA}{Locale.SERVER_HOST_DETAILS}:<br>" + selectedServer.ServerDetails);
 
                 if (selectedServer.ServerDetails != null && selectedServer.ServerDetails.Length > 0)
                     details.Append("<br>");
@@ -656,11 +642,11 @@ namespace Multiplayer.Components.MainMenu
                 if (modsOk)
                 {
                     elementRequiredMods.Collapse(false);
-                    elementExtraMods.SetText($"{Locale.SERVER_BROWSER__REQUIRED_MODS}: {Locale.SERVER_BROWSER__OK}");
+                    elementExtraMods.SetText($"{FORMAT_ALPHA}{Locale.SERVER_BROWSER__REQUIRED_MODS}: {Locale.SERVER_BROWSER__OK}");
                 }
                 else
                 {
-                    elementRequiredMods.SetText($"{Locale.SERVER_BROWSER__REQUIRED_MODS}");
+                    elementRequiredMods.SetText($"{FORMAT_ALPHA}{Locale.SERVER_BROWSER__REQUIRED_MODS}");
                 }
             }
 
@@ -719,11 +705,11 @@ namespace Multiplayer.Components.MainMenu
                 if (modsOk)
                 {
                     elementExtraMods.Collapse(false);
-                    elementExtraMods.SetText($"{Locale.SERVER_BROWSER__EXTRA_MODS}: {Locale.SERVER_BROWSER__OK}");
+                    elementExtraMods.SetText($"{FORMAT_ALPHA}{Locale.SERVER_BROWSER__EXTRA_MODS}: {Locale.SERVER_BROWSER__OK}");
                 }
                 else
                 {
-                    elementExtraMods.SetText($"{Locale.SERVER_BROWSER__EXTRA_MODS}");
+                    elementExtraMods.SetText($"{FORMAT_ALPHA}{Locale.SERVER_BROWSER__EXTRA_MODS}");
                 }
             }
 
