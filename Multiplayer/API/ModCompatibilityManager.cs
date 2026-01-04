@@ -167,7 +167,8 @@ public class ModCompatibilityManager : SingletonBehaviour<ModCompatibilityManage
 
                     case MultiplayerCompatibility.Incompatible:
                         //There shouldn't be any at this stage
-                        return null;
+                        localMods.Add(modInfo);
+                        break;
 
                     case MultiplayerCompatibility.Host:
                     case MultiplayerCompatibility.Client:
