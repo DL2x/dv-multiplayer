@@ -11,7 +11,7 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
     {
         public override bool IsPlaceholder => true;
 
-        protected override void Awake()
+        public override void Awake()
         {
             // Find and assign TextMeshProUGUI components for displaying server details
             GameObject networkNameGO = this.FindChildByName("name [noloc]");

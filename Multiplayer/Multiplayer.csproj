@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net48</TargetFramework>
         <LangVersion>latest</LangVersion>
@@ -22,6 +22,7 @@
         <Publicize Include="DV.Utils:HingeJointAngleFix.angleRange" />
         <Publicize Include="DV.Utils:HingeJointAngleFix.startRotationInverse" />
         <Publicize Include="DV.UI" IncludeCompilerGeneratedMembers="false" />
+        <Publicize Include="DV.UIFramework" IncludeCompilerGeneratedMembers="false" />
         <Publicize Include="Facepunch.Steamworks.Win64" IncludeCompilerGeneratedMembers="false" />
     </ItemGroup>
     
