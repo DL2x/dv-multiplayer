@@ -49,9 +49,9 @@ namespace Multiplayer
         public static string SERVER_BROWSER__TITLE => Get(SERVER_BROWSER__TITLE_KEY);
         public const string SERVER_BROWSER__TITLE_KEY = $"{PREFIX_SERVER_BROWSER}/title";
         public static string SERVER_BROWSER__MANUAL_CONNECT => Get(SERVER_BROWSER__MANUAL_CONNECT_KEY);
-        public const string SERVER_BROWSER__MANUAL_CONNECT_KEY = $"{PREFIX_SERVER_BROWSER}/manual_connect";        
+        public const string SERVER_BROWSER__MANUAL_CONNECT_KEY = $"{PREFIX_SERVER_BROWSER}/manual_connect";
         public static string SERVER_BROWSER__HOST => Get(SERVER_BROWSER__HOST_KEY);
-        public const string SERVER_BROWSER__HOST_KEY = $"{PREFIX_SERVER_BROWSER}/host";                
+        public const string SERVER_BROWSER__HOST_KEY = $"{PREFIX_SERVER_BROWSER}/host";
         public static string SERVER_BROWSER__REFRESH => Get(SERVER_BROWSER__REFRESH_KEY);
         public const string SERVER_BROWSER__REFRESH_KEY = $"{PREFIX_SERVER_BROWSER}/refresh";
         public static string SERVER_BROWSER__JOIN => Get(SERVER_BROWSER__JOIN_KEY);
@@ -80,6 +80,20 @@ namespace Multiplayer
         private const string SERVER_BROWSER__YES_KEY = $"{PREFIX_SERVER_BROWSER}/yes";
         public static string SERVER_BROWSER__NO => Get(SERVER_BROWSER__NO_KEY);
         private const string SERVER_BROWSER__NO_KEY = $"{PREFIX_SERVER_BROWSER}/no";
+        public static string SERVER_BROWSER__OK => Get(SERVER_BROWSER__OK_KEY);
+        private const string SERVER_BROWSER__OK_KEY = $"{PREFIX_SERVER_BROWSER}/ok";
+        public static string SERVER_BROWSER__MISMATCH => Get(SERVER_BROWSER__MISMATCH_KEY);
+        private const string SERVER_BROWSER__MISMATCH_KEY = $"{PREFIX_SERVER_BROWSER}/mismatch";
+        public static string SERVER_BROWSER__MISSING => Get(SERVER_BROWSER__MISSING_KEY);
+        private const string SERVER_BROWSER__MISSING_KEY = $"{PREFIX_SERVER_BROWSER}/missing";
+        public static string SERVER_BROWSER__REQUIRED_MODS => Get(SERVER_BROWSER__REQUIRED_MODS_KEY);
+        private const string SERVER_BROWSER__REQUIRED_MODS_KEY = $"{PREFIX_SERVER_BROWSER}/required_mods";
+        public static string SERVER_BROWSER__EXTRA_MODS => Get(SERVER_BROWSER__EXTRA_MODS_KEY);
+        private const string SERVER_BROWSER__EXTRA_MODS_KEY = $"{PREFIX_SERVER_BROWSER}/extra_mods";
+        public static string SERVER_BROWSER__INCOMPATIBLE => Get(SERVER_BROWSER__INCOMPATIBLE_KEY);
+        private const string SERVER_BROWSER__INCOMPATIBLE_KEY = $"{PREFIX_SERVER_BROWSER}/incompatible";
+        public static string SERVER_BROWSER__EXTRA_MOD => Get(SERVER_BROWSER__EXTRA_MOD_KEY);
+        private const string SERVER_BROWSER__EXTRA_MOD_KEY = $"{PREFIX_SERVER_BROWSER}/extra_mod";
         public static string SERVER_BROWSER__NO_SERVERS => Get(SERVER_BROWSER__NO_SERVERS_KEY);
         public const string SERVER_BROWSER__NO_SERVERS_KEY = $"{PREFIX_SERVER_BROWSER}/no_servers";
         public static string SERVER_BROWSER__INFO_TITLE => Get(SERVER_BROWSER__INFO_TITLE_KEY);
@@ -99,8 +113,8 @@ namespace Multiplayer
         public const string SERVER_HOST_PUBLIC_KEY = $"{PREFIX_SERVER_HOST}/public";
         public static string SERVER_HOST_VISIBILITY => Get(SERVER_HOST_PUBLIC_KEY);
         public const string SERVER_HOST_VISIBILITY_KEY = $"{PREFIX_SERVER_HOST}/visibility";
-       // public static string SERVER_HOST_VISIBILITY_MODES => Get(SERVER_HOST_VISIBILITY_MODES_KEY);
-        public static string[] SERVER_HOST_VISIBILITY_MODES = [$"{SERVER_HOST_VISIBILITY_MODES_KEY}/private" , $"{SERVER_HOST_VISIBILITY_MODES_KEY}/friends",$"{SERVER_HOST_VISIBILITY_MODES_KEY}/public"];
+
+        public static string[] SERVER_HOST_VISIBILITY_MODES = [$"{SERVER_HOST_VISIBILITY_MODES_KEY}/private", $"{SERVER_HOST_VISIBILITY_MODES_KEY}/friends", $"{SERVER_HOST_VISIBILITY_MODES_KEY}/public"];
         public const string SERVER_HOST_VISIBILITY_MODES_KEY = $"{PREFIX_SERVER_HOST}/visibility/modes";
         public static string SERVER_HOST_DETAILS => Get(SERVER_HOST_DETAILS_KEY);
         public const string SERVER_HOST_DETAILS_KEY = $"{PREFIX_SERVER_HOST}/details";

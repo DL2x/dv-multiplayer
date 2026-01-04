@@ -1,7 +1,7 @@
-using UnityEngine;
-using TMPro;
-using UnityEngine.EventSystems;
 using System.Text.RegularExpressions;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace Multiplayer.Components.Util
 {
@@ -20,24 +20,41 @@ namespace Multiplayer.Components.Util
         private int hoveredLinkIndex = -1;
         private bool underlineLinks = true;
 
+        protected void Awake()
+        {
+            InitializeComponents();
+        }
+
         protected void Start()
+        {
+            InitializeComponents();
+            ApplyLinkStyling();
+        }
+
+        private void InitializeComponents()
         {
             if (textComponent == null)
             {
                 textComponent = GetComponent<TextMeshProUGUI>();
+
+                textComponent.raycastTarget = true;
             }
 
-            canvas = GetComponentInParent<Canvas>();
-            if (canvas != null)
+            if (canvas == null)
             {
-                canvasCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+                canvas = GetComponentInParent<Canvas>();
+                if (canvas != null)
+                {
+                    canvasCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+                }
             }
-
-            ApplyLinkStyling();
         }
 
         protected void Update()
         {
+            if (textComponent == null || canvas == null)
+                return;
+
             int linkIndex = TMP_TextUtilities.FindIntersectingLink(textComponent, Input.mousePosition, canvasCamera);
 
             if (linkIndex != -1 && linkIndex != hoveredLinkIndex)
@@ -61,18 +78,26 @@ namespace Multiplayer.Components.Util
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            if (textComponent == null)
+                return;
+
+            Multiplayer.LogDebug(() => $"HyperlinkHandler.OnPointerClick() mouse pos: {Input.mousePosition}");
             int linkIndex = TMP_TextUtilities.FindIntersectingLink(textComponent, Input.mousePosition, canvasCamera);
 
             if (linkIndex != -1)
             {
                 TMP_LinkInfo linkInfo = textComponent.textInfo.linkInfo[linkIndex];
                 string url = linkInfo.GetLinkID();
+                Multiplayer.LogDebug(() => $"HyperlinkHandler: Opening URL: {url}");
                 Application.OpenURL(url);
             }
         }
 
         public void ApplyLinkStyling()
         {
+            if (textComponent == null)
+                return;
+
             string text = textComponent.text;
             string pattern = @"<link=""([^""]+)"">(.*?)<\/link>";
             string replacement = underlineLinks

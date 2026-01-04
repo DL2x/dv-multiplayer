@@ -1,6 +1,7 @@
 using DV.Localization;
 using DV.Platform.Steam;
 using DV.UI;
+using DV.UI.Manual;
 using DV.UIFramework;
 using DV.Utils;
 using LiteNetLib;
@@ -25,11 +26,15 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Color = UnityEngine.Color;
 
 namespace Multiplayer.Components.MainMenu
 {
+
     public class ServerBrowserPane : MonoBehaviour
     {
+        private const string FORMAT_ALPHA = "<alpha=#50>";
+
         private enum ConnectionState
         {
             NotConnected,
@@ -49,25 +54,29 @@ namespace Multiplayer.Components.MainMenu
         private const int MIN_PORT = 1024;
         private const int MAX_PORT = 49151;
 
-        //Gridview variables
+        // Gridview variables
         private ServerBrowserGridView serverGridView;
         private IServerBrowserGameDetails selectedServer;
 
-        //ping tracking
+        // Ping tracking
         private float pingTimer = 0f;
         private const float PING_INTERVAL = 2f; // base interval to refresh all pings
 
-        //Button variables
+        // Button variables
         private ButtonDV buttonJoin;
         private ButtonDV buttonRefresh;
         private ButtonDV buttonDirectIP;
 
-        //Misc GUI Elements
+        // Misc GUI Elements
         private TextMeshProUGUI serverName;
         private TextMeshProUGUI detailsPane;
-        private HyperlinkHandler modHyperlinkHandler;
+        private GameObject navigationButtonPrefab;
+        private Transform modsContainer;
+        private CollapsibleElement elementRequiredMods;
+        private CollapsibleElement elementExtraMods;
 
-        //Remote server tracking
+
+        // Remote server tracking
         private readonly List<IServerBrowserGameDetails> remoteServers = [];
         private bool serverRefreshing = false;
         private float timePassed = 0f; //time since last refresh
@@ -75,7 +84,7 @@ namespace Multiplayer.Components.MainMenu
         private const int REFRESH_MIN_TIME = 10; //Stop refresh spam
         private bool remoteRefreshComplete;
 
-        //connection parameters
+        // Connection parameters
         private string address;
         private int portNumber;
         private Lobby? selectedLobby;
@@ -293,6 +302,8 @@ namespace Multiplayer.Components.MainMenu
             detailsPane.fontSize = 18;
             detailsPane.text = Locale.Get(Locale.SERVER_BROWSER__INFO_CONTENT_KEY, [AUTO_REFRESH_TIME, REFRESH_MIN_TIME]);// "Welcome to Derail Valley Multiplayer Mod!<br><br>The server list refreshes automatically every 30 seconds, but you can refresh manually once every 10 seconds.";
 
+            SetupModsGroup(content);
+
             // Adjust text RectTransform to fit content
             RectTransform textRT = textGO.GetComponent<RectTransform>();
             textRT.pivot = new Vector2(0.5f, 1f);
@@ -304,11 +315,6 @@ namespace Multiplayer.Components.MainMenu
             // Set content size to fit text
             contentRT.sizeDelta = new Vector2(contentRT.sizeDelta.x - 50, detailsPane.preferredHeight);
 
-            // Enable hyperlink parsing
-            modHyperlinkHandler = textGO.GetOrAddComponent<HyperlinkHandler>();
-
-            modHyperlinkHandler.linkColor = new UnityEngine.Color(0.302f, 0.651f, 1f); // #4DA6FF
-            modHyperlinkHandler.linkHoverColor = new UnityEngine.Color(0.498f, 0.749f, 1f); // #7FBFFF
 
             // Update buttons on the multiplayer pane
             GameObject goDirectIP = this.gameObject.UpdateButton("ButtonTextIcon Overwrite", "ButtonTextIcon Manual", Locale.SERVER_BROWSER__MANUAL_CONNECT_KEY, null, Multiplayer.AssetIndex.multiplayerIcon);
@@ -335,6 +341,7 @@ namespace Multiplayer.Components.MainMenu
             //Lock out the join button until a server has been selected
             buttonJoin.ToggleInteractable(false);
         }
+
         private void SetupServerBrowser()
         {
             GameObject GridviewGO = this.FindChildByName("Scroll View").FindChildByName("GRID VIEW");
@@ -359,15 +366,102 @@ namespace Multiplayer.Components.MainMenu
             GridviewGO.SetActive(true);
             serverGridView.Clear();
         }
+
+        private void SetupModsGroup(GameObject content)
+        {
+            ManualController manualController = MainMenuControllerPatch.MainMenuControllerInstance.GetComponentInChildren<ManualController>(true);
+            if (manualController == null)
+            {
+                Multiplayer.LogError("SetupModsGroup() ManualController not found");
+                return;
+            }
+
+            GameObject navigationPrefab = manualController.gameObject.FindChildByName("Navigation");
+            GameObject navigationGroup = Instantiate(navigationPrefab, content.transform);
+            navigationGroup.name = "Mods Container";
+            modsContainer = navigationGroup.transform;
+
+            foreach (GameObject child in navigationGroup.GetChildren())
+                GameObject.Destroy(child);
+
+            navigationButtonPrefab = manualController.navigationButtonPrefab;
+
+            elementRequiredMods = CreateModElement($"{FORMAT_ALPHA}{Locale.SERVER_BROWSER__REQUIRED_MODS}");
+            elementRequiredMods.name = "Required Mods";
+            elementRequiredMods.Collapse(true);
+
+            elementExtraMods = CreateModElement($"{FORMAT_ALPHA}{Locale.SERVER_BROWSER__EXTRA_MODS}");
+            elementExtraMods.name = "Extra Mods";
+            elementExtraMods.Collapse(true);
+        }
+
+        private CollapsibleElement CreateModElement(string label, CollapsibleElement parent = null)
+        {
+            // Container for required mods
+            RectTransform rt = Instantiate(navigationButtonPrefab, modsContainer).GetComponent<RectTransform>();
+
+            CollapsibleElement element = rt.GetComponent<CollapsibleElement>();
+            CollapsibleElementVisualController controller = rt.GetComponent<CollapsibleElementVisualController>();
+
+            controller.categoryTextColor = Color.white;
+            controller.articleTextColor = Color.white;
+            controller.collapseIndicatorImage.color = new(1f, 1f, 1f, 0x50 / 255f);
+
+            element.SetText(label);
+
+            if (parent != null)
+            {
+                var last = parent.childElements.LastOrDefault() ?? parent;
+                element.transform.SetSiblingIndex(last.transform.GetSiblingIndex() + 1);
+                parent.AddChild(element);
+
+                // Remove the Button to allow the hyperlink handler to work
+                Component.Destroy(element.GetComponentInChildren<ButtonDV>(true));
+
+                //// Enable hyperlink parsing
+                HyperlinkHandler modHyperlinkHandler = controller.elementText.GetOrAddComponent<HyperlinkHandler>();
+                modHyperlinkHandler.linkColor = new UnityEngine.Color(0.302f, 0.651f, 1f); // #4DA6FF
+                modHyperlinkHandler.linkHoverColor = new UnityEngine.Color(0.498f, 0.749f, 1f); // #7FBFFF
+                modHyperlinkHandler.ApplyLinkStyling();
+            }
+
+            return element;
+        }
+
+        private void ClearModElements(CollapsibleElement parent)
+        {
+            if (parent == null)
+                return;
+
+            parent.Collapse(true);
+
+            if (parent.childElements.Count == 0)
+                return;
+
+            foreach (var element in parent.childElements)
+                GameObject.Destroy(element.gameObject);
+
+            parent.childElements.Clear();
+        }
+
+        private void CollapsibleElementClicked(CollapsibleElement element)
+        {
+            element.Toggle();
+        }
+
         private void SetupListeners(bool on)
         {
             if (on)
             {
                 serverGridView.SelectedIndexChanged += this.OnSelectedIndexChanged;
+                elementRequiredMods.CollapsibleElementClicked += CollapsibleElementClicked;
+                elementExtraMods.CollapsibleElementClicked += CollapsibleElementClicked;
             }
             else
             {
                 serverGridView.SelectedIndexChanged -= this.OnSelectedIndexChanged;
+                elementRequiredMods.CollapsibleElementClicked -= CollapsibleElementClicked;
+                elementExtraMods.CollapsibleElementClicked -= CollapsibleElementClicked;
             }
         }
         #endregion
@@ -462,7 +556,6 @@ namespace Multiplayer.Components.MainMenu
             {
                 var viewElement = serverGridView.GetElementAt(index) as ServerBrowserElement;
                 viewElement?.UpdateView();
-
             }
         }
         #endregion
@@ -470,17 +563,69 @@ namespace Multiplayer.Components.MainMenu
         private void UpdateDetailsPane()
         {
             StringBuilder details = new();
-            StringBuilder modDetails = new("<alpha=#50>Mods:</color>");
 
-            var localMods = ModCompatibilityManager.Instance.GetLocalMods();
+            if (selectedServer != null)
+            {
+                serverName.text = selectedServer.Name;
+
+                // Note: built-in localisations have a trailing colon e.g. 'Game mode:'
+
+                details.Append(FORMAT_ALPHA + LocalizationAPI.L("launcher/game_mode", []) + "</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>");
+                details.Append(FORMAT_ALPHA + LocalizationAPI.L("launcher/difficulty", []) + "</color> " + LobbyServerData.GetDifficultyFromInt(selectedServer.Difficulty) + "<br>");
+                details.Append(FORMAT_ALPHA + LocalizationAPI.L("launcher/in_game_time_passed", []) + "</color> " + selectedServer.TimePassed + "<br>");
+                details.Append(FORMAT_ALPHA + Locale.SERVER_BROWSER__PLAYERS + ":</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>");
+                details.Append(FORMAT_ALPHA + Locale.SERVER_BROWSER__PASSWORD_REQUIRED + ":</color> " + (selectedServer.HasPassword ? Locale.SERVER_BROWSER__YES : Locale.SERVER_BROWSER__NO) + "<br>");
+                details.Append(FORMAT_ALPHA + Locale.SERVER_BROWSER__GAME_VERSION + ":</color> " + (selectedServer.GameVersion != MainMenuControllerPatch.MenuProvider.BuildVersionString ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>");
+                details.Append(selectedServer.ServerDetails);
+
+                if (selectedServer.ServerDetails != null && selectedServer.ServerDetails.Length > 0)
+                    details.Append("<br>");
+
+                detailsPane.text = details.ToString();
+
+                // Build mod lists
+                ClearModElements(elementRequiredMods);
+                ClearModElements(elementExtraMods);
+
+                var localMods = ModCompatibilityManager.Instance.GetLocalMods();
+
+                BuildServerMods(selectedServer.RequiredMods, localMods);
+                BuildLocalMods(localMods);
+            }
+            else
+            {
+                serverName.text = Locale.SERVER_BROWSER__INFO_TITLE;// "Server Browser Info";
+                detailsPane.text = Locale.Get(Locale.SERVER_BROWSER__INFO_CONTENT_KEY, [AUTO_REFRESH_TIME, REFRESH_MIN_TIME]);// "Welcome to Derail Valley Multiplayer Mod!<br><br>The server list refreshes automatically every 30 seconds, but you can refresh manually once every 10 seconds.";
+
+                ClearModElements(elementRequiredMods);
+                ClearModElements(elementExtraMods);
+            }
+
+        }
+
+        /// <summary>
+        /// Validates the client has all required mods for the server and the versions match.
+        /// Populates the mod details list.
+        /// </summary>
+        /// <param name="serverMods"></param>
+        /// <param name="localMods"></param>
+        /// <param name="modDetails"></param>
+        /// <returns>true if all required mods are present and have correct versions, false if any mods are missing or there is a version mismatch.</returns>
+        private bool BuildServerMods(ModInfo[] serverMods, ModInfo[] localMods)
+        {
+            bool modsOk = true;
+
+            if (serverMods == null || localMods == null)
+            {
+                Multiplayer.LogWarning("BuildServerMods() called with null serverMods or localMods");
+                return false;
+            }
 
             if (selectedServer.RequiredMods != null && selectedServer.RequiredMods.Length > 0)
             {
-                var modData = selectedServer.RequiredMods; // ModInfo.DeserializeRequiredMods(selectedServer.RequiredMods);
+                Multiplayer.LogDebug(() => $"Parsed {serverMods?.Length} mods from server \"{selectedServer?.Name}\"");
 
-                Multiplayer.LogDebug(() => $"Parsed {modData?.Length} mods from server \"{selectedServer?.Name}\"");
-
-                foreach (var mod in modData)
+                foreach (var mod in serverMods)
                 {
                     ModInfo modMatch = localMods.FirstOrDefault(l => l.Id == mod.Id);
 
@@ -489,69 +634,100 @@ namespace Multiplayer.Components.MainMenu
                     bool modFound = modMatch.Id == mod.Id;
                     bool modVersionMatch = modFound && modMatch.Version == mod.Version;
 
+                    modsOk &= modVersionMatch;
+
                     string status;
                     if (modFound && modVersionMatch)
-                        status = "<color=\"green\">OK</color>";
+                        status = $"<color=\"green\">{Locale.SERVER_BROWSER__OK}</color>";
                     else if (modFound && !modVersionMatch)
-                        status = "<color=\"red\">Version Mismatch</color>";
+                        status = $"<color=\"red\">{Locale.SERVER_BROWSER__MISMATCH}</color>";
                     else
-                        status = "<color=\"red\">Missing</color>";
+                        status = $"<color=\"red\">{Locale.SERVER_BROWSER__MISSING}</color>";
 
                     var link = !string.IsNullOrEmpty(mod.Url) ? $"<link=\"{mod.Url}\">{mod.Id}</link>" : mod.Id;
 
-                    modDetails.Append($"<br><alpha=#50>{link} ({mod.Version}) - {status}</color>");
+                    var element = CreateModElement(mod.Id, elementRequiredMods);
+                    element.isLeaf = true;
+                    element.SetText($"{link} ({mod.Version}) - {status}</color>");
                 }
-                Multiplayer.LogDebug(() => $"Mod details for server \"{selectedServer.Name}\":\r\n{modDetails.ToString()}");
 
-                var extraMods = localMods.Where(l => !modData.Any(m => m.Id == l.Id)).ToArray();
-                Multiplayer.LogDebug(() => $"Found {extraMods.Length} extra mods on client for server \"{selectedServer.Name}\"");
+                elementRequiredMods.Expand(false);
 
-                if (extraMods.Length > 0)
+                if (modsOk)
                 {
-                    foreach (var mod in extraMods)
-                    {
-                        var compatibility = ModCompatibilityManager.Instance.GetCompatibility(mod);
-                        if (compatibility == MultiplayerCompatibility.Incompatible)
-                        {
-                            modDetails.Append($"<br><alpha=#50>{mod.Id} ({mod.Version}) - <color=\"red\">Incompatible</color></color>");
-                        }
-                        else if (compatibility == MultiplayerCompatibility.Undefined || compatibility == MultiplayerCompatibility.All)
-                        {
-                            modDetails.Append($"<br><alpha=#50>{mod.Id} ({mod.Version}) - <color=\"red\">Extra Mod</color></color>");
-                        }
-                    }
+                    elementRequiredMods.Collapse(false);
+                    elementExtraMods.SetText($"{Locale.SERVER_BROWSER__REQUIRED_MODS}: {Locale.SERVER_BROWSER__OK}");
+                }
+                else
+                {
+                    elementRequiredMods.SetText($"{Locale.SERVER_BROWSER__REQUIRED_MODS}");
                 }
             }
-            Multiplayer.LogDebug(() => $"Finished compiling mod details for server \"{selectedServer.Name}\"");
-            Multiplayer.LogDebug(() => $"Version: {MainMenuControllerPatch.MenuProvider.BuildVersionString}");
-            if (selectedServer != null)
+
+            return modsOk;
+        }
+
+        /// <summary>
+        /// Validates the client does not have any mods that the server is not running and does not have any mods incompatible with Multiplayer.
+        /// Populates the mod details list.
+        /// </summary>
+        /// <param name="serverMods"></param>
+        /// <param name="localMods"></param>
+        /// <param name="modDetails"></param>
+        /// <returns>true if there are no conflicting mods, false if any mods can not be used with this server.</returns>
+        private bool BuildLocalMods(ModInfo[] localMods)
+        {
+            bool modsOk = true;
+
+            if (localMods == null || selectedServer?.RequiredMods == null)
             {
-                serverName.text = selectedServer.Name;
-
-                //note: built-in localisations have a trailing colon e.g. 'Game mode:'
-
-                details.Append("<alpha=#50>" + LocalizationAPI.L("launcher/game_mode", []) + "</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>");
-                details.Append("<alpha=#50>" + LocalizationAPI.L("launcher/difficulty", []) + "</color> " + LobbyServerData.GetDifficultyFromInt(selectedServer.Difficulty) + "<br>");
-                details.Append("<alpha=#50>" + LocalizationAPI.L("launcher/in_game_time_passed", []) + "</color> " + selectedServer.TimePassed + "<br>");
-                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__PLAYERS + ":</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>");
-                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__PASSWORD_REQUIRED + ":</color> " + (selectedServer.HasPassword ? Locale.SERVER_BROWSER__YES : Locale.SERVER_BROWSER__NO) + "<br>");
-                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__MODS_REQUIRED + ":</color> " + ((selectedServer.RequiredMods != null && selectedServer.RequiredMods.Length > 0) ? Locale.SERVER_BROWSER__NO : Locale.SERVER_BROWSER__YES) + "<br>");
-                details.Append("<br>");
-                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__GAME_VERSION + ":</color> " + (selectedServer.GameVersion != MainMenuControllerPatch.MenuProvider.BuildVersionString ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>");
-                details.Append("<alpha=#50>" + Locale.SERVER_BROWSER__MOD_VERSION + ":</color> " + (selectedServer.MultiplayerVersion != Multiplayer.Ver ? "<color=\"red\">" : "") + selectedServer.MultiplayerVersion + "</color><br>");
-                details.Append("<br>");
-                details.Append(selectedServer.ServerDetails);
-
-                if (selectedServer.ServerDetails != null && selectedServer.ServerDetails.Length > 0)
-                    details.Append("<br>");
-
-                details.Append(modDetails.ToString());
-
-                //Multiplayer.Log("Finished Prepping Data");
-                detailsPane.text = details.ToString();
-
-                modHyperlinkHandler.ApplyLinkStyling();
+                Multiplayer.LogWarning($"BuildLocalMods() localMods is null: {localMods == null}, requiredMods is null: {selectedServer?.RequiredMods == null}");
+                return false;
             }
+
+            var extraMods = localMods.Where(l => !selectedServer.RequiredMods.Any(m => m.Id == l.Id)).ToArray();
+            Multiplayer.LogDebug(() => $"Found {extraMods.Length} extra mods on client for server \"{selectedServer.Name}\"");
+
+            if (extraMods.Length > 0)
+            {
+                string status;
+                foreach (var mod in extraMods)
+                {
+                    var compatibility = ModCompatibilityManager.Instance.GetCompatibility(mod);
+                    if (compatibility == MultiplayerCompatibility.Incompatible)
+                    {
+                        status = $"<color=\"red\">{Locale.SERVER_BROWSER__INCOMPATIBLE}</color>";
+                        modsOk = false;
+                    }
+                    else if (compatibility == MultiplayerCompatibility.Undefined || compatibility == MultiplayerCompatibility.All)
+                    {
+                        status = $"<color=\"red\">{Locale.SERVER_BROWSER__EXTRA_MOD}</color>";
+                        modsOk = false;
+                    }
+                    else
+                    {
+                        status = $"<color=\"green\">{Locale.SERVER_BROWSER__OK}</color>";
+                    }
+
+                    var element = CreateModElement(mod.Id, elementExtraMods);
+                    element.isLeaf = true;
+                    element.SetText($"{mod.Id} ({mod.Version}) - {status}");
+                }
+
+                elementExtraMods.Expand(false);
+
+                if (modsOk)
+                {
+                    elementExtraMods.Collapse(false);
+                    elementExtraMods.SetText($"{Locale.SERVER_BROWSER__EXTRA_MODS}: {Locale.SERVER_BROWSER__OK}");
+                }
+                else
+                {
+                    elementExtraMods.SetText($"{Locale.SERVER_BROWSER__EXTRA_MODS}");
+                }
+            }
+
+            return modsOk;
         }
 
         private void ShowIpPopup()
@@ -1002,6 +1178,7 @@ namespace Multiplayer.Components.MainMenu
             return null;
         }
         #endregion
+
         private void RefreshGridView()
         {
             // Get all active IDs
