@@ -108,7 +108,7 @@ public class NetworkedMapMarkersController : MonoBehaviour
 
             WorldMapIndicatorRefs refs = kvp.Value;
 
-            bool active = Globals.G.gameParams.PlayerMarkerDisplayed;
+            bool active = Globals.G.GameParams.PlayerMarkerDisplayed;
             if (refs.gameObject.activeSelf != active)
                 refs.gameObject.SetActive(active);
             if (!active)

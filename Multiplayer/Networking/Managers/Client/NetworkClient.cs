@@ -419,8 +419,8 @@ public class NetworkClient : NetworkManager
     private void OnClientboundGameParamsPacket(ClientboundGameParamsPacket packet)
     {
         LogDebug(() => $"Received {nameof(ClientboundGameParamsPacket)} ({packet.SerializedGameParams.Length} chars)");
-        if (Globals.G.gameParams != null)
-            packet.Apply(Globals.G.gameParams);
+        if (Globals.G.GameParams != null)
+            packet.Apply(Globals.G.GameParams);
         if (Globals.G.gameParamsInstance != null)
             packet.Apply(Globals.G.gameParamsInstance);
     }
