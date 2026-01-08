@@ -460,7 +460,6 @@ public class HostGamePane : MonoBehaviour
                 serverData.GameMode = LobbyServerData.GetGameModeFromString(startGameData.session.GameMode);
             }
 
-
             Multiplayer.Settings.ServerName = serverData.Name;
             Multiplayer.Settings.Password = password.text;
             Multiplayer.Settings.Visibility = serverData.Visibility;
@@ -468,13 +467,12 @@ public class HostGamePane : MonoBehaviour
             Multiplayer.Settings.MaxPlayers = serverData.MaxPlayers;
             Multiplayer.Settings.Details = serverData.ServerDetails;
 
-
-            //Pass the server data to the NetworkLifecycle manager
+            // Pass the server data to the NetworkLifecycle manager
             NetworkLifecycle.Instance.serverData = serverData;
         }
-        //Mark it as a real multiplayer game
-        NetworkLifecycle.Instance.IsSinglePlayer = false;
 
+        // Mark it as a real multiplayer game
+        NetworkLifecycle.Instance.IsSinglePlayer = false;
 
         var ContinueGameRequested = lcInstance.GetType().GetMethod("OnRunClicked", BindingFlags.NonPublic | BindingFlags.Instance);
 
