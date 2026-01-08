@@ -561,7 +561,8 @@ public class ServerBrowserPane : MonoBehaviour
             details.Append(FORMAT_ALPHA + Locale.SERVER_BROWSER__PLAYERS + ":</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>");
             details.Append(FORMAT_ALPHA + Locale.SERVER_BROWSER__PASSWORD_REQUIRED + ":</color> " + (selectedServer.HasPassword ? Locale.SERVER_BROWSER__PASSWORD_REQUIRED_YES : Locale.SERVER_BROWSER__PASSWORD_REQUIRED_NO) + "<br>");
             details.Append(FORMAT_ALPHA + Locale.SERVER_BROWSER__GAME_VERSION + ":</color> " + (selectedServer.GameVersion != MainMenuControllerPatch.MenuProvider.BuildVersionString ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>");
-            details.Append($"{FORMAT_ALPHA}{Locale.SERVER_HOST_DETAILS}:<br>" + selectedServer.ServerDetails);
+
+            details.Append(selectedServer.ServerDetails);
 
             if (selectedServer.ServerDetails != null && selectedServer.ServerDetails.Length > 0)
                 details.Append("<br>");
