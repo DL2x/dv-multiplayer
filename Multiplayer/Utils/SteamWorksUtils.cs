@@ -45,7 +45,7 @@ public static class SteamworksUtils
             if (SteamApps.IsAppInstalled(DVSteamworks.APP_ID))
                 Multiplayer.Log($"Found Steam Name: {username}, steamId {steamId}");
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Multiplayer.LogError($"Failed to obtain Steam user.\r\n{ex.StackTrace}");
         }
@@ -59,6 +59,19 @@ public static class SteamworksUtils
         foreach (var prop in properties)
         {
             var value = prop.GetValue(data)?.ToString() ?? "";
+            if (prop.Name == nameof(LobbyServerData.RequiredMods))
+            {
+                try
+                {
+                    value = Newtonsoft.Json.JsonConvert.SerializeObject((ModInfo[])prop.GetValue(data));
+                }
+                catch (Exception ex)
+                {
+                    Multiplayer.LogException($"SetLobbyData() Error serializing RequiredMods property", ex);
+                }
+
+                Multiplayer.LogDebug(() => $"SetLobbyData() Setting property: {prop.Name}, value: {value}");
+            }
             lobby.SetData(prop.Name, value);
         }
     }
@@ -75,6 +88,17 @@ public static class SteamworksUtils
             {
                 value = lobby.GetData(prop.Name);
                 if (string.IsNullOrEmpty(value)) continue;
+
+                Multiplayer.LogDebug(() => $"GetLobbyData() Retrieving property: {prop.Name}, value: {value}");
+
+                // Backward compatibility for non-JSON strings
+                if (prop.Name == nameof(LobbyServerData.RequiredMods))
+                {
+                    var mods = ModInfo.DeserializeRequiredMods(value);
+
+                    prop.SetValue(data, mods);
+                    continue;
+                }
 
                 if (prop.PropertyType.IsEnum)
                 {
@@ -121,7 +145,7 @@ public static class SteamworksUtils
         hasJoinedCL = true;
 
         //allow steamworks to initialise
-        yield return new WaitUntil(()=>{ return DVSteamworks.Success || (Time.deltaTime - time) > 5; });
+        yield return new WaitUntil(() => { return DVSteamworks.Success || (Time.deltaTime - time) > 5; });
 
         if (!DVSteamworks.Success)
             yield break;
@@ -184,10 +208,10 @@ public static class SteamworksUtils
 
             popup.Closed += (PopupResult result) =>
             {
-                Multiplayer.LogDebug(()=>$"Agreed to join: {result.closedBy}");
+                Multiplayer.LogDebug(() => $"Agreed to join: {result.closedBy}");
                 if (result.closedBy == PopupClosedByAction.Positive)
-                    QueueLobbyInvite(lobby); 
-            }; 
+                    QueueLobbyInvite(lobby);
+            };
 
         });
 

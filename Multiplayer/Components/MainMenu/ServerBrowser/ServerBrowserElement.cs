@@ -34,7 +34,7 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
         private const int PING_THRESHOLD_GOOD = 100;
         private const int PING_THRESHOLD_HIGH = 150;
 
-        protected override void Awake()
+        public override void Awake()
         {
             // Find and assign TextMeshProUGUI components for displaying server details
             serverName = this.FindChildByName("name [noloc]").GetComponent<TextMeshProUGUI>();

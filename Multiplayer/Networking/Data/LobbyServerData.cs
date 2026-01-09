@@ -8,7 +8,7 @@ namespace Multiplayer.Networking.Data
     {
         [JsonProperty("game_server_id")]
         public string id { get; set; }
- 
+
         public string ipv4 { get; set; }
         public string ipv6 { get; set; }
         public int port { get; set; }
@@ -155,21 +155,17 @@ namespace Multiplayer.Networking.Data
 
         public static void Serialize(NetDataWriter writer, LobbyServerData data)
         {
-            //Multiplayer.Log($"LobbyServerData.Serialize() {writer != null }, {data != null} ");
-
-            //have we got data?
+            // Data available flag
             writer.Put(data != null);
 
             if (data != null)
                 writer.Put(new NetSerializer().Serialize(data));
-
-            //Multiplayer.Log($"LobbyServerData.Serialize() {writer != null}, {data != null} POST");
-
         }
 
         public static LobbyServerData Deserialize(NetDataReader reader)
         {
-            if(reader.GetBool())
+            // Check data available flag
+            if (reader.GetBool())
                 return new NetSerializer().Deserialize<LobbyServerData>(reader);
             else
                 return null;

@@ -13,10 +13,9 @@ namespace Multiplayer.Patches.MainMenu;
 [HarmonyPatch(typeof(MainMenuController))]
 public static class MainMenuControllerPatch
 {
-    public static AMainMenuProvider MenuProvider => _mainMenuControllerInstance.provider;
+    public static AMainMenuProvider MenuProvider => MainMenuControllerInstance.provider;
     public static GameObject MultiplayerButton { get; private set; }
-
-    private static MainMenuController _mainMenuControllerInstance;
+    public static MainMenuController MainMenuControllerInstance { get; private set; }
 
     /// <summary>
     /// Prefix method to run before MainMenuController's Awake method.
@@ -26,7 +25,7 @@ public static class MainMenuControllerPatch
     [HarmonyPrefix]
     private static void Awake(MainMenuController __instance)
     {
-        _mainMenuControllerInstance = __instance;
+        MainMenuControllerInstance = __instance;
 
         // Find the Sessions button to base the Multiplayer button on
         GameObject sessionsButton = __instance.FindChildByName("ButtonSelectable Sessions");
