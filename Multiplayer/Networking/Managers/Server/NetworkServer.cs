@@ -464,7 +464,7 @@ public class NetworkServer : NetworkManager
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, excludeSelf: true);
     }
 
-    public void SendSpawnTrainset(List<TrainCar> set, bool autoCouple, bool sendToAll, ITransportPeer sendTo = null)
+    public void SendSpawnTrainset(List<TrainCar> set, bool autoCouple, bool sendToAll, bool playerSpawned = false, ITransportPeer sendTo = null)
     {
 
         LogDebug(() =>
@@ -482,7 +482,7 @@ public class NetworkServer : NetworkManager
 
         });
 
-        var packet = ClientboundSpawnTrainSetPacket.FromTrainSet(set, autoCouple);
+        var packet = ClientboundSpawnTrainSetPacket.FromTrainSet(set, autoCouple, playerSpawned);
 
         if (!sendToAll)
         {
@@ -493,11 +493,6 @@ public class NetworkServer : NetworkManager
         }
         else
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
-    }
-
-    public void SendSpawnTrainCar(NetworkedTrainCar networkedTrainCar)
-    {
-        SendPacketToAll(ClientboundSpawnTrainCarPacket.FromTrainCar(networkedTrainCar), DeliveryMethod.ReliableOrdered, excludeSelf: true);
     }
 
     public void SendDestroyTrainCar(NetworkedTrainCar netTrainCar, ITransportPeer peer = null)
@@ -1156,7 +1151,7 @@ public class NetworkServer : NetworkManager
         {
             try
             {
-                SendSpawnTrainset(set.cars, false, false, peer);
+                SendSpawnTrainset(set.cars, false, false, false, peer);
             }
             catch (Exception e)
             {
@@ -1527,6 +1522,56 @@ public class NetworkServer : NetworkManager
         }
 
         trainCar.Rerail(networkedRailTrack.RailTrack, position, packet.Forward);
+    }
+
+    private void OnServerboundTrainSpawnRequestPacket(ServerboundTrainSpawnRequestPacket packet, ITransportPeer peer)
+    {
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
+            return;
+
+        if (!NetworkedRailTrack.TryGet(packet.TrackNetId, out NetworkedRailTrack networkedRailTrack) || networkedRailTrack == null)
+        {
+            LogWarning($"{player.Username} tried to spawn a car on invalid track netId: {packet.TrackNetId}");
+            return;
+        }
+
+        if (!Components.TrainComponentLookup.Instance.LiveryFromId(packet.LiveryId, out TrainCarLivery livery) || livery == null || livery.prefab == null)
+        {
+            LogWarning($"{player.Username} tried to spawn a car with invalid livery Id: {packet.LiveryId}");
+            return;
+        }
+
+        // Check spawn location on track is valid
+        var kinked = networkedRailTrack.RailTrack.GetKinkedPointSet().points;
+        if (packet.Index < 0 || packet.Index >= kinked.Length)
+        {
+            LogWarning($"{player.Username} tried to spawn a car at an invalid index: {packet.Index}");
+            return;
+        }
+
+        var spawnPoint = kinked[packet.Index];
+        var startPoint = (Vector3)kinked.First().position;// + WorldMover.currentMove;
+        var endpoint = (Vector3)kinked.Last().position;// + WorldMover.currentMove;
+
+        // Check there's enough space for the car
+        var carBounds = CarSpawner.GetBoundsOfCar(livery.prefab);
+        if (!CarSpawner.IsThereSpaceForCarOnPoint(spawnPoint, startPoint, endpoint, carBounds.extents))
+        {
+            LogWarning($"{player.Username} tried to spawn a car, but there's no room on the track");
+            return;
+        }
+
+        // Check player is within range of the spawn point
+        float playerDistanceToSpawn = (player.AbsoluteWorldPosition - (Vector3)spawnPoint.position).magnitude;
+        if (playerDistanceToSpawn > CommsRadioCarSpawner.SIGNAL_RANGE && !Mathf.Approximately(playerDistanceToSpawn, CommsRadioCarSpawner.SIGNAL_RANGE))
+        {
+            LogWarning($"{player.Username} tried to spawn a train {playerDistanceToSpawn:F2}m away (max: {CommsRadioCarSpawner.SIGNAL_RANGE}m)");
+            return;
+        }
+
+        Vector3 forward = packet.WithTrackDirection ? spawnPoint.forward : -spawnPoint.forward;
+
+        TrainCar spawnedCar = CarSpawner.Instance.SpawnCarFromRemote(livery.prefab, networkedRailTrack.RailTrack, (Vector3)spawnPoint.position, forward);
     }
 
     private void OnServerboundLicensePurchaseRequestPacket(ServerboundLicensePurchaseRequestPacket packet, ITransportPeer peer)
