@@ -633,7 +633,7 @@ public class NetworkClient : NetworkManager
             }
         }
 
-        NetworkedCarSpawner.SpawnCars(packet.SpawnParts, packet.AutoCouple);
+        NetworkedCarSpawner.SpawnCars(packet.SpawnParts, packet.AutoCouple, packet.PlayerSpawned);
     }
 
     private void OnClientboundDestroyTrainCarPacket(ClientboundDestroyTrainCarPacket packet)
