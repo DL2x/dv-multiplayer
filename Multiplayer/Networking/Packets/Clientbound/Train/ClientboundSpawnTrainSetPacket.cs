@@ -7,21 +7,14 @@ public class ClientboundSpawnTrainSetPacket
 {
     public TrainsetSpawnPart[] SpawnParts { get; set; }
     public bool AutoCouple { get; set; }
+    public bool PlayerSpawned { get; set; }
 
-    //public static ClientboundSpawnTrainSetPacket FromTrainSet(Trainset trainset, bool autoCouple)
-    //{
-    //    return new ClientboundSpawnTrainSetPacket {
-    //        SpawnParts = TrainsetSpawnPart.FromTrainSet(trainset),
-    //        AutoCouple = autoCouple
-    //    };
-    //}
-
-    public static ClientboundSpawnTrainSetPacket FromTrainSet(List<TrainCar> trainset, bool autoCouple)
+    public static ClientboundSpawnTrainSetPacket FromTrainSet(List<TrainCar> trainset, bool autoCouple, bool playerSpawned = false)
     {
         return new ClientboundSpawnTrainSetPacket {
             SpawnParts = TrainsetSpawnPart.FromTrainSet(trainset),
-            AutoCouple = autoCouple
-
+            AutoCouple = autoCouple,
+            PlayerSpawned = playerSpawned
         };
     }
 }

@@ -148,7 +148,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundTimeAdvancePacket>(OnClientboundTimeAdvancePacket);
         netPacketProcessor.SubscribeReusable<CommonChangeJunctionPacket>(OnCommonChangeJunctionPacket);
         netPacketProcessor.SubscribeReusable<CommonRotateTurntablePacket>(OnCommonRotateTurntablePacket);
-        netPacketProcessor.SubscribeReusable<ClientboundSpawnTrainCarPacket>(OnClientboundSpawnTrainCarPacket);
+
         netPacketProcessor.SubscribeReusable<ClientboundSpawnTrainSetPacket>(OnClientboundSpawnTrainSetPacket);
         netPacketProcessor.SubscribeReusable<ClientboundDestroyTrainCarPacket>(OnClientboundDestroyTrainCarPacket);
         netPacketProcessor.SubscribeReusable<ClientboundTrainsetPhysicsPacket>(OnClientboundTrainPhysicsPacket);
@@ -567,17 +567,6 @@ public class NetworkClient : NetworkManager
         turntable.SetRotation(packet.rotation);
     }
 
-    private void OnClientboundSpawnTrainCarPacket(ClientboundSpawnTrainCarPacket packet)
-    {
-        TrainsetSpawnPart spawnPart = packet.SpawnPart;
-
-        LogDebug(() => $"Spawning {spawnPart.CarId} ({spawnPart.LiveryId}) with net ID {spawnPart.NetId}");
-
-        NetworkedCarSpawner.SpawnCar(spawnPart);
-
-        SendTrainSyncRequest(spawnPart.NetId);
-    }
-
     private void OnClientboundSpawnTrainSetPacket(ClientboundSpawnTrainSetPacket packet)
     {
         LogDebug(() => $"Spawning trainset consisting of {string.Join(", ", packet.SpawnParts.Select(p => $"{p.CarId} ({p.LiveryId}) with netId: {p.NetId}"))}");
@@ -591,7 +580,7 @@ public class NetworkClient : NetworkManager
             }
         }
 
-        NetworkedCarSpawner.SpawnCars(packet.SpawnParts, packet.AutoCouple);
+        NetworkedCarSpawner.SpawnCars(packet.SpawnParts, packet.AutoCouple, packet.PlayerSpawned);
     }
 
     private void OnClientboundDestroyTrainCarPacket(ClientboundDestroyTrainCarPacket packet)
@@ -1222,6 +1211,7 @@ public class NetworkClient : NetworkManager
         SendNetSerializablePacketToServer(wrapper, deliveryMethod);
     }
     #endregion
+
     public void SendSaveGameDataRequest()
     {
         SendPacketToServer(new ServerboundSaveGameDataRequestPacket(), DeliveryMethod.ReliableOrdered);
@@ -1508,6 +1498,17 @@ public class NetworkClient : NetworkManager
             TrackId = trackId,
             Position = position,
             Forward = forward
+        }, DeliveryMethod.ReliableUnordered);
+    }
+
+    public void SendTrainSpawnRequest(string liveryId, ushort trackNetId, int position, bool withTrackDirection)
+    {
+        SendPacketToServer(new ServerboundTrainSpawnRequestPacket
+        {
+            LiveryId = liveryId,
+            TrackNetId = trackNetId,
+            Index = position,
+            WithTrackDirection = withTrackDirection
         }, DeliveryMethod.ReliableUnordered);
     }
 

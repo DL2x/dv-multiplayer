@@ -1,10 +1,10 @@
-using System.Collections;
-using DV.Damage;
+using DV;
 using DV.LocoRestoration;
 using DV.Simulation.Brake;
 using DV.ThingTypes;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Data.Train;
+using Multiplayer.Patches.CommsRadio;
 using Multiplayer.Utils;
 using UnityEngine;
 
@@ -12,13 +12,19 @@ namespace Multiplayer.Components.Networking.Train;
 
 public static class NetworkedCarSpawner
 {
-    public static void SpawnCars(TrainsetSpawnPart[] parts, bool autoCouple)
+    
+    public static void SpawnCars(TrainsetSpawnPart[] parts, bool autoCouple, bool playerSpawned = false)
     {
         NetworkedTrainCar[] cars = new NetworkedTrainCar[parts.Length];
 
         //spawn the cars
         for (int i = 0; i < parts.Length; i++)
+        {
             cars[i] = SpawnCar(parts[i], true);
+
+            if (playerSpawned && CommsRadioCarSpawnerPatch.SpawnVehicleSound != null)
+                CommsRadioController.PlayAudioFromCar(CommsRadioCarSpawnerPatch.SpawnVehicleSound, cars[i].TrainCar, false);
+        }
 
         //Set brake params
         for (int i = 0; i < cars.Length; i++)
@@ -34,7 +40,7 @@ public static class NetworkedCarSpawner
             cars[i].Client_trainSpeedQueue.ReceiveSnapshot(parts[i].Speed, NetworkLifecycle.Instance.Tick);
     }
 
-    public static NetworkedTrainCar SpawnCar(TrainsetSpawnPart spawnPart, bool preventCoupling = false)
+    private static NetworkedTrainCar SpawnCar(TrainsetSpawnPart spawnPart, bool preventCoupling = false)
     {
         if (!NetworkedRailTrack.TryGet(spawnPart.Bogie1.TrackNetId, out NetworkedRailTrack bogie1Track) && spawnPart.Bogie1.TrackNetId != 0)
         {
