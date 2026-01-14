@@ -113,7 +113,7 @@ public class NetworkedMapMarkersController : MonoBehaviour
                 refs.gameObject.SetActive(active);
             if (!active)
             {
-                Multiplayer.LogDebug(() => $"NetworkedWorldMap.UpdatePlayers() key: {kvp.Key}, is NOT active");
+                //Multiplayer.LogDebug(() => $"NetworkedWorldMap.UpdatePlayers() key: {kvp.Key}, is NOT active");
                 return;
             }
 
