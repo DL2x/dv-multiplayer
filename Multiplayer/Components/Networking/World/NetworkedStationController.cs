@@ -7,9 +7,9 @@ using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
 using Multiplayer.Utils;
-using System.Collections.Generic;
-using System.Collections;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Multiplayer.Components.Networking.World;
@@ -407,7 +407,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         networkedJob.NetId = netId;
         networkedJob.Initialize(job, this);
         networkedJob.SetTasksFromServer(netIdToTask);
-        networkedJob.OnJobDirty += OnJobDirty;
+        //networkedJob.OnJobDirty += OnJobDirty;
         networkedJob.JobCars = carNetIds;
         return networkedJob;
     }
@@ -536,7 +536,8 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                 //    availableJobs.Remove(netJob.Job);
 
                 netJob.Job.ExpireJob();
-                StationController.ClearAvailableJobOverviewGOs();   //todo: better logic when players can hold items
+                netJob.JobOverview?.GetTrackedItem<JobOverview>()?.DestroyJobOverview();
+                //StationController.ClearAvailableJobOverviewGOs();   //todo: better logic when players can hold items
                 StartCoroutine(UpdateCarPlates(netJob.JobCars, string.Empty));
                 break;
 
@@ -553,6 +554,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
             validator.bookletPrinter.Print(false);
         }
     }
+
     public void RemoveJob(NetworkedJob job)
     {
         if (availableJobs.Contains(job.Job))
