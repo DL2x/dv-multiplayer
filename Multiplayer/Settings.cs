@@ -69,6 +69,8 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public bool ShowNameTags = true;
     [Draw("Show Ping In Name Tag", Tooltip = "Whether to show player pings above their heads.", VisibleOn = "ShowNameTags|true")]
     public bool ShowPingInNameTags;
+    [Draw("Show Player List in Alt Mouse Mode", Tooltip = "Whether to show the player list in mouse mode.")]
+    public bool ShowPlayerListInAltMouseMode = true;
 
     [Space(10)]
     [Header("Advanced Settings")]
