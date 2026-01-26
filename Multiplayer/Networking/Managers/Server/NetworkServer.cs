@@ -462,6 +462,7 @@ public class NetworkServer : NetworkManager
 
         player.Peer.Disconnect(WritePacket(new ClientboundDisconnectPacket { Kicked = true }));
     }
+
     public void SendGameParams(GameParams gameParams)
     {
         SendPacketToAll(ClientboundGameParamsPacket.FromGameParams(gameParams), DeliveryMethod.ReliableOrdered, excludeSelf: true);
@@ -945,13 +946,15 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundClientLoginPacket(ServerboundClientLoginPacket packet, IConnectionRequest request)
     {
+        Log($"Received login request from {packet.Username}{(Multiplayer.Settings.LogIps ? $" at {request.RemoteEndPoint.Address}" : "")}");
+
         LogDebug(() => $"OnServerboundClientLoginPacket from {packet.Username}");
 
         // clean up username - remove leading/trailing white space, swap spaces for underscores and truncate
         packet.Username = packet.Username.Trim().Replace(' ', '_').Truncate(Settings.MAX_USERNAME_LENGTH);
         string overrideUsername = packet.Username;
 
-        //ensure the username is unique
+        // ensure the username is unique
         int uniqueName = ServerPlayers.Where(player => player.OriginalUsername.ToLower() == packet.Username.ToLower()).Count();
 
         if (uniqueName > 0)
@@ -1078,6 +1081,8 @@ public class NetworkServer : NetworkManager
             return;
         }
 
+        Log($"Player {player.Username} requested save game data");
+
         PlayerConnected?.Invoke(player);
 
         //if (peers.ContainsKey((byte)peer.Id))
@@ -1104,8 +1109,11 @@ public class NetworkServer : NetworkManager
         // Allow clients to connect before the server is fully loaded
         if (!IsLoaded)
         {
+            Log($"Player {serverPlayer.Username} is ready, adding to the queue");
+
             joinQueue.Enqueue(peer);
             SendPacket(peer, new ClientboundServerLoadingPacket(), DeliveryMethod.ReliableOrdered);
+
             return;
         }
 
@@ -1128,17 +1136,18 @@ public class NetworkServer : NetworkManager
         LogDebug(() => $"Chatmanager");
         ChatManager.ServerMessage(serverPlayer.Username + " joined the game", null, serverPlayer);
 
-        Log($"Client {peer.Id} is ready. Sending world state");
-
         // No need to sync the world state if the player is the host
         if (NetworkLifecycle.Instance.IsHost(serverPlayer))
         {
+            Log($"Server loaded. Triggering loading screen removal");
+
             SendPacket(peer, new ClientboundRemoveLoadingScreenPacket(), DeliveryMethod.ReliableOrdered);
             serverPlayer.IsLoaded = true;
             PlayerReady?.Invoke(serverPlayer);
             return;
         }
 
+        Log($"Player {serverPlayer.Username} is ready. Sending world state");
         SendPacket(peer, new ClientboundBeginWorldSyncPacket(), DeliveryMethod.ReliableOrdered);
 
         // Send weather state
@@ -1205,7 +1214,7 @@ public class NetworkServer : NetworkManager
         }
 
         // All data has been sent, allow the client to load into the world.
-        Log($"Sending Remove Loading Screen to {serverPlayer.Username}");
+        Log($"World state sent to {serverPlayer.Username}. Triggering loading screen removal");
         SendPacket(peer, new ClientboundRemoveLoadingScreenPacket(), DeliveryMethod.ReliableOrdered);
 
         serverPlayer.IsLoaded = true;

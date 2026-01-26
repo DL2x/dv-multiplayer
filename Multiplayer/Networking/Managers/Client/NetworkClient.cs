@@ -76,6 +76,7 @@ public class NetworkClient : NetworkManager
 
     public NetworkClient(Settings settings, bool singlePlayer) : base(settings)
     {
+        Log($"Client created for {(singlePlayer ? "single player" : "multiplayer")} game");
         isSinglePlayer = singlePlayer;
         ClientPlayerManager = new ClientPlayerManager();
 
@@ -101,6 +102,8 @@ public class NetworkClient : NetworkManager
             BuildVersion = MainMenuControllerPatch.MenuProvider.BuildVersionString,
             Mods = ModCompatibilityManager.Instance.GetLocalMods()
         };
+
+        Log("Sending Login Packet");
         netPacketProcessor.Write(cachedWriter, serverboundClientLoginPacket);
         selfPeer = Connect(address, port, cachedWriter);
 
@@ -112,12 +115,11 @@ public class NetworkClient : NetworkManager
 
     public override void Stop()
     {
+        Log("Stopping client");
         if (!isAlsoHost && originalSession != null)
         {
             LogDebug(() => $"NetworkClient.Stop() destroying session... Original session is Null: {originalSession == null}");
-            //IGameSession session = UserManager.Instance.CurrentUser.CurrentSession;
             Client_GameSession.SetCurrent(originalSession);
-            //session?.Dispose();
         }
 
         base.Stop();
@@ -322,7 +324,7 @@ public class NetworkClient : NetworkManager
 
         if (packet.Accepted)
         {
-            Log($"Received player accepted packet");
+            Log($"Player accepted");
             PlayerId = packet.PlayerId;
 
             if (NetworkLifecycle.Instance.IsHost())
@@ -353,7 +355,7 @@ public class NetworkClient : NetworkManager
             }
         }
 
-        Log($"Received player deny packet: {text}");
+        Log($"Player denied: {text}");
         onDisconnect(DisconnectReason.ConnectionRejected, text);
     }
 
@@ -468,6 +470,8 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundWeatherPacket(ClientboundWeatherPacket packet)
     {
+        Log("Received weather state");
+
         WeatherDriver.Instance.LoadSaveData(JObject.FromObject(packet), Globals.G.GameParams.WeatherEditorAlwaysAllowed);
     }
 
@@ -538,6 +542,8 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundRailwayStatePacket(ClientboundRailwayStatePacket packet)
     {
+        Log("Received railway state");
+
         for (int i = 0; i < packet.SelectedJunctionBranches.Length; i++)
         {
             if (!NetworkedJunction.Get((ushort)(i + 1), out NetworkedJunction junction))
@@ -1214,6 +1220,7 @@ public class NetworkClient : NetworkManager
 
     public void SendSaveGameDataRequest()
     {
+        Log("Requesting game data from server");
         SendPacketToServer(new ServerboundSaveGameDataRequestPacket(), DeliveryMethod.ReliableOrdered);
     }
 
