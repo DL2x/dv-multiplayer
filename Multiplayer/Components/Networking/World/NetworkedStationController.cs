@@ -514,7 +514,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                     printed = true;
                 }
 
-                netJob.JobOverview?.GetTrackedItem<JobOverview>()?.DestroyJobOverview();
+                netJob.DestroyJobOverview();
 
                 break;
 
@@ -534,7 +534,8 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                 }
 
                 StartCoroutine(UpdateCarPlates(netJob.JobCars, string.Empty));
-                netJob.JobBooklet?.GetTrackedItem<JobBooklet>()?.DestroyJobBooklet();
+
+                netJob.DestroyJobBooklet();
 
                 break;
 
@@ -550,7 +551,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                 //    availableJobs.Remove(netJob.Job);
 
                 netJob.Job.ExpireJob();
-                netJob.JobOverview?.GetTrackedItem<JobOverview>()?.DestroyJobOverview();
+                netJob.DestroyJobOverview();
                 //StationController.ClearAvailableJobOverviewGOs();   //todo: better logic when players can hold items
                 StartCoroutine(UpdateCarPlates(netJob.JobCars, string.Empty));
                 break;
@@ -583,8 +584,8 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         if (abandonedJobs.Contains(job.Job))
             abandonedJobs.Remove(job.Job);
 
-        job.JobOverview?.GetTrackedItem<JobOverview>()?.DestroyJobOverview();
-        job.JobBooklet?.GetTrackedItem<JobBooklet>()?.DestroyJobBooklet();
+        job.DestroyJobOverview();
+        job.DestroyJobBooklet();
 
         job.ClearReports();
 
