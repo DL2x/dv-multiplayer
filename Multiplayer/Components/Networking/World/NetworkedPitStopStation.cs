@@ -121,7 +121,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         if (NetId == 0)
             base.Awake();
 
-        StationName = $"{transform.parent.parent.name} - {transform.parent.name}";
+        StationName = $"{transform?.parent?.parent?.name} - {transform?.parent?.name}";
 
         if (NetworkLifecycle.Instance.IsHost())
         {

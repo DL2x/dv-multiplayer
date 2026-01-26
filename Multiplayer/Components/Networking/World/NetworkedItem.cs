@@ -154,7 +154,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
         createdDirty = createDirty;
 
-        if(Item == null)
+        if (Item == null)
             Register();
 
     }
@@ -192,7 +192,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         catch (Exception ex)
         {
             Multiplayer.LogError($"NetworkedItem.Register() Unable to find ItemBase for {name}\r\n{ex.Message}");
-            return false; 
+            return false;
         }
     }
 
@@ -211,7 +211,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     public void OnThrow(Vector3 direction)
     {
         //block a received throw from 
-        if(wasThrown)
+        if (wasThrown)
         {
             wasThrown = false;
             return;
@@ -222,7 +222,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         thrownRotation = Item.transform.rotation;
 
         //Multiplayer.LogDebug(() => $"NetworkedItem.OnThrow() netId: {NetId}, Name: {name}, Raw Position: {Item.transform.position}, Position: {thrownPosition}, Rotation: {thrownRotation}, Direction: {throwDirection}");
-         
+
         wasThrown = true;
         stateDirty = true;
     }
@@ -252,7 +252,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     private bool HasDirtyValues()
     {
         //clients should only send values that are not server authoritative
-        if(!NetworkLifecycle.Instance.IsHost())
+        if (!NetworkLifecycle.Instance.IsHost())
             return trackedValues.Any(tv => ((dynamic)tv).IsDirty && !((dynamic)tv).ServerAuthoritative);
         else
             return trackedValues.Any(tv => ((dynamic)tv).IsDirty);
@@ -307,7 +307,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
         if (!createdDirty)
         {
-            if(lastState != currentState)
+            if (lastState != currentState)
                 updateType |= ItemUpdateData.ItemUpdateType.ItemState;
 
             if (hasDirtyVals)
@@ -340,7 +340,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     public void ReceiveSnapshot(ItemUpdateData snapshot)
     {
-        if(snapshot == null || snapshot.UpdateType == ItemUpdateData.ItemUpdateType.None)
+        if (snapshot == null || snapshot.UpdateType == ItemUpdateData.ItemUpdateType.None)
             return;
 
         if (!registrationComplete)
@@ -405,12 +405,16 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     public ItemUpdateData CreateUpdateData(ItemUpdateData.ItemUpdateType updateType)
     {
-        //Multiplayer.LogDebug(() => $"NetworkedItem.CreateUpdateData({updateType}) NetId: {NetId}, name: {name}");
+        if (transform == null || Item == null || Item?.InventorySpecs == null || Item?.InventorySpecs?.ItemPrefabName == null)
+        {
+            Multiplayer.LogDebug(()=>$"NetworkedItem.CreateUpdateData({updateType}) NetId: {NetId}, name: {name}. Transform is null: {transform == null}, Item is null: {Item == null}, Inventory Specs: {Item?.InventorySpecs == null}, ItemPrefabName is null: {Item?.InventorySpecs?.ItemPrefabName == null}");
+            return null;
+        }
 
         Vector3 position;
         Quaternion rotation;
         Dictionary<string, object> states;
-        ushort carId =0;
+        ushort carId = 0;
         bool frontCoupler = true;
 
         if (wasThrown)
@@ -433,7 +437,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             states = GetDirtyStateData();
         }
 
-        if(lastState == ItemState.Attached)
+        if (lastState == ItemState.Attached)
         {
             ItemSnapPointCoupler itemSnapPointCoupler = snappableItem.SnappedTo as ItemSnapPointCoupler;
 
@@ -484,7 +488,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if (Inventory.Instance.Contains(this.gameObject, false))
             return ItemState.InInventory;
 
-        if(snappableItem != null && snappableItem.IsSnapped)
+        if (snappableItem != null && snappableItem.IsSnapped)
         {
             Multiplayer.LogDebug(() => $"GetItemState() NetId: {NetId}, {name}, snapped! {this.transform.parent}");
             return ItemState.Attached;
@@ -492,7 +496,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
         //do we need a condition to check if it's attached to something else (last attach vs current attach)?
         return ItemState.Dropped;
-            
+
     }
 
     private void ApplyTrackedValues(Dictionary<string, object> newValues)
@@ -558,7 +562,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         //handle throwing of the item
         if (snapshot.ItemState == ItemState.Thrown)
         {
-            Multiplayer.LogDebug(()=>$"NetworkedItem.HandleDroppedOrThrownState() ItemNetId: {snapshot?.ItemNetId} Thrown. Position: {transform.position}, Direction: {snapshot?.ThrowDirection}");
+            Multiplayer.LogDebug(() => $"NetworkedItem.HandleDroppedOrThrownState() ItemNetId: {snapshot?.ItemNetId} Thrown. Position: {transform.position}, Direction: {snapshot?.ThrowDirection}");
 
             wasThrown = true;
             grabHandler?.Throw(snapshot.ThrowDirection);
@@ -612,7 +616,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         }
 
         if (NetworkLifecycle.Instance.IsHost())
-            if(NetworkLifecycle.Instance.Server.TryGetServerPlayer(snapshot.Player, out ServerPlayer player) && !player.OwnsItem(NetId))
+            if (NetworkLifecycle.Instance.Server.TryGetServerPlayer(snapshot.Player, out ServerPlayer player) && !player.OwnsItem(NetId))
                 player.AddOwnedItem(NetId);
 
         //todo add to player model's hand
@@ -627,7 +631,9 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
         if (NetworkLifecycle.Instance.IsHost())
         {
-            NetworkedItemManager.Instance.AddDirtyItemSnapshot(this, CreateUpdateData(ItemUpdateData.ItemUpdateType.Destroy));
+            var updateData = CreateUpdateData(ItemUpdateData.ItemUpdateType.Destroy);
+            if (updateData != null)
+                NetworkedItemManager.Instance.AddDirtyItemSnapshot(this, updateData);
         }
 
         if (Item != null)
