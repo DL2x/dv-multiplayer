@@ -548,13 +548,9 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                 break;
 
             case JobState.Expired:
-                //if (availableJobs.Contains(netJob.Job))
-                //    availableJobs.Remove(netJob.Job);
-
                 netJob.Job.ExpireJob();
-                netJob.JobOverview?.GetTrackedItem<JobOverview>()?.DestroyJobOverview();
+                netJob.DestroyJobOverview();
 
-                //StationController.ClearAvailableJobOverviewGOs();   //todo: better logic when players can hold items
                 StartCoroutine(UpdateCarPlates(netJob.JobCars, string.Empty));
                 break;
 
