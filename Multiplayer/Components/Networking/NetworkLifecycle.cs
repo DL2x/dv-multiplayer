@@ -40,6 +40,8 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
 
     public bool IsProcessingPacket => Client?.IsProcessingPacket ?? false;
 
+    public bool IsReturningToMenu { get; private set; } = false;
+
     private PlayerListGUI playerList;
     private NetworkStatsGui Stats;
     private readonly ExecutionTimer tickTimer = new();
@@ -73,6 +75,7 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         //RegisterPackets();
         WorldStreamingInit.LoadingFinished += () => { playerList.RegisterListeners(); };
         Settings.OnSettingsUpdated += OnSettingsUpdated;
+        SceneSwitcher.SceneRequested += OnSceneSwitchRequested;
         SceneManager.sceneLoaded += (scene, _) =>
         {
             if (scene.buildIndex != (int)DVScenes.MainMenu)
@@ -82,6 +85,11 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
             TriggerMainMenuEventLater();
         };
         StartCoroutine(PollEvents());
+    }
+
+    private void OnSceneSwitchRequested(DVScenes scene)
+    {
+        IsReturningToMenu = scene == DVScenes.MainMenu;
     }
 
     private void OnSettingsUpdated(Settings settings)
@@ -156,7 +164,7 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
 
         Client = client;
 
-        // Register server API
+        // Register client API
         var clientAPI = new ClientAPIProvider(client);
         MultiplayerAPI.RegisterClient(clientAPI);
 
@@ -173,12 +181,13 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
             tickWatchdog.Start();
             try
             {
-                if (!UnloadWatcher.isUnloading)
+                if (!UnloadWatcher.isUnloading && !UnloadWatcher.isQuitting && !IsReturningToMenu)
                     OnTick?.Invoke(Tick);
             }
             catch (Exception e)
             {
-                Multiplayer.LogError($"Exception while processing OnTick: {e}");
+                if (!UnloadWatcher.isUnloading && !UnloadWatcher.isQuitting && !IsReturningToMenu)
+                    Multiplayer.LogError($"Exception while processing OnTick: {e}");
             }
             finally
             {
