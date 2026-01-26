@@ -51,6 +51,7 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
                 Multiplayer.LogWarning($"Server_OnTick(): Trainset or cars are null. Set Id: {set?.id}, Cars: {set?.cars?.Count}");
         }
     }
+
     private void Server_TickSet(Trainset set, uint tick)
     {
         bool anyCarMoving = false;
@@ -59,6 +60,12 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
 
         if (UnloadWatcher.isUnloading || UnloadWatcher.isQuitting)
             return;
+
+        if (set == null)
+        {
+            Multiplayer.LogWarning("Server_TickSet() called with null Trainset!");
+            return;
+        }
 
         if (set.firstCar == null || set.lastCar == null)
         {
@@ -80,7 +87,20 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
                 return;
             }
 
-            //If we can locate the networked car, we'll add to the ticks counter and check if any tracks are dirty
+            // Check if Bogies array is valid before proceeding
+            if (trainCar.Bogies == null || trainCar.Bogies.Length < 2)
+            {
+                Multiplayer.LogError($"TrainCar {trainCar?.ID} in set {set?.id} Bogies array are null: {trainCar.Bogies == null}, Length: {trainCar.Bogies?.Length}");
+                return;
+            }
+
+            if (trainCar.Bogies[0] == null || trainCar.Bogies[1] == null)
+            {
+                Multiplayer.LogError($"TrainCar {trainCar?.ID} in set {set?.id} is missing Bogies! Bogie[0] is null: {trainCar.Bogies[0] == null}, Bogie[1] is null: {trainCar.Bogies[1] == null}");
+                return;
+            }
+
+            // If we can locate the networked car, we'll add to the ticks counter and check if any tracks are dirty
             if (NetworkedTrainCar.TryGetFromTrainCar(trainCar, out NetworkedTrainCar netTC) && netTC != null)
             {
                 maxTicksReached |= netTC.TicksSinceSync >= MAX_UNSYNC_TICKS; //Even if the car is stationary, if the max ticks has been exceeded we will still sync

@@ -216,16 +216,30 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         if (UnloadWatcher.isQuitting)
             return;
 
-        NetworkLifecycle.Instance.OnTick -= Server_OnTick;
+        if (NetworkLifecycle.Instance.IsHost())
+            NetworkLifecycle.Instance.OnTick -= Server_OnTick;
 
-        string stationId = StationController.logicStation.ID;
+        if (StationController != null)
+        {
+            string stationId = StationController.logicStation?.ID;
 
-        stationControllerToNetworkedStationController.Remove(StationController);
-        stationIdToNetworkedStationController.Remove(stationId);
-        stationIdToStationController.Remove(stationId);
-        stationToNetworkedStationController.Remove(StationController.logicStation);
-        jobValidatorToNetworkedStation.Remove(JobValidator);
-        jobValidators.Remove(this.JobValidator);
+            stationControllerToNetworkedStationController.Remove(StationController);
+
+            if (stationId != null)
+            {
+                stationIdToNetworkedStationController.Remove(stationId);
+                stationIdToStationController.Remove(stationId);
+            }
+
+            if (StationController.logicStation != null)
+                stationToNetworkedStationController.Remove(StationController.logicStation);
+
+            if (JobValidator != null)
+            {
+                jobValidatorToNetworkedStation.Remove(JobValidator);
+                jobValidators.Remove(this.JobValidator);
+            }
+        }
 
         Destroy(this);
     }

@@ -35,6 +35,13 @@ public readonly struct BogieData
 
     public static BogieData FromBogie(Bogie bogie)
     {
+        // Guard against null bogie
+        if (bogie == null)
+        {
+            Multiplayer.LogWarning("BogieData.FromBogie() called with null bogie!");
+            return new BogieData(BogieFlags.HasDerailed, -1.0, 0);
+        }
+
         bool includesTrackData = !bogie.HasDerailed && bogie.track;
 
         BogieFlags flags = BogieFlags.None;
