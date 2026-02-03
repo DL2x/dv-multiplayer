@@ -166,5 +166,12 @@ public static class DvExtensions
     {
         return transform.position - WorldMover.currentMove;
     }
+
+    public static bool AllowPause()
+    {
+        return NetworkLifecycle.Instance.IsHost() &&
+            (NetworkLifecycle.Instance.Server.IsSinglePlayer ||
+            (NetworkLifecycle.Instance.Server.PlayerCount == 1 && NetworkLifecycle.Instance.IsClientRunning));
+    }
     #endregion
 }
