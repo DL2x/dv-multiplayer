@@ -16,9 +16,9 @@ public class CashRegisterWithModulesPatch
     {
         //Multiplayer.LogDebug(() => $"CashRegisterWithModules.OnDisable({__instance.GetObjectPath()})");
 
-        __instance.StopAllCoroutines();
-        __instance.textController.Clear();
-        __instance.SetupListeners(false);
+        __instance?.StopAllCoroutines();
+        __instance?.textController?.Clear();
+        __instance?.SetupListeners(false);
 
         // Prevent clients from cancelling/returning cash on cash registers when loading the game or leaving the area
         return NetworkLifecycle.Instance.IsHost();

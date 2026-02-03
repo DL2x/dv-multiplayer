@@ -7,9 +7,9 @@ using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
 using Multiplayer.Utils;
-using System.Collections.Generic;
-using System.Collections;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Multiplayer.Components.Networking.World;
@@ -216,16 +216,30 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         if (UnloadWatcher.isQuitting)
             return;
 
-        NetworkLifecycle.Instance.OnTick -= Server_OnTick;
+        if (NetworkLifecycle.Instance.IsHost())
+            NetworkLifecycle.Instance.OnTick -= Server_OnTick;
 
-        string stationId = StationController.logicStation.ID;
+        if (StationController != null)
+        {
+            string stationId = StationController.logicStation?.ID;
 
-        stationControllerToNetworkedStationController.Remove(StationController);
-        stationIdToNetworkedStationController.Remove(stationId);
-        stationIdToStationController.Remove(stationId);
-        stationToNetworkedStationController.Remove(StationController.logicStation);
-        jobValidatorToNetworkedStation.Remove(JobValidator);
-        jobValidators.Remove(this.JobValidator);
+            stationControllerToNetworkedStationController.Remove(StationController);
+
+            if (stationId != null)
+            {
+                stationIdToNetworkedStationController.Remove(stationId);
+                stationIdToStationController.Remove(stationId);
+            }
+
+            if (StationController.logicStation != null)
+                stationToNetworkedStationController.Remove(StationController.logicStation);
+
+            if (JobValidator != null)
+            {
+                jobValidatorToNetworkedStation.Remove(JobValidator);
+                jobValidators.Remove(this.JobValidator);
+            }
+        }
 
         Destroy(this);
     }
@@ -407,7 +421,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         networkedJob.NetId = netId;
         networkedJob.Initialize(job, this);
         networkedJob.SetTasksFromServer(netIdToTask);
-        networkedJob.OnJobDirty += OnJobDirty;
+        //networkedJob.OnJobDirty += OnJobDirty;
         networkedJob.JobCars = carNetIds;
         return networkedJob;
     }
@@ -500,7 +514,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                     printed = true;
                 }
 
-                netJob.JobOverview?.GetTrackedItem<JobOverview>()?.DestroyJobOverview();
+                netJob.DestroyJobOverview();
 
                 break;
 
@@ -520,7 +534,8 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                 }
 
                 StartCoroutine(UpdateCarPlates(netJob.JobCars, string.Empty));
-                netJob.JobBooklet?.GetTrackedItem<JobBooklet>()?.DestroyJobBooklet();
+
+                netJob.DestroyJobBooklet();
 
                 break;
 
@@ -536,7 +551,8 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                 //    availableJobs.Remove(netJob.Job);
 
                 netJob.Job.ExpireJob();
-                StationController.ClearAvailableJobOverviewGOs();   //todo: better logic when players can hold items
+                netJob.DestroyJobOverview();
+                //StationController.ClearAvailableJobOverviewGOs();   //todo: better logic when players can hold items
                 StartCoroutine(UpdateCarPlates(netJob.JobCars, string.Empty));
                 break;
 
@@ -553,6 +569,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
             validator.bookletPrinter.Print(false);
         }
     }
+
     public void RemoveJob(NetworkedJob job)
     {
         if (availableJobs.Contains(job.Job))
@@ -567,8 +584,8 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         if (abandonedJobs.Contains(job.Job))
             abandonedJobs.Remove(job.Job);
 
-        job.JobOverview?.GetTrackedItem<JobOverview>()?.DestroyJobOverview();
-        job.JobBooklet?.GetTrackedItem<JobBooklet>()?.DestroyJobBooklet();
+        job.DestroyJobOverview();
+        job.DestroyJobBooklet();
 
         job.ClearReports();
 

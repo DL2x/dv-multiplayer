@@ -1,3 +1,5 @@
+using DV.CabControls;
+using DV.InventorySystem;
 using DV.Logic.Job;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Data;
@@ -68,6 +70,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     public NetworkedStationController Station { get; private set; }
 
     private NetworkedItem _jobOverview;
+
     public NetworkedItem JobOverview
     {
         get => _jobOverview;
@@ -87,6 +90,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     }
 
     private NetworkedItem _jobBooklet;
+
     public NetworkedItem JobBooklet
     {
         get => _jobBooklet;
@@ -291,6 +295,34 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
             JobReports.Add(item);
             Cause = DirtyCause.JobReport;
             OnJobDirty?.Invoke(this);
+        }
+    }
+
+    public void DestroyJobOverview()
+    {
+        JobOverview joItem = JobOverview?.GetTrackedItem<JobOverview>();
+
+        if (joItem != null)
+        {
+            var itemBase = joItem.GetComponent<ItemBase>();
+            itemBase?.ForceEndInteraction();
+            itemBase?.InContainer?.RemoveItem(itemBase.gameObject, false, true);
+            Inventory.Instance.DropItemFromHandsOrInventory(itemBase.gameObject);
+            joItem.DestroyJobOverview();
+        }
+    }
+
+    public void DestroyJobBooklet()
+    {
+        JobBooklet jbItem = JobBooklet?.GetTrackedItem<JobBooklet>();
+
+        if (jbItem != null)
+        {
+            var itemBase = jbItem.GetComponent<ItemBase>();
+            itemBase?.ForceEndInteraction();
+            itemBase?.InContainer?.RemoveItem(itemBase.gameObject, false, true);
+            Inventory.Instance.DropItemFromHandsOrInventory(itemBase.gameObject);
+            jbItem.DestroyJobBooklet();
         }
     }
 

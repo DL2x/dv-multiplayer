@@ -1,43 +1,83 @@
-using System.Collections;
 using DV;
-using DV.InventorySystem;
 using HarmonyLib;
 using Multiplayer.Components.Networking;
-using Multiplayer.Components.Networking.Train;
-using Multiplayer.Utils;
+using Multiplayer.Components.Networking.World;
 using UnityEngine;
 
 namespace Multiplayer.Patches.CommsRadio;
 
-
 [HarmonyPatch(typeof(CommsRadioCarSpawner))]
 public static class CommsRadioCarSpawnerPatch
 {
+    public static AudioClip SpawnVehicleSound { get; private set; }
+    public static AudioClip ConfirmSound { get; private set; }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(nameof(CommsRadioCarSpawner.Awake))]
+    private static void Awake(CommsRadioCarSpawner __instance)
+    {
+        SpawnVehicleSound = __instance.spawnVehicleSound;
+        ConfirmSound = __instance.confirmSound;
+    }
+
     [HarmonyPrefix]
     [HarmonyPatch(nameof(CommsRadioCarSpawner.OnUse))]
     private static bool OnUse_Prefix(CommsRadioCarSpawner __instance)
     {
         if (__instance.state != CommsRadioCarSpawner.State.PickDestination)
             return true;
+
         if (NetworkLifecycle.Instance.IsHost())
             return true;
 
-        //temporarily disable client spawning
-        CommsRadioController.PlayAudioFromRadio(__instance.cancelSound, __instance.transform);
-        __instance.ClearFlags();
-        return false;
+        if (__instance.destinationTrack == null || !__instance.closestPointOnDestinationTrack.HasValue)
+        {
+            SpawnFail(__instance, "CommsRadioCarSpawner unable to spawn car, destination track does not exist");
+            return false;
+        }
 
+        if (!NetworkedRailTrack.TryGetNetId(__instance.destinationTrack, out var trackNetId) || trackNetId == 0)
+        {
+            SpawnFail(__instance, $"CommsRadioCarSpawner NetworkedRailTrack not found for: {__instance.destinationTrack?.name}");
+            return false;
+        }
+
+        if (__instance.carPrefabToSpawn == null)
+        {
+            SpawnFail(__instance, "CommsRadioCarSpawner car prefab not found");
+            return false;
+        }
+
+        if (!__instance.carPrefabToSpawn.TryGetComponent(out TrainCar trainCar) || trainCar == null)
+        {
+            SpawnFail(__instance, "CommsRadioCarSpawner car prefab does not have a TrainCar component");
+            return false;
+        }
+
+        if (trainCar.carLivery == null)
+        {
+            SpawnFail(__instance, "CommsRadioCarSpawner TrainCar does not have a valid carLivery");
+            return false;
+        }
+
+        NetworkLifecycle.Instance.Client.SendTrainSpawnRequest(
+            trainCar.carLivery.id,
+            trackNetId,
+            __instance.closestPointOnDestinationTrack.Value.index,
+            __instance.spawnWithTrackDirection
+        );
+
+        __instance.ClearFlags();
+
+        return false;
+    }
+
+    private static void SpawnFail(CommsRadioCarSpawner instance, string message)
+    {
+        Multiplayer.LogWarning(message);
+        Multiplayer.LogDebug(() => $"CommsRadioCarSpawner.OnUse() spawnCategory: {instance.category}, selectedLocoIndex: {instance.selectedLocoIndex}, selectedCarTypeIndex: {instance.selectedCarTypeIndex}, selectedLiveryIndex: {instance.selectedCarLiveryIndex}");
+
+        CommsRadioController.PlayAudioFromRadio(instance.cancelSound, instance.transform);
+        instance.ClearFlags();
     }
 }
-
-    //private static IEnumerator PlaySoundsLater(CommsRadioCarDeleter __instance, Vector3 trainPosition, bool playMoneyRemovedSound = true)
-    //{
-    //    yield return new WaitForSecondsRealtime((NetworkLifecycle.Instance.Client.Ping * 3f)/1000);
-    //    if (playMoneyRemovedSound && __instance.moneyRemovedSound != null)
-    //        __instance.moneyRemovedSound.Play2D();
-    //    // The TrainCar may already be deleted when we're done waiting, so we play the sound manually.
-    //    __instance.removeCarSound.Play(trainPosition, minDistance: CommsRadioController.CAR_AUDIO_SOURCE_MIN_DISTANCE, parent: WorldMover.Instance.originShiftParent);
-    //    CommsRadioController.PlayAudioFromRadio(__instance.confirmSound, __instance.transform);
-    //}
-
-

@@ -145,44 +145,19 @@ public class NetworkServer : NetworkManager
 
     protected override void Subscribe()
     {
-        //Client management
+        // Client management
         netPacketProcessor.SubscribeReusable<ServerboundClientLoginPacket, IConnectionRequest>(OnServerboundClientLoginPacket);
+        netPacketProcessor.SubscribeReusable<CommonChatPacket, ITransportPeer>(OnCommonChatPacket);
+        netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
 
-        //World sync
+
+        // World sync
         netPacketProcessor.SubscribeReusable<ServerboundClientReadyPacket, ITransportPeer>(OnServerboundClientReadyPacket);
         netPacketProcessor.SubscribeReusable<ServerboundSaveGameDataRequestPacket, ITransportPeer>(OnServerboundSaveGameDataRequestPacket);
         netPacketProcessor.SubscribeReusable<ServerboundTimeAdvancePacket, ITransportPeer>(OnServerboundTimeAdvancePacket);
 
-
-        netPacketProcessor.SubscribeReusable<ServerboundPlayerPositionPacket, ITransportPeer>(OnServerboundPlayerPositionPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundTrainSyncRequestPacket>(OnServerboundTrainSyncRequestPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundTrainDeleteRequestPacket, ITransportPeer>(OnServerboundTrainDeleteRequestPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundTrainRerailRequestPacket, ITransportPeer>(OnServerboundTrainRerailRequestPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundLicensePurchaseRequestPacket, ITransportPeer>(OnServerboundLicensePurchaseRequestPacket);
         netPacketProcessor.SubscribeReusable<CommonChangeJunctionPacket, ITransportPeer>(OnCommonChangeJunctionPacket);
         netPacketProcessor.SubscribeReusable<CommonRotateTurntablePacket, ITransportPeer>(OnCommonRotateTurntablePacket);
-        netPacketProcessor.SubscribeReusable<CommonCouplerInteractionPacket, ITransportPeer>(OnCommonCouplerInteractionPacket);
-
-        netPacketProcessor.SubscribeReusable<CommonTrainUncouplePacket, ITransportPeer>(OnCommonTrainUncouplePacket);
-        netPacketProcessor.SubscribeReusable<CommonHoseConnectedPacket, ITransportPeer>(OnCommonHoseConnectedPacket);
-        netPacketProcessor.SubscribeReusable<CommonHoseDisconnectedPacket, ITransportPeer>(OnCommonHoseDisconnectedPacket);
-        netPacketProcessor.SubscribeReusable<CommonMuConnectedPacket, ITransportPeer>(OnCommonMuConnectedPacket);
-        netPacketProcessor.SubscribeReusable<CommonMuDisconnectedPacket, ITransportPeer>(OnCommonMuDisconnectedPacket);
-        netPacketProcessor.SubscribeReusable<CommonCockFiddlePacket, ITransportPeer>(OnCommonCockFiddlePacket);
-        netPacketProcessor.SubscribeReusable<ServerboundTrainControlAuthorityPacket, ITransportPeer>(OnServerboundTrainControlAuthorityPacket);
-        netPacketProcessor.SubscribeReusable<CommonBrakeCylinderReleasePacket, ITransportPeer>(OnCommonBrakeCylinderReleasePacket);
-        netPacketProcessor.SubscribeReusable<CommonHandbrakePositionPacket, ITransportPeer>(OnCommonHandbrakePositionPacket);
-        netPacketProcessor.SubscribeReusable<CommonPaintThemePacket, ITransportPeer>(OnCommonPaintThemePacket);
-        netPacketProcessor.SubscribeReusable<ServerboundAddCoalPacket, ITransportPeer>(OnServerboundAddCoalPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundTenderCoalPacket, ITransportPeer>(OnServerboundTenderCoalPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundFireboxIgnitePacket, ITransportPeer>(OnServerboundFireboxIgnitePacket);
-        netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, ITransportPeer>(OnCommonTrainPortsPacket);
-        netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, ITransportPeer>(OnCommonTrainFusesPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundJobValidateRequestPacket, ITransportPeer>(OnServerboundJobValidateRequestPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundWarehouseMachineControllerRequestPacket, ITransportPeer>(OnServerboundWarehouseMachineControllerRequestPacket);
-        netPacketProcessor.SubscribeReusable<CommonChatPacket, ITransportPeer>(OnCommonChatPacket);
-        netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
-        netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, ITransportPeer>(OnCommonItemChangePacket);
 
         netPacketProcessor.SubscribeReusable<CommonPitStopInteractionPacket, ITransportPeer>(OnCommonPitStopInteractionPacket);
         netPacketProcessor.SubscribeNetSerializable<CommonPitStopPlugInteractionPacket, ITransportPeer>(OnCommonPitStopPlugInteractionPacket);
@@ -190,6 +165,45 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonCashRegisterWithModulesActionPacket, ITransportPeer>(OnCommonCashRegisterWithModulesActionPacket);
 
         netPacketProcessor.SubscribeReusable<CommonGenericSwitchStatePacket, ITransportPeer>(OnCommonGenericSwitchStatePacket);
+
+
+        // Player
+        netPacketProcessor.SubscribeReusable<ServerboundPlayerPositionPacket, ITransportPeer>(OnServerboundPlayerPositionPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundLicensePurchaseRequestPacket, ITransportPeer>(OnServerboundLicensePurchaseRequestPacket);
+
+
+        // Train
+        netPacketProcessor.SubscribeReusable<ServerboundTrainSyncRequestPacket>(OnServerboundTrainSyncRequestPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundTenderCoalPacket, ITransportPeer>(OnServerboundTenderCoalPacket);
+        netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, ITransportPeer>(OnCommonTrainPortsPacket);
+        netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, ITransportPeer>(OnCommonTrainFusesPacket);
+        netPacketProcessor.SubscribeReusable<CommonPaintThemePacket, ITransportPeer>(OnCommonPaintThemePacket);
+
+        // Train Interaction
+        netPacketProcessor.SubscribeReusable<ServerboundTrainControlAuthorityPacket, ITransportPeer>(OnServerboundTrainControlAuthorityPacket);
+        netPacketProcessor.SubscribeReusable<CommonCouplerInteractionPacket, ITransportPeer>(OnCommonCouplerInteractionPacket);
+        netPacketProcessor.SubscribeReusable<CommonTrainUncouplePacket, ITransportPeer>(OnCommonTrainUncouplePacket);
+        netPacketProcessor.SubscribeReusable<CommonHoseConnectedPacket, ITransportPeer>(OnCommonHoseConnectedPacket);
+        netPacketProcessor.SubscribeReusable<CommonHoseDisconnectedPacket, ITransportPeer>(OnCommonHoseDisconnectedPacket);
+        netPacketProcessor.SubscribeReusable<CommonMuConnectedPacket, ITransportPeer>(OnCommonMuConnectedPacket);
+        netPacketProcessor.SubscribeReusable<CommonMuDisconnectedPacket, ITransportPeer>(OnCommonMuDisconnectedPacket);
+        netPacketProcessor.SubscribeReusable<CommonCockFiddlePacket, ITransportPeer>(OnCommonCockFiddlePacket);
+        netPacketProcessor.SubscribeReusable<CommonBrakeCylinderReleasePacket, ITransportPeer>(OnCommonBrakeCylinderReleasePacket);
+        netPacketProcessor.SubscribeReusable<CommonHandbrakePositionPacket, ITransportPeer>(OnCommonHandbrakePositionPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundAddCoalPacket, ITransportPeer>(OnServerboundAddCoalPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundFireboxIgnitePacket, ITransportPeer>(OnServerboundFireboxIgnitePacket);
+
+        netPacketProcessor.SubscribeReusable<ServerboundTrainDeleteRequestPacket, ITransportPeer>(OnServerboundTrainDeleteRequestPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundTrainRerailRequestPacket, ITransportPeer>(OnServerboundTrainRerailRequestPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundTrainSpawnRequestPacket, ITransportPeer>(OnServerboundTrainSpawnRequestPacket);
+
+
+        // Jobs
+        netPacketProcessor.SubscribeReusable<ServerboundJobValidateRequestPacket, ITransportPeer>(OnServerboundJobValidateRequestPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundWarehouseMachineControllerRequestPacket, ITransportPeer>(OnServerboundWarehouseMachineControllerRequestPacket);
+
+        // Items
+        netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, ITransportPeer>(OnCommonItemChangePacket);
     }
 
     //allow mods to register their own packets
@@ -448,6 +462,7 @@ public class NetworkServer : NetworkManager
 
         player.Peer.Disconnect(WritePacket(new ClientboundDisconnectPacket { Kicked = true }));
     }
+
     public void SendGameParams(GameParams gameParams)
     {
         SendPacketToAll(ClientboundGameParamsPacket.FromGameParams(gameParams), DeliveryMethod.ReliableOrdered, excludeSelf: true);
@@ -463,7 +478,7 @@ public class NetworkServer : NetworkManager
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, excludeSelf: true);
     }
 
-    public void SendSpawnTrainset(List<TrainCar> set, bool autoCouple, bool sendToAll, ITransportPeer sendTo = null)
+    public void SendSpawnTrainset(List<TrainCar> set, bool autoCouple, bool sendToAll, bool playerSpawned = false, ITransportPeer sendTo = null)
     {
 
         LogDebug(() =>
@@ -481,7 +496,7 @@ public class NetworkServer : NetworkManager
 
         });
 
-        var packet = ClientboundSpawnTrainSetPacket.FromTrainSet(set, autoCouple);
+        var packet = ClientboundSpawnTrainSetPacket.FromTrainSet(set, autoCouple, playerSpawned);
 
         if (!sendToAll)
         {
@@ -492,11 +507,6 @@ public class NetworkServer : NetworkManager
         }
         else
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, SelfPeer);
-    }
-
-    public void SendSpawnTrainCar(NetworkedTrainCar networkedTrainCar)
-    {
-        SendPacketToAll(ClientboundSpawnTrainCarPacket.FromTrainCar(networkedTrainCar), DeliveryMethod.ReliableOrdered, excludeSelf: true);
     }
 
     public void SendDestroyTrainCar(NetworkedTrainCar netTrainCar, ITransportPeer peer = null)
@@ -936,13 +946,15 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundClientLoginPacket(ServerboundClientLoginPacket packet, IConnectionRequest request)
     {
+        Log($"Received login request from {packet.Username}{(Multiplayer.Settings.LogIps ? $" at {request.RemoteEndPoint.Address}" : "")}");
+
         LogDebug(() => $"OnServerboundClientLoginPacket from {packet.Username}");
 
         // clean up username - remove leading/trailing white space, swap spaces for underscores and truncate
         packet.Username = packet.Username.Trim().Replace(' ', '_').Truncate(Settings.MAX_USERNAME_LENGTH);
         string overrideUsername = packet.Username;
 
-        //ensure the username is unique
+        // ensure the username is unique
         int uniqueName = ServerPlayers.Where(player => player.OriginalUsername.ToLower() == packet.Username.ToLower()).Count();
 
         if (uniqueName > 0)
@@ -1069,6 +1081,8 @@ public class NetworkServer : NetworkManager
             return;
         }
 
+        Log($"Player {player.Username} requested save game data");
+
         PlayerConnected?.Invoke(player);
 
         //if (peers.ContainsKey((byte)peer.Id))
@@ -1095,8 +1109,11 @@ public class NetworkServer : NetworkManager
         // Allow clients to connect before the server is fully loaded
         if (!IsLoaded)
         {
+            Log($"Player {serverPlayer.Username} is ready, adding to the queue");
+
             joinQueue.Enqueue(peer);
             SendPacket(peer, new ClientboundServerLoadingPacket(), DeliveryMethod.ReliableOrdered);
+
             return;
         }
 
@@ -1119,17 +1136,18 @@ public class NetworkServer : NetworkManager
         LogDebug(() => $"Chatmanager");
         ChatManager.ServerMessage(serverPlayer.Username + " joined the game", null, serverPlayer);
 
-        Log($"Client {peer.Id} is ready. Sending world state");
-
         // No need to sync the world state if the player is the host
         if (NetworkLifecycle.Instance.IsHost(serverPlayer))
         {
+            Log($"Server loaded. Triggering loading screen removal");
+
             SendPacket(peer, new ClientboundRemoveLoadingScreenPacket(), DeliveryMethod.ReliableOrdered);
             serverPlayer.IsLoaded = true;
             PlayerReady?.Invoke(serverPlayer);
             return;
         }
 
+        Log($"Player {serverPlayer.Username} is ready. Sending world state");
         SendPacket(peer, new ClientboundBeginWorldSyncPacket(), DeliveryMethod.ReliableOrdered);
 
         // Send weather state
@@ -1147,7 +1165,7 @@ public class NetworkServer : NetworkManager
         {
             try
             {
-                SendSpawnTrainset(set.cars, false, false, peer);
+                SendSpawnTrainset(set.cars, false, false, false, peer);
             }
             catch (Exception e)
             {
@@ -1196,7 +1214,7 @@ public class NetworkServer : NetworkManager
         }
 
         // All data has been sent, allow the client to load into the world.
-        Log($"Sending Remove Loading Screen to {serverPlayer.Username}");
+        Log($"World state sent to {serverPlayer.Username}. Triggering loading screen removal");
         SendPacket(peer, new ClientboundRemoveLoadingScreenPacket(), DeliveryMethod.ReliableOrdered);
 
         serverPlayer.IsLoaded = true;
@@ -1518,6 +1536,56 @@ public class NetworkServer : NetworkManager
         }
 
         trainCar.Rerail(networkedRailTrack.RailTrack, position, packet.Forward);
+    }
+
+    private void OnServerboundTrainSpawnRequestPacket(ServerboundTrainSpawnRequestPacket packet, ITransportPeer peer)
+    {
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
+            return;
+
+        if (!NetworkedRailTrack.TryGet(packet.TrackNetId, out NetworkedRailTrack networkedRailTrack) || networkedRailTrack == null)
+        {
+            LogWarning($"{player.Username} tried to spawn a car on invalid track netId: {packet.TrackNetId}");
+            return;
+        }
+
+        if (!Components.TrainComponentLookup.Instance.LiveryFromId(packet.LiveryId, out TrainCarLivery livery) || livery == null || livery.prefab == null)
+        {
+            LogWarning($"{player.Username} tried to spawn a car with invalid livery Id: {packet.LiveryId}");
+            return;
+        }
+
+        // Check spawn location on track is valid
+        var kinked = networkedRailTrack.RailTrack.GetKinkedPointSet().points;
+        if (packet.Index < 0 || packet.Index >= kinked.Length)
+        {
+            LogWarning($"{player.Username} tried to spawn a car at an invalid index: {packet.Index}");
+            return;
+        }
+
+        var spawnPoint = kinked[packet.Index];
+        var startPoint = (Vector3)kinked.First().position;// + WorldMover.currentMove;
+        var endpoint = (Vector3)kinked.Last().position;// + WorldMover.currentMove;
+
+        // Check there's enough space for the car
+        var carBounds = CarSpawner.GetBoundsOfCar(livery.prefab);
+        if (!CarSpawner.IsThereSpaceForCarOnPoint(spawnPoint, startPoint, endpoint, carBounds.extents))
+        {
+            LogWarning($"{player.Username} tried to spawn a car, but there's no room on the track");
+            return;
+        }
+
+        // Check player is within range of the spawn point
+        float playerDistanceToSpawn = (player.AbsoluteWorldPosition - (Vector3)spawnPoint.position).magnitude;
+        if (playerDistanceToSpawn > CommsRadioCarSpawner.SIGNAL_RANGE && !Mathf.Approximately(playerDistanceToSpawn, CommsRadioCarSpawner.SIGNAL_RANGE))
+        {
+            LogWarning($"{player.Username} tried to spawn a train {playerDistanceToSpawn:F2}m away (max: {CommsRadioCarSpawner.SIGNAL_RANGE}m)");
+            return;
+        }
+
+        Vector3 forward = packet.WithTrackDirection ? spawnPoint.forward : -spawnPoint.forward;
+
+        TrainCar spawnedCar = CarSpawner.Instance.SpawnCarFromRemote(livery.prefab, networkedRailTrack.RailTrack, (Vector3)spawnPoint.position, forward);
     }
 
     private void OnServerboundLicensePurchaseRequestPacket(ServerboundLicensePurchaseRequestPacket packet, ITransportPeer peer)

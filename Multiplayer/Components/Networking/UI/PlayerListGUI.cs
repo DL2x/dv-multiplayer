@@ -14,6 +14,7 @@ public class PlayerListGUI : MonoBehaviour
         ScreenspaceMouse.Instance.ValueChanged += OnToggle;
         localPlayerUsername = Multiplayer.Settings.GetUserName();
     }
+
     public void UnRegisterListeners()
     {
         ScreenspaceMouse.Instance.ValueChanged -= OnToggle;
@@ -22,10 +23,10 @@ public class PlayerListGUI : MonoBehaviour
 
     private void OnToggle(bool status)
     {
-        showPlayerList = status;
+        showPlayerList = status && Multiplayer.Settings.ShowPlayerListInAltMouseMode;
     }
 
-    private void OnGUI()
+    protected void OnGUI()
     {
         if (!showPlayerList)
             return;
