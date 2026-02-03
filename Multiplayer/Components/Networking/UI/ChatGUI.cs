@@ -1,24 +1,19 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using DV;
-using DV.UI;
-using Multiplayer.Utils;
-using TMPro;
-using UnityEngine;
-using UnityEngine.UI;
-using System.Text.RegularExpressions;
 using DV.Common;
-using System.Collections;
+using DV.Interaction.Inputs;
+using DV.UI;
+using DV;
 using Multiplayer.Networking.Managers.Server;
-using Multiplayer.Components.Networking.Player;
-using static System.Net.Mime.MediaTypeNames;
-
+using Multiplayer.Utils;
+using System.Collections.Generic;
+using System.Collections;
+using System.Linq;
+using System.Text.RegularExpressions;
+using TMPro;
+using UnityEngine.UI;
+using UnityEngine;
 
 namespace Multiplayer.Components.Networking.UI;
 
-//[RequireComponent(typeof(Canvas))]
-//[RequireComponent(typeof(CanvasScaler))]
 [RequireComponent(typeof(RectTransform))]
 public class ChatGUI : MonoBehaviour
 {
@@ -679,6 +674,10 @@ public class ChatGUI : MonoBehaviour
 
             //InputFocusManager.Instance.ReleaseKeyboardFocus(); 
         }
+
+        // Block Teleport input and Pause Menu input. Blocking pause menu allows us to use Escape to close the chat.
+        InputManager.Actions.SetActionDisabled(InputManager.RewiredActionConsts.Teleport, block);
+        InputManager.Actions.SetActionDisabled(InputManager.RewiredActionConsts.Escape, block);
     }
     #endregion
 }
