@@ -120,8 +120,17 @@ namespace Multiplayer
         public static string SERVER_HOST_VISIBILITY => Get(SERVER_HOST_PUBLIC_KEY);
         public const string SERVER_HOST_VISIBILITY_KEY = $"{PREFIX_SERVER_HOST}/visibility";
 
+        // public static string SERVER_HOST_VISIBILITY_MODES => Get(SERVER_HOST_VISIBILITY_MODES_KEY);
         public static string[] SERVER_HOST_VISIBILITY_MODES = [$"{SERVER_HOST_VISIBILITY_MODES_KEY}/private", $"{SERVER_HOST_VISIBILITY_MODES_KEY}/friends", $"{SERVER_HOST_VISIBILITY_MODES_KEY}/public"];
         public const string SERVER_HOST_VISIBILITY_MODES_KEY = $"{PREFIX_SERVER_HOST}/visibility/modes";
+        public static string SERVER_HOST_TRANSPORT_MODE => Get(SERVER_HOST_TRANSPORT_MODE_KEY);
+        public const string SERVER_HOST_TRANSPORT_MODE_KEY = $"{PREFIX_SERVER_HOST}/transport_mode";
+
+        public const string SERVER_HOST_TRANSPORT_MODE__TOOLTIP_KEY = $"{PREFIX_SERVER_HOST}/transport_mode__tooltip";
+        public const string SERVER_HOST_TRANSPORT_MODE__TOOLTIP_DISABLED_KEY = $"{PREFIX_SERVER_HOST}/transport_mode__tooltip_disabled";
+
+        public static string[] SERVER_HOST_TRANSPORT_MODE_MODES = [$"{SERVER_HOST_TRANSPORT_MODE_MODES_KEY}/steam", $"{SERVER_HOST_TRANSPORT_MODE_MODES_KEY}/ip"/*, $"{SERVER_HOST_TRANSPORT_MODE_MODES_KEY}/both",*/];
+        public const string SERVER_HOST_TRANSPORT_MODE_MODES_KEY = $"{PREFIX_SERVER_HOST}/transport_mode/modes";
         public static string SERVER_HOST_DETAILS => Get(SERVER_HOST_DETAILS_KEY);
         public const string SERVER_HOST_DETAILS_KEY = $"{PREFIX_SERVER_HOST}/details";
         public static string SERVER_HOST_MAX_PLAYERS => Get(SERVER_HOST_MAX_PLAYERS_KEY);

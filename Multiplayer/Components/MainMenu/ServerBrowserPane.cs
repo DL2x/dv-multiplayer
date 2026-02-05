@@ -12,6 +12,7 @@ using Multiplayer.Components.Networking;
 using Multiplayer.Components.UI.Controls;
 using Multiplayer.Components.Util;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.TransportLayers;
 using Multiplayer.Patches.MainMenu;
 using Multiplayer.Utils;
 using Steamworks;
@@ -95,6 +96,10 @@ public class ServerBrowserPane : MonoBehaviour
     private Popup connectingPopup;
     private int attempt;
 
+    // Oculus-compat additions (timeout protection)
+    private float connectionStartTime;
+    private const float CONNECTION_TIMEOUT = 12f;
+
     private Lobby[] lobbies;
 
     private bool incompatibleMods = true;
@@ -134,9 +139,11 @@ public class ServerBrowserPane : MonoBehaviour
 
     public void Update()
     {
-        SteamClient.RunCallbacks();
+        // Steam callbacks only make sense on Steam builds
+        if (GameVersionDetector.IsSteam)
+            SteamClient.RunCallbacks();
 
-        //Handle server refresh interval
+        // Handle server refresh interval
         timePassed += Time.deltaTime;
 
         if (!serverRefreshing)
@@ -159,13 +166,26 @@ public class ServerBrowserPane : MonoBehaviour
             timePassed = 0;
         }
 
-        //Handle pinging servers
+        // Handle pinging servers
         pingTimer += Time.deltaTime;
 
         if (pingTimer >= PING_INTERVAL)
         {
             UpdatePings();
             pingTimer = 0f;
+        }
+
+        // Handle connection attempts that never resolve (e.g. unreachable host with no callbacks).
+        if (connectingPopup != null &&
+            (connectionState == ConnectionState.AttemptingIPv4 ||
+             connectionState == ConnectionState.AttemptingIPv6 ||
+             connectionState == ConnectionState.AttemptingSteamRelay) &&
+            (Time.realtimeSinceStartup - connectionStartTime) > CONNECTION_TIMEOUT)
+        {
+            Multiplayer.LogWarning($"Connection attempt timed out after {CONNECTION_TIMEOUT}s.");
+            NetworkLifecycle.Instance.Stop();
+            AttemptFail();
+            MainMenuThingsAndStuff.Instance?.ShowOkPopup("Host Unreachable (timeout).", () => { });
         }
 
         if (lobbyToJoin != null && connectionState == ConnectionState.NotConnected)
@@ -188,11 +208,19 @@ public class ServerBrowserPane : MonoBehaviour
 
     public void Start()
     {
-        if (DVSteamworks.Success)
+        // Steam build: nothing special
+        if (GameVersionDetector.IsSteam)
             return;
 
-        Multiplayer.Log($"Steam not detected, prompt for restart.");
-        MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Please restart the game with Steam running", () => { });
+        // Oculus build: let user know we won't use Steam
+        if (GameVersionDetector.IsOculus)
+        {
+            MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Using LiteNet instead", () => { });
+            return;
+        }
+
+        // Other/non-steam build
+        MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Try restarting the game.", () => { });
     }
 
     private void CleanUI()
@@ -207,11 +235,10 @@ public class ServerBrowserPane : MonoBehaviour
         GameObject.Destroy(this.FindChildByName("ButtonIcon OpenFolder"));
         GameObject.Destroy(this.FindChildByName("ButtonIcon Rename"));
         GameObject.Destroy(this.FindChildByName("ButtonTextIcon Load"));
-
     }
+
     private void BuildUI()
     {
-
         // Update title
         GameObject titleObj = this.FindChildByName("Title");
         GameObject.Destroy(titleObj.GetComponentInChildren<I2.Loc.Localize>());
@@ -225,7 +252,6 @@ public class ServerBrowserPane : MonoBehaviour
 
         //Create new objects
         GameObject serverScroll = Instantiate(scrollViewGO, serverNameGO.transform.position, Quaternion.identity, serverWindowGO.transform);
-
 
         /* 
          * Setup server name 
@@ -244,7 +270,7 @@ public class ServerBrowserPane : MonoBehaviour
         serverName.alignment = TextAlignmentOptions.Center;
         serverName.textWrappingMode = TextWrappingModes.Normal;
         serverName.fontSize = 22;
-        serverName.text = Locale.SERVER_BROWSER__INFO_TITLE;// "Server Browser Info";
+        serverName.text = Locale.SERVER_BROWSER__INFO_TITLE;
 
         /* 
          * Setup server details
@@ -294,7 +320,7 @@ public class ServerBrowserPane : MonoBehaviour
         detailsPane = textGO.GetComponent<TextMeshProUGUI>();
         detailsPane.textWrappingMode = TextWrappingModes.Normal;
         detailsPane.fontSize = 18;
-        detailsPane.text = Locale.Get(Locale.SERVER_BROWSER__INFO_CONTENT_KEY, [AUTO_REFRESH_TIME, REFRESH_MIN_TIME]);// "Welcome to Derail Valley Multiplayer Mod!<br><br>The server list refreshes automatically every 30 seconds, but you can refresh manually once every 10 seconds.";
+        detailsPane.text = Locale.Get(Locale.SERVER_BROWSER__INFO_CONTENT_KEY, [AUTO_REFRESH_TIME, REFRESH_MIN_TIME]);
 
         SetupModsGroup();
 
@@ -313,7 +339,6 @@ public class ServerBrowserPane : MonoBehaviour
         GameObject goDirectIP = this.gameObject.UpdateButton("ButtonTextIcon Overwrite", "ButtonTextIcon Manual", Locale.SERVER_BROWSER__MANUAL_CONNECT_KEY, null, Multiplayer.AssetIndex.multiplayerIcon);
         GameObject goJoin = this.gameObject.UpdateButton("ButtonTextIcon Save", "ButtonTextIcon Join", Locale.SERVER_BROWSER__JOIN_KEY, null, Multiplayer.AssetIndex.connectIcon);
         GameObject goRefresh = this.gameObject.UpdateButton("ButtonIcon Delete", "ButtonIcon Refresh", Locale.SERVER_BROWSER__REFRESH_KEY, null, Multiplayer.AssetIndex.refreshIcon);
-
 
         if (goDirectIP == null || goJoin == null || goRefresh == null)
         {
@@ -341,7 +366,6 @@ public class ServerBrowserPane : MonoBehaviour
 
         //Disable before we make any changes
         GridviewGO.SetActive(false);
-
 
         //load our custom controller
         SaveLoadGridView slgv = GridviewGO.GetComponent<SaveLoadGridView>();
@@ -403,7 +427,7 @@ public class ServerBrowserPane : MonoBehaviour
             // Remove the Button to allow the hyperlink handler to work
             Component.Destroy(element.GetComponentInChildren<ButtonDV>(true));
 
-            //// Enable hyperlink parsing
+            // Enable hyperlink parsing
             HyperlinkHandler modHyperlinkHandler = controller.elementText.GetOrAddComponent<HyperlinkHandler>();
             modHyperlinkHandler.linkColor = new UnityEngine.Color(0.302f, 0.651f, 1f); // #4DA6FF
             modHyperlinkHandler.linkHoverColor = new UnityEngine.Color(0.498f, 0.749f, 1f); // #7FBFFF
@@ -460,13 +484,13 @@ public class ServerBrowserPane : MonoBehaviour
         remoteServers.Clear();
 
         serverRefreshing = true;
-        //buttonJoin.ToggleInteractable(false);
         buttonRefresh.ToggleInteractable(false);
 
-        if (DVSteamworks.Success)
+        // Only list Steam lobbies on Steam builds w/ Steamworks available
+        if (GameVersionDetector.IsSteam && DVSteamworks.Success)
             ListActiveLobbies();
-
     }
+
     private void JoinAction()
     {
         if (selectedServer == null || connectionState != ConnectionState.NotConnected)
@@ -554,7 +578,6 @@ public class ServerBrowserPane : MonoBehaviour
             serverName.text = selectedServer.Name;
 
             // Note: built-in localisations have a trailing colon e.g. 'Game mode:'
-
             details.Append(FORMAT_ALPHA + LocalizationAPI.L("launcher/game_mode", []) + "</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>");
             details.Append(FORMAT_ALPHA + LocalizationAPI.L("launcher/difficulty", []) + "</color> " + LobbyServerData.GetDifficultyFromInt(selectedServer.Difficulty) + "<br>");
             details.Append(FORMAT_ALPHA + LocalizationAPI.L("launcher/in_game_time_passed", []) + "</color> " + selectedServer.TimePassed + "<br>");
@@ -580,23 +603,18 @@ public class ServerBrowserPane : MonoBehaviour
         }
         else
         {
-            serverName.text = Locale.SERVER_BROWSER__INFO_TITLE;// "Server Browser Info";
-            detailsPane.text = Locale.Get(Locale.SERVER_BROWSER__INFO_CONTENT_KEY, [AUTO_REFRESH_TIME, REFRESH_MIN_TIME]);// "Welcome to Derail Valley Multiplayer Mod!<br><br>The server list refreshes automatically every 30 seconds, but you can refresh manually once every 10 seconds.";
+            serverName.text = Locale.SERVER_BROWSER__INFO_TITLE;
+            detailsPane.text = Locale.Get(Locale.SERVER_BROWSER__INFO_CONTENT_KEY, [AUTO_REFRESH_TIME, REFRESH_MIN_TIME]);
 
             ClearModElements(elementRequiredMods);
             ClearModElements(elementExtraMods);
         }
-
     }
 
     /// <summary>
     /// Validates the client has all required mods for the server and the versions match.
     /// Populates the mod details list.
     /// </summary>
-    /// <param name="serverMods"></param>
-    /// <param name="localMods"></param>
-    /// <param name="modDetails"></param>
-    /// <returns>true if all required mods are present and have correct versions, false if any mods are missing or there is a version mismatch.</returns>
     private bool BuildServerMods(ModInfo[] serverMods, ModInfo[] localMods)
     {
         bool modsOk = true;
@@ -657,10 +675,6 @@ public class ServerBrowserPane : MonoBehaviour
     /// Validates the client does not have any mods that the server is not running and does not have any mods incompatible with Multiplayer.
     /// Populates the mod details list.
     /// </summary>
-    /// <param name="serverMods"></param>
-    /// <param name="localMods"></param>
-    /// <param name="modDetails"></param>
-    /// <returns>true if there are no conflicting mods, false if any mods can not be used with this server.</returns>
     private bool BuildLocalMods(ModInfo[] localMods)
     {
         bool modsOk = true;
@@ -791,7 +805,6 @@ public class ServerBrowserPane : MonoBehaviour
 
     private void ShowPortPopup()
     {
-
         var popup = MainMenuThingsAndStuff.Instance.ShowRenamePopup();
         if (popup == null)
         {
@@ -883,14 +896,12 @@ public class ServerBrowserPane : MonoBehaviour
         loc.key = "cancel";
         loc.UpdateLocalization();
 
-
         popup.labelTMPro.text = $"Connecting, please wait..."; //to be localised
 
         popup.Closed += (PopupResult result) =>
         {
             connectionState = ConnectionState.Aborted;
         };
-
     }
 
     #region workflow
@@ -901,17 +912,20 @@ public class ServerBrowserPane : MonoBehaviour
 
     private void InitiateConnection()
     {
-
         Multiplayer.Log($"Initiating connection. Direct: {direct}, Address: {address}, Lobby: {selectedLobby?.Id.ToString()}");
 
         attempt = 0;
+        connectionStartTime = Time.realtimeSinceStartup;
         ShowConnectingPopup();
 
         if (!direct && joinedLobby != null)
         {
+            // Steam lobby join -> connect via Steam relay using the lobby owner's SteamID.
             connectionState = ConnectionState.AttemptingSteamRelay;
             string hostId = ((Lobby)joinedLobby).Owner.Id.Value.ToString();
-            NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, OnDisconnect);
+
+            // If your StartClient signature doesn't include TransportMode, remove that parameter.
+            NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, TransportMode.Steamworks, OnDisconnect);
             return;
         }
 
@@ -950,26 +964,11 @@ public class ServerBrowserPane : MonoBehaviour
 
         Multiplayer.Log($"AttemptIPv6() starting attempt");
         connectionState = ConnectionState.AttemptingIPv6;
-        SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
 
+        // If your StartClient signature doesn't include TransportMode, remove that parameter.
+        SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, TransportMode.LiteNetLib, OnDisconnect);
     }
 
-    //private void AttemptIPv6Punch()
-    //{
-    //    Multiplayer.Log($"AttemptIPv6Punch() {address}");
-
-    //    if (connectionState == ConnectionState.Aborted)
-    //        return;
-
-    //    attempt++;
-    //    if (connectingPopup != null)
-    //        connectingPopup.labelTMPro.text = $"Connecting, please wait...\r\nAttempt: {attempt}";
-
-    //    //punching not implemented we'll just try again for now
-    //    connectionState = ConnectionState.AttemptingIPv6Punch;
-    //    SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
-
-    //}
     private void AttemptIPv4()
     {
         Multiplayer.Log($"AttemptIPv4() {address}, {connectionState}");
@@ -1001,7 +1000,9 @@ public class ServerBrowserPane : MonoBehaviour
             {
                 Multiplayer.Log($"AttemptIPv4() starting attempt");
                 connectionState = ConnectionState.AttemptingIPv4;
-                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
+
+                // If your StartClient signature doesn't include TransportMode, remove that parameter.
+                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, TransportMode.LiteNetLib, OnDisconnect);
                 return;
             }
         }
@@ -1011,22 +1012,6 @@ public class ServerBrowserPane : MonoBehaviour
         string message = "Host Unreachable";
         MainMenuThingsAndStuff.Instance.ShowOkPopup(message, () => { });
     }
-
-    //private void AttemptIPv4Punch()
-    //{
-    //    Multiplayer.Log($"AttemptIPv4Punch() {address}");
-
-    //    if (connectionState == ConnectionState.Aborted)
-    //        return;
-
-    //    attempt++;
-    //    if (connectingPopup != null)
-    //        connectingPopup.labelTMPro.text = $"Connecting, please wait...\r\nAttempt: {attempt}";
-
-    //    //punching not implemented we'll just try again for now
-    //    connectionState = ConnectionState.AttemptingIPv4Punch;
-    //    SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
-    //}
 
     private void AttemptFail()
     {
@@ -1085,17 +1070,16 @@ public class ServerBrowserPane : MonoBehaviour
     {
         return reason switch
         {
-            DisconnectReason.UnknownHost => Locale.DISCONN_REASON__UNKNOWN_HOST, //"Unknown Host",
-            DisconnectReason.DisconnectPeerCalled => Locale.DISCONN_REASON__PLAYER_KICKED, //"Player Kicked",
-            DisconnectReason.ConnectionFailed => Locale.DISCONN_REASON__HOST_UNREACHABLE, //"Host Unreachable",
-            DisconnectReason.ConnectionRejected => Locale.DISCONN_REASON__REJECTED, //"Rejected!",
-            DisconnectReason.RemoteConnectionClose => Locale.DISCONN_REASON__SHUTTING_DOWN, //"Server Shutting Down",
-            DisconnectReason.Timeout => Locale.DISCONN_REASON__HOST_TIMED_OUT, //"Server Timed Out",
+            DisconnectReason.UnknownHost => Locale.DISCONN_REASON__UNKNOWN_HOST,
+            DisconnectReason.DisconnectPeerCalled => Locale.DISCONN_REASON__PLAYER_KICKED,
+            DisconnectReason.ConnectionFailed => Locale.DISCONN_REASON__HOST_UNREACHABLE,
+            DisconnectReason.ConnectionRejected => Locale.DISCONN_REASON__REJECTED,
+            DisconnectReason.RemoteConnectionClose => Locale.DISCONN_REASON__SHUTTING_DOWN,
+            DisconnectReason.Timeout => Locale.DISCONN_REASON__HOST_TIMED_OUT,
             _ => "Connection Failed"
         };
     }
     #endregion
-
 
     #region steam lobby
     private async void ListActiveLobbies()
@@ -1103,7 +1087,6 @@ public class ServerBrowserPane : MonoBehaviour
         lobbies = await SteamMatchmaking.LobbyList.WithMaxResults(100)
                                                   .FilterDistanceWorldwide()
                                                   .WithSlotsAvailable(-1)
-                                                  //.WithKeyValue(SteamworksUtils.MP_MOD_KEY, string.Empty)
                                                   .RequestAsync();
 
         Multiplayer.LogDebug(() => $"ListActiveLobbies() lobbies found: {lobbies?.Count()}");
@@ -1112,8 +1095,6 @@ public class ServerBrowserPane : MonoBehaviour
 
         if (lobbies != null)
         {
-            var myLoc = SteamNetworkingUtils.LocalPingLocation;
-
             foreach (var lobby in lobbies)
             {
                 LobbyServerData server = SteamworksUtils.GetLobbyData(lobby);
@@ -1126,7 +1107,6 @@ public class ServerBrowserPane : MonoBehaviour
                 remoteServers.Add(server);
 
                 Multiplayer.LogDebug(() => $"ListActiveLobbies() lobby {server.Name}, {lobby.MemberCount}/{lobby.MaxMembers}");
-
             }
         }
         remoteRefreshComplete = true;
@@ -1134,13 +1114,16 @@ public class ServerBrowserPane : MonoBehaviour
 
     private void UpdatePingsSteam()
     {
+        if (!GameVersionDetector.IsSteam)
+            return;
+
         foreach (var server in serverGridView.Items)
         {
             if (server is LobbyServerData lobbyServer)
             {
                 if (ulong.TryParse(server.id, out ulong id))
                 {
-                    Lobby? lobby = lobbies.FirstOrDefault(l => l.Id.Value == id);
+                    Lobby? lobby = lobbies?.FirstOrDefault(l => l.Id.Value == id);
                     if (lobby != null)
                     {
                         string strLoc = ((Lobby)lobby).GetData(SteamworksUtils.LOBBY_NET_LOCATION_KEY);
@@ -1224,7 +1207,6 @@ public class ServerBrowserPane : MonoBehaviour
 
     private async Task<bool> JoinLobby(Lobby lobby)
     {
-
         if (connectionState != ConnectionState.NotConnected)
         {
             Multiplayer.LogWarning($"Cannot join lobby while in state: {connectionState}");

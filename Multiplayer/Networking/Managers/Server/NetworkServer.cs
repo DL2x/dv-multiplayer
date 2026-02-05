@@ -37,6 +37,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Multiplayer.Networking.Managers.Server;
@@ -87,7 +88,13 @@ public class NetworkServer : NetworkManager
 
     private uint lastTick;
 
-    public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData) : base(settings)
+    public NetworkServer(
+     IDifficulty difficulty,
+     Settings settings,
+     bool singlePlayer,
+     LobbyServerData serverData,
+     TransportMode transportMode = TransportMode.Steamworks)
+     : base(settings, transportMode)
     {
         Log($"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
 
@@ -288,15 +295,35 @@ public class NetworkServer : NetworkManager
     public override void OnPeerConnected(ITransportPeer peer)
     {
         LogDebug(() => $"OnPeerConnected({peer.Id})");
+
+        // Send the login-accept packet only once the peer is fully connected.
+        // Sending during the connection-request phase can be unreliable on some transports.
+        if (peerToPlayer.TryGetValue(peer, out var player))
+        {
+            if (!player.LoginResponseSent)
+            {
+                var acceptPacket = new ClientboundLoginResponsePacket
+                {
+                    Accepted = true,
+                    PlayerId = player.PlayerId,
+                };
+
+                SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
+                player.LoginResponseSent = true;
+            }
+        }
     }
 
     public override void OnPeerDisconnected(ITransportPeer peer, DisconnectReason disconnectReason)
     {
         LogDebug(() => $"OnPeerDisconnected({peer.Id})");
-        if (!peerToPlayer.TryGetValue(peer, out ServerPlayer player))
-            LogWarning($"Peer {peer.GetType()}, peerId: {peer.Id} disconnected but no player found");
-        else
-            Log($"Player {player?.Username} disconnected: {disconnectReason}");
+        if (!peerToPlayer.TryGetValue(peer, out ServerPlayer player) || player == null)
+        {
+            LogWarning($"Peer {peer?.GetType()}, peerId: {peer?.Id} disconnected but no player found");
+            return;
+        }
+
+        Log($"Player {player.Username} disconnected: {disconnectReason}");
 
         if (WorldStreamingInit.isLoaded)
             SaveGameManager.Instance.UpdateInternalData();
@@ -350,7 +377,17 @@ public class NetworkServer : NetworkManager
     public override void OnConnectionRequest(NetDataReader requestData, IConnectionRequest request)
     {
         LogDebug(() => $"NetworkServer OnConnectionRequest");
-        netPacketProcessor.ReadAllPackets(requestData, request);
+        try
+        {
+            netPacketProcessor.ReadAllPackets(requestData, request);
+        }
+        catch (Exception e)
+        {
+            // If parsing/handling fails, we must reject the request; otherwise the client will sit
+            // in "connecting" forever and eventually hit our client-side watchdog timeout.
+            LogWarning($"Failed to process connection request from {request.RemoteEndPoint}: {e}");
+            try { request.Reject(); } catch { }
+        }
     }
 
     #endregion
@@ -944,6 +981,39 @@ public class NetworkServer : NetworkManager
 
     #region Listeners
 
+
+    private static bool IsBuildCompatible(string clientBuild, string serverBuild)
+    {
+        // Historically LocalBuildInfo included store-specific buildbot metadata (e.g. Steam vs Oculus).
+        // For cross-store Direct-IP play we only require the numeric build number to match.
+        var c = ExtractBuildNumber(clientBuild);
+        var s = ExtractBuildNumber(serverBuild);
+
+        if (c > 0 && s > 0)
+            return c == s;
+
+        // Fallback to exact string comparison if we couldn't parse.
+        return string.Equals(clientBuild, serverBuild, StringComparison.Ordinal);
+    }
+
+    private static int ExtractBuildNumber(string build)
+    {
+        if (string.IsNullOrWhiteSpace(build))
+            return -1;
+
+        // Prefer a leading number (e.g. "123 - ...")
+        var m = Regex.Match(build, @"^\s*(\d+)");
+        if (m.Success && int.TryParse(m.Groups[1].Value, out var n))
+            return n;
+
+        // Otherwise, take the first number anywhere in the string.
+        m = Regex.Match(build, @"(\d+)");
+        if (m.Success && int.TryParse(m.Groups[1].Value, out n))
+            return n;
+
+        return -1;
+    }
+
     private void OnServerboundClientLoginPacket(ServerboundClientLoginPacket packet, IConnectionRequest request)
     {
         Log($"Received login request from {packet.Username}{(Multiplayer.Settings.LogIps ? $" at {request.RemoteEndPoint.Address}" : "")}");
@@ -980,11 +1050,11 @@ public class NetworkServer : NetworkManager
         if (Multiplayer.Settings.Password != packet.Password)
         {
             LogWarning("Denied login due to invalid password!");
-            ClientboundLoginResponsePacket denyPacket = new()
+            ClientboundLoginResponsePacket denyInvalidPassword = new()
             {
                 ReasonKey = Locale.DISCONN_REASON__INVALID_PASSWORD_KEY
             };
-            request.Reject(WritePacket(denyPacket));
+            request.Reject(WritePacket(denyInvalidPassword));
             return;
         }
 
@@ -996,7 +1066,7 @@ public class NetworkServer : NetworkManager
                 ReasonKey = Locale.DISCONN_REASON__GAME_VERSION_KEY,
                 ReasonArgs = [MainMenuControllerPatch.MenuProvider.BuildVersionString, packet.BuildVersion.ToString()]
             };
-            request.Reject(WritePacket(denyPacket));
+            request.Reject(WritePacket(denyIncompatibleVersion));
             return;
         }
 
@@ -1011,7 +1081,31 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        var validation = ModCompatibilityManager.Instance.ValidateClientMods(packet.Mods);
+        // Mods may be missing/truncated on some clients/transports.
+        // If the client didn't send a list at all, skip validation (best-effort, avoids false negatives).
+        var clientMods = packet.Mods;
+
+        ModValidationResult validation;
+        if (clientMods == null)
+        {
+            LogWarning("Client sent no mod list in login packet; skipping mod validation.");
+            validation = new ModValidationResult { IsValid = true };
+            clientMods = Array.Empty<ModInfo>();
+        }
+        else
+        {
+            try
+            {
+                validation = ModCompatibilityManager.Instance.ValidateClientMods(clientMods);
+            }
+            catch (Exception e)
+            {
+                // Don't leave the client hanging in "connecting" due to an exception here.
+                // Prefer allowing the client to join (best-effort) and log the problem.
+                LogWarning($"Mod validation failed (will allow join): {e.Message}");
+                validation = new ModValidationResult { IsValid = true };
+            }
+        }
         if (!validation.IsValid)
         {
 
@@ -1024,7 +1118,7 @@ public class NetworkServer : NetworkManager
                     sb.AppendLine($"\t{mod.Id} {mod.Version}, Status: {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
 
                 sb.AppendLine("\r\nClient Mods:");
-                foreach (ModInfo mod in packet.Mods)
+                foreach (ModInfo mod in clientMods)
                     sb.AppendLine($"\t{mod.Id} {mod.Version}, Status (if known): {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
 
                 sb.AppendLine("\r\nMissing Mods:");
@@ -1048,7 +1142,17 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        ITransportPeer peer = request.Accept();
+        ITransportPeer peer;
+        try
+        {
+            peer = request.Accept();
+        }
+        catch (Exception e)
+        {
+            LogWarning($"Accept() threw for {packet.Username}{(Multiplayer.Settings.LogIps ? $" at {request.RemoteEndPoint.Address}" : "")}: {e}");
+            request.Reject();
+            return;
+        }
 
         ServerPlayer serverPlayer = new
         (
@@ -1061,13 +1165,18 @@ public class NetworkServer : NetworkManager
         serverPlayers.Add(serverPlayer.PlayerId, serverPlayer);
         peerToPlayer.Add(peer, serverPlayer);
 
-        ClientboundLoginResponsePacket acceptPacket = new()
+        // Send Accepted immediately for transport compatibility.
+        // Steamworks can invoke OnPeerConnected before the first connection-request payload is processed,
+        // so relying on OnPeerConnected to send this can leave the client stuck on "connecting".
+        var acceptPacket = new ClientboundLoginResponsePacket
         {
             Accepted = true,
             PlayerId = serverPlayer.PlayerId,
         };
-
         SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
+        serverPlayer.LoginResponseSent = true;
+
+        // OnPeerConnected still sends Accepted as a fallback if it hasn't been sent yet.
     }
 
     private void OnServerboundSaveGameDataRequestPacket(ServerboundSaveGameDataRequestPacket packet, ITransportPeer peer)

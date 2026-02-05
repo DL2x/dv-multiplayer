@@ -8,6 +8,7 @@ using Multiplayer.Networking.TransportLayers;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using Multiplayer.Utils;
 
 namespace Multiplayer.Networking.Managers;
 
@@ -27,11 +28,33 @@ public abstract class NetworkManager
     public bool IsRunning => transport.IsRunning;
     public bool IsProcessingPacket { get; private set; }
 
+    public TransportMode TransportMode { get; }
+
     protected NetworkManager(Settings settings)
+        : this(settings, TransportMode.Auto)
+    {
+    }
+
+    protected NetworkManager(Settings settings, TransportMode transportMode)
     {
         netPacketProcessor = new NetPacketProcessor();
-        //transport = new LiteNetLibTransport();
-        transport = new SteamWorksTransport();
+
+        // Resolve Auto to a concrete transport we can expose to callers (e.g. LobbyServerManager).
+        var resolvedMode = transportMode == TransportMode.Auto
+            ? (GameVersionDetector.IsSteam ? TransportMode.Steamworks : TransportMode.LiteNetLib)
+            : transportMode;
+
+        TransportMode = resolvedMode;
+
+        transport = resolvedMode switch
+        {
+            TransportMode.LiteNetLib => new LiteNetLibTransport(),
+            TransportMode.Steamworks => new SteamWorksTransport(),
+            _ => new LiteNetLibTransport(),
+        };
+
+        Multiplayer.Log($"[dv-multiplayer] Transport: {transport.GetType().Name} (mode {resolvedMode})");
+
 
         transport.OnConnectionRequest += OnConnectionRequest;
         transport.OnPeerConnected += OnPeerConnected;
@@ -46,8 +69,8 @@ public abstract class NetworkManager
         Settings.OnSettingsUpdated += OnSettingsUpdated;
 
         Subscribe();
-
     }
+
 
     private void RegisterNestedTypes()
     {

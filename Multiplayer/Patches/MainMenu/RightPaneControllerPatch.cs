@@ -1,4 +1,5 @@
 using DV.Localization;
+using DV.Platform.Steam;
 using DV.UI;
 using DV.UIFramework;
 using HarmonyLib;
@@ -13,6 +14,7 @@ using TMPro;
 using UnityEngine;
 
 namespace Multiplayer.Patches.MainMenu;
+
 
 [HarmonyPatch(typeof(RightPaneController))]
 public static class RightPaneController_Patch
@@ -103,11 +105,14 @@ public static class RightPaneController_Patch
     [HarmonyPostfix]
     private static void OnEnablePost(RightPaneController __instance)
     {
-        //SteamMatchmaking.OnLobbyDataChanged += SteamworksUtils.OnLobbyDataChanged;
-        SteamMatchmaking.OnLobbyInvite += SteamworksUtils.OnLobbyInviteRequest;
-        SteamFriends.OnGameLobbyJoinRequested += SteamworksUtils.OnLobbyJoinRequest;
+        if (GameVersionDetector.IsSteam)
+        {
+            //SteamMatchmaking.OnLobbyDataChanged += SteamworksUtils.OnLobbyDataChanged;
+            SteamMatchmaking.OnLobbyInvite += SteamworksUtils.OnLobbyInviteRequest;
+            SteamFriends.OnGameLobbyJoinRequested += SteamworksUtils.OnLobbyJoinRequest;
 
-        if (Environment.GetCommandLineArgs().Contains("+connect_lobby"))
-            __instance.StartCoroutine(SteamworksUtils.JoinFromCommandLine());
+            if (Environment.GetCommandLineArgs().Contains("+connect_lobby"))
+                __instance.StartCoroutine(SteamworksUtils.JoinFromCommandLine());
+        }
     }
 }

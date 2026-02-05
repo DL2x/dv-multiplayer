@@ -28,6 +28,7 @@ public class ServerPlayer : IDisposable
     public ITransportPeer Peer { get; private set; }
     public byte PlayerId { get; private set; }
     public bool IsLoaded { get; set; }
+    public bool LoginResponseSent { get; set; }
     public string Username { get; set; }
     public string OriginalUsername { get; set; }
     public Guid Guid { get; set; }
