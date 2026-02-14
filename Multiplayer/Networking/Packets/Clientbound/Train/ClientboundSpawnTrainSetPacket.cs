@@ -12,7 +12,7 @@ public class ClientboundSpawnTrainSetPacket
     {
         return new ClientboundSpawnTrainSetPacket {
             SpawnParts = TrainsetSpawnPart.FromTrainSet(trainset),
-            AutoCouple = autoCouple,
+            AutoCouple = autoCouple
         };
     }
 }

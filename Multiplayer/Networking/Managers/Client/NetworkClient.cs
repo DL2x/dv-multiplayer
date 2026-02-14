@@ -144,6 +144,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeNetSerializable<ClientboundRpcResponsePacket>(OnClientboundRpcResponsePacket);
 
         netPacketProcessor.SubscribeNetSerializable<ClientboundRpcResponsePacket>(OnClientboundRpcResponsePacket);
+
         netPacketProcessor.SubscribeReusable<ClientboundTickSyncPacket>(OnClientboundTickSyncPacket);
         netPacketProcessor.SubscribeReusable<ClientboundBeginWorldSyncPacket>(OnClientboundBeginWorldSyncPacket);
         netPacketProcessor.SubscribeReusable<ClientboundGameParamsPacket>(OnClientboundGameParamsPacket);
@@ -633,7 +634,7 @@ public class NetworkClient : NetworkManager
             }
         }
 
-        NetworkedCarSpawner.SpawnCars(packet.SpawnParts, packet.AutoCouple, packet.PlayerSpawned);
+        NetworkedCarSpawner.SpawnCars(packet.SpawnParts, packet.AutoCouple);
     }
 
     private void OnClientboundDestroyTrainCarPacket(ClientboundDestroyTrainCarPacket packet)
