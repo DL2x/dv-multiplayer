@@ -28,10 +28,6 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public string Username = "Player";
     public string Guid = System.Guid.NewGuid().ToString();
 
-    [Space(10)]
-    [Header("Misc.")]
-    [Draw("Chat Key Bind", Tooltip ="Key to show chat window.")]
-    public KeyCode ChatKey = KeyCode.Return;
 
     [Space(10)]
     [Header("Server")]
@@ -71,6 +67,10 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public bool ShowPingInNameTags;
     [Draw("Show Player List in Alt Mouse Mode", Tooltip = "Whether to show the player list in mouse mode.")]
     public bool ShowPlayerListInAltMouseMode = true;
+    [Draw("Chat Key Bind", Tooltip = "Key to show chat window.")]
+    public KeyCode ChatKey = KeyCode.Return;
+    [Draw("Hide Chat Messages", Tooltip = "Hide incoming chat messages.")]
+    public bool HideChatMessages = false;
 
     [Space(10)]
     [Header("Advanced Settings")]

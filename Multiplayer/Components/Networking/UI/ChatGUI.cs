@@ -382,6 +382,9 @@ public class ChatGUI : MonoBehaviour
             AddMessage(message);
         }
 
+        if (Multiplayer.Settings.HideChatMessages)
+            return;
+
         timeOut = 0;
         showingMessage = true;
 
