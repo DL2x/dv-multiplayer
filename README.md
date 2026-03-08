@@ -42,8 +42,11 @@
 At present, assume all other mods are incompatible!
 Some mods may work, but many do cause issues and break multiplayer capabilities.
 
-Our primary focus is to have the vanilla game working in multiplayer; once this is achieved we will then work on compatibility with other mods.
+Our primary focus is to have the vanilla game working in multiplayer; once this is achieved we will then work on compatibility with other mods, dedicated servers and company modes.
 
+## Installation
+If you are only intending to use the mod and not work on the code, it is recommended you download from the [Nexus Mods page](https://www.nexusmods.com/derailvalley/mods/1070).
+Unity Mod Manager is required to use this mod.
 
 <!-- ABOUT THE PROJECT -->
 
@@ -71,13 +74,45 @@ The mod will be released on Nexus once it's ready.
 
 ## Building
 
-Before you can build Multiplayer, you'll need to build the Unity project.  
-To do this, open the `MultiplayerAssets` folder in Unity **2019.4.40f1**, then click on the `Multiplayer` > `Build Asset Bundle and Scripts ` menu item.
+Before you can build Multiplayer, you'll need to either:
+a) Build the Unity project.
+or 
+b) Copy `multiplayer.assetbundle`, `MultiplayerEditor.dll` and `UnityChan.dll` from the released binaries to the `build` directory.
 
-Once the Unity project is compiled, the rest of the mod uses the same build system as Mapify which you can read about in the [Mapify building documentation][mapify-building-docs].
+### Building Unity Assets
+1) Install Unity Editior **2019.4.40f1**
+2) Open the `MultiplayerAssets` folder in Unity **2019.4.40f1**
+3) Click on the `Multiplayer` > `Build Asset Bundle and Scripts ` menu item.
+The asset file and dlls will be compiled and copied to the `build` directory
 
+Once the Unity project is compiled, you can build the mod.
 
+1. In the main project folder copy `Directory.Build.targets.EXAMPLE` and rename the copy to `Directory.Build.targets`.
+2. Open `Directory.Build.targets` in your favourite text editor and update the paths for `DvInstallDir` and `UnityInstallDir`.
+If you are NOT using a code signing certificate, leave the `Cert-Thumb` attribute blank, otherwise, ensure the `SignToolPath` is correct and the `Cert-Thumb` matches the thumbprint of your certificate.
+Example `Directory.Build.targets`:
+```xml
+<Project>
+    <PropertyGroup>
+        <DvInstallDir>C:\Program Files (x86)\Steam\steamapps\common\Derail Valley</DvInstallDir>
+        <UnityInstallDir>C:\Program Files\Unity\Hub\Editor\2019.4.40f1\Editor</UnityInstallDir>
+        <ReferencePath>
+            $(DvInstallDir)\DerailValley_Data\Managed\;
+            $(DvInstallDir)\DerailValley_Data\Managed\UnityModManager\;
+            $(UnityInstallDir)\Data\Managed\
+        </ReferencePath>
+        <AssemblySearchPaths>$(AssemblySearchPaths);$(ReferencePath);</AssemblySearchPaths>
+		<SignToolPath>C:\Program Files (x86)\Microsoft SDKs\ClickOnce\SignTool\</SignToolPath>
+		<Cert-Thumb>2ce2b8a98a59ffd407ada2e94f233bf24a0e68b9</Cert-Thumb>
+    </PropertyGroup>
+</Project>
+```
+3. Install xmldoc2md from the [AMacro repository](https://github.com/AMacro/xmldoc2md/), unless the [official repo](https://charlesdevandiere.github.io/xmldoc2md/) has been updated with [PR #45](https://github.com/charlesdevandiere/xmldoc2md/pull/45).
+4. Open the Multiplayer solution and compile (solution may need to be compiled a couple of times for all errors to clear.
 
+Notes:
+- Debug builds will output a `harmony.log.txt` to the desktop
+- Release builds will be signed (if code signing is available) and packaged.
 
 <!-- CONTRIBUTING -->
 
