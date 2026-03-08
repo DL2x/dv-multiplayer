@@ -75,9 +75,12 @@ The mod will be released on Nexus once it's ready.
 ## Building
 
 Before you can build Multiplayer, you'll need to either:
-a) Build the Unity project.
-or 
-b) Copy `multiplayer.assetbundle`, `MultiplayerEditor.dll` and `UnityChan.dll` from the released binaries to the `build` directory.
+
+1) Build the Unity project.
+
+or
+
+2) Copy `multiplayer.assetbundle`, `MultiplayerEditor.dll` and `UnityChan.dll` from the released binaries to the `build` directory.
 
 ### Building Unity Assets
 1) Install Unity Editior **2019.4.40f1**
