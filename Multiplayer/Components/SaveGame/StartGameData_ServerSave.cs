@@ -1,7 +1,3 @@
-using System;
-using System.Collections;
-using System.ComponentModel;
-using System.Linq;
 using DV;
 using DV.CabControls;
 using DV.Common;
@@ -13,6 +9,11 @@ using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Patches.SaveGame;
 using Newtonsoft.Json.Linq;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
 using UnityEngine;
 
 namespace Multiplayer.Components.SaveGame;
@@ -58,6 +59,31 @@ public class StartGameData_ServerSave : AStartGameData
             return $"StartGameData_ServerSave.SetFromPacket() UnlockedGen: {{{unlockedGen}}}, PacketGen: {{{packetGen}}},  UnlockedJob: {{{unlockedJob}}}, PacketJob: {{{packetJob}}}";
         });
 
+        // Load player inventory
+        List<StorageItemData> items = [];
+
+        foreach (var item in packet.PlayerItems)
+        {
+            StorageItemData itemData = new
+            (
+                item.ItemPrefabName,
+                new Vector3(item.ItemPositionX, item.ItemPositionY, item.ItemPositionZ),
+                new Quaternion(item.ItemRotationX, item.ItemRotationY, item.ItemRotationZ, item.ItemRotationW),
+                item.BelongsToPlayer,
+                item.IsGrabbed,
+                item.CarGuid,
+                item.State,
+                item.InventorySlotIndex,
+                item.ContainerSlotIndex,
+                item.InLockedSlot,
+                item.IsDropped,
+                item.ContainerId
+            );
+
+            items.Add(itemData);
+        }
+        Multiplayer.LogDebug(() => $"StartGameData_ServerSave.SetFromPacket() PlayerItems count: {packet.PlayerItems.Length}, items string count: {items.Count()}");
+        saveGameData.SetObject(SaveGameKeys.Storage_Inventory, items);
 
         //For clients we need to have a session - new users may not have a session and this may also be causing problems with licenses syncing
         if (NetworkLifecycle.Instance.IsHost())
@@ -65,7 +91,7 @@ public class StartGameData_ServerSave : AStartGameData
 
         Client_GameSession.SetCurrent(new Client_GameSession(packet.GameMode, DifficultyToUse));
     }
-
+    
     public override void Initialize()
     {
         throw new InvalidOperationException($"Use {nameof(SetFromPacket)} instead!");
@@ -127,6 +153,6 @@ public class StartGameData_ServerSave : AStartGameData
         return false;
     }
 
-    public override void MakeCurrent(){}
+    public override void MakeCurrent() { }
 }
 
