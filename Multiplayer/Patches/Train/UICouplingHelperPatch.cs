@@ -20,7 +20,7 @@ public static class UICouplingHelperPatch
             return;
 
         Coupler otherCoupler = null;
-        CouplerInteractionType interaction = CouplerInteractionType.Start;
+        CouplerInteractionType interaction = CouplerInteractionType.NoAction;
 
         if (coupler.IsCoupled())
         {
