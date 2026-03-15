@@ -45,7 +45,7 @@ public static class CommsRadioCrewVehiclePatch
         }
 
         var ticket = RpcManager.Instance
-            .CreateTicket(Mathf.Max(NetworkLifecycle.Instance.Client.Ping * 8f / 1000, 2f))
+            .CreateTicket(Mathf.Max(NetworkLifecycle.Instance.Client.RPC_Timeout, 2f))
             .OnResolve
             (
                 response =>
