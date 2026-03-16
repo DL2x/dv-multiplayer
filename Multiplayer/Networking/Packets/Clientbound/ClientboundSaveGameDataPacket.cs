@@ -64,13 +64,23 @@ public class ClientboundSaveGameDataPacket
 
         List<PlayerItemSaveData> playerItems = [];
         string[] items = ["shovel", "lighter", "Oiler", "Lantern", "Flashlight", "Hanger", "DuctTape"];
+        string[] states = ["", "", "", "", "{\"Restock\": true,\"Battery_power\": 100}", "", ""];
+
         for (int i = 0; i < items.Length; i++)
         {
+            JObject state;
+
+            if (!string.IsNullOrEmpty(states[i]))
+                state = JObject.Parse(states[i]);
+            else
+                state = [];
+
             var testItem = new PlayerItemSaveData()
             {
                 ItemPrefabName = items[i],
                 BelongsToPlayer = true,
-                InventorySlotIndex = 14 + i
+                InventorySlotIndex = 14 + i,
+                State = state
             };
             playerItems.Add(testItem);
         }
