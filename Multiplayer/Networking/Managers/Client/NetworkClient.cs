@@ -1361,7 +1361,7 @@ public class NetworkClient : NetworkManager
 
         if (couplerNetId == 0 || otherCouplerNetId == 0)
         {
-            LogWarning($"SendHoseConnected failed. Coupler: {coupler.name} {couplerNetId}, OtherCoupler: {otherCoupler.name} {otherCouplerNetId}");
+            LogWarning($"SendHoseConnected failed. Coupler: {coupler?.train?.ID} {couplerNetId}, OtherCoupler: {otherCoupler?.train?.ID} {otherCouplerNetId}");
             return;
         }
 
