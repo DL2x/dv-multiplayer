@@ -403,13 +403,13 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         (
             () =>
             {
-                return TrainCar.loadedInterior != null || Time.time - time > 2000f;
+                return TrainCar?.loadedInterior != null || Time.time - time > 2000f;
             }
         );
 
         yield return new WaitForFixedUpdate();
 
-        if (TrainCar.loadedInterior == null)
+        if (TrainCar?.loadedInterior == null)
         {
             Multiplayer.LogError($"TrainCar {CurrentID} failed to load an interior");
             yield break;
