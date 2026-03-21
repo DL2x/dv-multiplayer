@@ -601,6 +601,14 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
         yield return new WaitUntil(() => !isResourceRemoteGrabbedDict[resourceType] && !rm.IsFlowing);
         yield return null;
 
+        if (!lastRemoteValueDict.ContainsKey(resourceType))
+        {
+            if (resourceTypeToLocoResourceModule.ContainsKey(resourceType))
+                lastRemoteValueDict[resourceType] = rm.Data.unitsToBuy;
+            else
+                lastRemoteValueDict[resourceType] = 0f;
+        }
+
         SetUnits(rm, lastRemoteValueDict[resourceType]);
     }
 
