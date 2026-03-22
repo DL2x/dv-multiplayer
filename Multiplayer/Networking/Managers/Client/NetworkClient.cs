@@ -67,10 +67,11 @@ public class NetworkClient : NetworkManager
     public readonly ClientPlayerManager ClientPlayerManager;
     public readonly Dictionary<byte, ClientPlayerWrapper> PlayerWrapperCache = [];
     public IReadOnlyCollection<ClientPlayerWrapper> ClientPlayerWrappers => PlayerWrapperCache.Values;
-	
+
     internal PlayerLoadingState LoadingState { get; set; } = PlayerLoadingState.None;
     internal uint trainSetsToSpawn = uint.MaxValue;
     internal uint trainSetsSpawned = 0;
+    internal bool railwayStateLoaded = false;
 
     // One way ping in milliseconds
     public int Ping { get; private set; }
@@ -663,8 +664,7 @@ public class NetworkClient : NetworkManager
             turntable.SetRotation(packet.TurntableRotations[i], true, true);
         }
 
-        Log("Requesting cars");
-        SendLoadStateUpdate(PlayerLoadingState.ReadyForTrainSets);
+        railwayStateLoaded = true;
     }
 
     private void OnCommonChangeJunctionPacket(CommonChangeJunctionPacket packet)
@@ -922,7 +922,6 @@ public class NetworkClient : NetworkManager
     {
         if (!NetworkedTrainCar.TryGet(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
-
 
         networkedTrainCar.Client_ReceiveBrakeStateUpdate(packet);
 
