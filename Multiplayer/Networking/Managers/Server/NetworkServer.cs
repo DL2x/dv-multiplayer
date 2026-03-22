@@ -60,6 +60,7 @@ public class NetworkServer : NetworkManager
     private readonly Dictionary<byte, ServerPlayer> serverPlayers = [];             //player Id to ServerPlayer mapping
     private readonly Dictionary<byte, ITransportPeer> peers = [];                   //player Id to peer mapping
     private readonly Dictionary<ITransportPeer, ServerPlayer> peerToPlayer = [];    //peer to ServerPlayer mapping
+    public readonly Dictionary<byte, ServerPlayerWrapper> PlayerWrapperCache = []; //cache for ServerPlayers for API use
 
     private LobbyServerManager lobbyServerManager;
     public readonly bool IsSinglePlayer;
@@ -67,6 +68,7 @@ public class NetworkServer : NetworkManager
     public RerailController rerailController;
 
     public IReadOnlyCollection<ServerPlayer> ServerPlayers => serverPlayers.Values;
+    public IReadOnlyCollection<ServerPlayerWrapper> ServerPlayerWrappers => PlayerWrapperCache.Values;
     public int PlayerCount => ServerPlayers.Count;
 
     private ITransportPeer _selfPeer;
@@ -242,7 +244,7 @@ public class NetworkServer : NetworkManager
     {
         netPacketProcessor.SubscribeReusable<T, ITransportPeer>((packet, peer) =>
         {
-            var serverPlayer = TryGetServerPlayer(peer, out var player) ? new ServerPlayerWrapper(player) : null;
+            var serverPlayer = TryGetServerPlayer(peer, out var player) ? GetWrapper(player) : null;
             handler(packet, serverPlayer);
         });
     }
@@ -312,6 +314,16 @@ public class NetworkServer : NetworkManager
     public bool TryGetServerPlayer(byte playerId, out ServerPlayer player)
     {
         return serverPlayers.TryGetValue(playerId, out player);
+    }
+
+    public ServerPlayerWrapper GetWrapper(ServerPlayer serverPlayer)
+    {
+        if (!PlayerWrapperCache.TryGetValue(serverPlayer.PlayerId, out var wrapper))
+        {
+            wrapper = new ServerPlayerWrapper(serverPlayer);
+            PlayerWrapperCache[serverPlayer.PlayerId] = wrapper;
+        }
+        return wrapper;
     }
 
     #region Net Events
@@ -789,6 +801,19 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableUnordered, SelfPeer);
     }
 
+    public void SendPlayerPreferencesUpdate(ServerPlayer player)
+    {
+        Log($"Sending player preferences update for '{player.Username}'");
+
+        var packet = new ClientboundPlayerPreferencesUpdatePacket
+        {
+            PlayerId = player.PlayerId,
+            CrewName = player.CrewName
+        };
+
+        SendPacketToAll(packet, DeliveryMethod.ReliableUnordered);
+    }
+
     public void SendTrainUncouple(Coupler coupler, bool playAudio, bool dueToBrokenCouple, bool viaChainInteraction)
     {
         ushort couplerNetId = coupler.train.GetNetId();
@@ -1127,6 +1152,7 @@ public class NetworkServer : NetworkManager
         {
             Accepted = true,
             PlayerId = serverPlayer.PlayerId,
+            OverrideUsername = serverPlayer.OriginalUsername == serverPlayer.Username ? string.Empty : overrideUsername,
         };
 
         SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
@@ -1191,7 +1217,6 @@ public class NetworkServer : NetworkManager
         {
             PlayerId = serverPlayer.PlayerId,
             Username = serverPlayer.Username,
-            //Guid = serverPlayer.Guid.ToByteArray()
         };
         SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, peer);
 
@@ -1268,7 +1293,7 @@ public class NetworkServer : NetworkManager
             {
                 PlayerId = player.PlayerId,
                 Username = player.Username,
-                //Guid = player.Guid.ToByteArray(),
+                CrewName = player.CrewName,
                 CarID = player.CarId,
                 Position = player.RawPosition,
                 Rotation = player.RawRotationY
