@@ -291,7 +291,7 @@ public class NetworkClient : NetworkManager
         Log($"Waiting for ready-blocks...");
         DisplayLoadingInfo displayLoadingInfo = Object.FindObjectOfType<DisplayLoadingInfo>();
         foreach (string modName in readyBlocks)
-            displayLoadingInfo?.OnLoadingStatusChanged($"Waiting for mod {modName} to load", false, 100);
+            displayLoadingInfo?.OnLoadingStatusChanged($"Waiting for mod {modName} to load", false, ((float)LoadingState / (float)PlayerLoadingState.Complete) * 100);
 
         while (readyBlocks.Count > 0)
             yield return null;
@@ -302,17 +302,20 @@ public class NetworkClient : NetworkManager
          */
 
         Log("Syncing world state");
-        displayLoadingInfo.OnLoadingStatusChanged(Locale.LOADING_INFO__SYNC_WORLD_STATE, false, 100); //todo add additional status info and % complete
         SendLoadStateUpdate(PlayerLoadingState.ReadyForWorldState);
+        displayLoadingInfo.OnLoadingStatusChanged(Locale.LOADING_INFO__SYNC_WORLD_STATE, false, ((float)LoadingState / (float)PlayerLoadingState.Complete) * 100);
 
-        // Transition is triggered by OnClientboundRailwayStatePacket()
-        while (LoadingState != PlayerLoadingState.ReadyForTrainSets)
+        while (!railwayStateLoaded)
             yield return null;
 
         /*
          * ReadyForTrainSets
          * Trainsets have been requested
          */
+
+        Log("Requesting cars");
+        SendLoadStateUpdate(PlayerLoadingState.ReadyForTrainSets);
+        displayLoadingInfo.OnLoadingStatusChanged("Syncing Rolling Stock", false, ((float)LoadingState / (float)PlayerLoadingState.Complete) * 100);
 
         uint lastLoggedSets = 0;
 
@@ -340,15 +343,16 @@ public class NetworkClient : NetworkManager
          */
 
         //TODO: implement
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(0.25f);
 
         /* 
          * ReadyForItems
          */
+
         Log($"Train sets spawned, requesting items");
         SendLoadStateUpdate(PlayerLoadingState.ReadyForItems);
 
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(0.25f);
 
         /* 
          * ReadyForJobs
@@ -357,7 +361,7 @@ public class NetworkClient : NetworkManager
         Log($"Requesting jobs");
         SendLoadStateUpdate(PlayerLoadingState.ReadyForJobs);
 
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(0.25f);
 
 
         /* 
@@ -370,6 +374,8 @@ public class NetworkClient : NetworkManager
         yield return new WaitForSeconds(0.5f);
 
         SendLoadStateUpdate(PlayerLoadingState.Complete);
+        displayLoadingInfo.OnLoadingStatusChanged("Complete", false, ((float)LoadingState / (float)PlayerLoadingState.Complete) * 100);
+        yield return new WaitForSeconds(0.25f);
     }
 
     public ClientPlayerWrapper GetWrapper(NetworkedPlayer networkedPlayer)
