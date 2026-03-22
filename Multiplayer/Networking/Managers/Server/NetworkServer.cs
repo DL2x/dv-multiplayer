@@ -514,7 +514,7 @@ public class NetworkServer : NetworkManager
             SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, PlayerLoadingState.ReadyForWorldState, excludeSelf: true);
     }
 
-    public void SendSpawnTrainset(List<TrainCar> set, bool autoCouple, bool sendToAll, bool playerSpawned = false, ITransportPeer sendTo = null)
+    public void SendSpawnTrainset(List<TrainCar> set, bool autoCouple, bool sendToAll, ITransportPeer sendTo = null)
     {
 
         LogDebug(() =>
@@ -532,7 +532,7 @@ public class NetworkServer : NetworkManager
 
         });
 
-        var packet = ClientboundSpawnTrainSetPacket.FromTrainSet(set, autoCouple, playerSpawned);
+        var packet = ClientboundSpawnTrainSetPacket.FromTrainSet(set, autoCouple);
 
         if (!sendToAll)
         {
@@ -1793,7 +1793,7 @@ public class NetworkServer : NetworkManager
             LogDebug(() => $"OnServerboundWorkTrainRequestPacket() {player.Username} tried to request a work train of {livery.id} but no existing car found, spawning new car");
             trainCar = CarSpawner.Instance.SpawnCrewVehicle(livery, networkedRailTrack.RailTrack, (Vector3)spawnPoint.position, forward, selectedGarageSpawner);
 
-            SendSpawnTrainset([trainCar], true, true, true);
+            SendSpawnTrainset([trainCar], true, true);
         }
         else
         {
