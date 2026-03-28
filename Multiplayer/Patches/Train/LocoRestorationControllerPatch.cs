@@ -1,4 +1,5 @@
 using DV.LocoRestoration;
+using DV.ThingTypes;
 using HarmonyLib;
 using Multiplayer.Components.Networking;
 using System.Collections.Generic;
@@ -100,6 +101,55 @@ public static class LocoRestorationControllerInitCarForRestorationPatch
              Multiplayer.LogWarning(() => $"LocoZoneBlocker not found for car {car.ID}");
 
         return locoZoneBlocker;
+    }
+
+}
+
+// Prevent the restoration popup from showing if the player is too far from the loco or tender
+[HarmonyPatch(typeof(LocoRestorationController))]
+public static class LocoRestorationControllerSetStatePatch
+{
+    const float MAX_MANUAL_DISTANCE_SQR = 50f * 50f;
+
+    [HarmonyPatch(nameof(LocoRestorationController.SetState))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> InitCarForRestoration(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+    {
+        var codeMatcher = new CodeMatcher(instructions, generator);
+
+        // Find call to GetStatusMessageFor()
+        codeMatcher
+            .MatchStartForward
+            (
+                new CodeMatch(OpCodes.Call, AccessTools.Method(typeof(LocoRestorationView), nameof(LocoRestorationView.GetStatusMessageFor)))
+            )
+            .ThrowIfNotMatch("Failed to find LocoRestorationView.GetStatusMessageFor() call")
+            .InsertAndAdvance(new CodeInstruction(OpCodes.Ldarg_0))   // Load LocoRestorationController instance instead of constant 'true'
+            .SetInstruction(CodeInstruction.Call(typeof(LocoRestorationControllerSetStatePatch), nameof(GetStatusMessageFor))); // replace GetStatusMessageFor with our version
+
+        return codeMatcher.Instructions();
+    }
+
+    // Check Player's distance to the loco and tender, if close enough, get the status message, otherwise return null to skip the popup
+    private static string GetStatusMessageFor(TrainCarLivery livery, LocoRestorationController.RestorationState state, bool popupMode, LocoRestorationController controller)
+    {
+        Vector3 locoDelta, tenderDelta;
+        float locoSqrMagnitude = float.MaxValue;
+        float tenderSqrMagnitude = float.MaxValue;
+
+        locoDelta = PlayerManager.PlayerTransform.position - controller.loco.transform.position;
+        locoSqrMagnitude = locoDelta.sqrMagnitude;
+
+        if (controller.secondCar != null)
+        {
+            tenderDelta = PlayerManager.PlayerTransform.position - controller.secondCar.transform.position;
+            tenderSqrMagnitude = tenderDelta.sqrMagnitude;
+        }
+
+        if (locoSqrMagnitude <= MAX_MANUAL_DISTANCE_SQR || tenderSqrMagnitude <= MAX_MANUAL_DISTANCE_SQR)
+            return LocoRestorationView.GetStatusMessageFor(livery, state, popupMode);
+
+        return null;
     }
 
 }
