@@ -14,4 +14,5 @@ public struct RestorationData
     public ushort NetId;
     public LocoRestorationController.RestorationState RestorationState;
     public ushort SecondCarNetId;
+    public ushort[] TransportingCarNetIds;
 }

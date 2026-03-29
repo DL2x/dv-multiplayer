@@ -102,7 +102,8 @@ public static class NetworkedCarSpawner
             {
                 NetId = spawnPart.NetId,
                 RestorationState = spawnPart.RestorationState,
-                SecondCarNetId = spawnPart.SecondCarNetId
+                SecondCarNetId = spawnPart.SecondCarNetId,
+                TransportingCarNetIds = spawnPart.TransportingCarNetIds
             });
         }
 
@@ -279,6 +280,22 @@ public static class NetworkedCarSpawner
                     continue;
                 }
                 restorationData.SetString(LocoRestorationController.SECOND_CAR_GUID_SAVE_KEY, secondCar.CarGUID);
+            }
+
+            // Add any transportation car GUIds
+            if (data.TransportingCarNetIds != null && data.TransportingCarNetIds.Length > 0)
+            {
+                string[] transportationCarsArray = new string[data.TransportingCarNetIds.Length];
+                for (int i = 0; i < data.TransportingCarNetIds.Length; i++)
+                {
+                    if (!NetworkedTrainCar.TryGet(data.TransportingCarNetIds[i], out TrainCar transportationCar))
+                    {
+                        Multiplayer.LogWarning($"Unable to apply restoration state for TrainCar with netId: {data.NetId} could not find transportation car with netId: {data.TransportingCarNetIds[i]}");
+                        continue;
+                    }
+                    transportationCarsArray[i] = transportationCar.CarGUID;
+                }
+                restorationData.SetStringArray(LocoRestorationController.TRANSPORTING_CARS_ARRAY_SAVE_KEY, transportationCarsArray);
             }
 
             // Apply the restoration state to the loco's LocoRestorationController
