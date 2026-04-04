@@ -3,6 +3,7 @@ using DV.Common;
 using DV.Customization.Paint;
 using DV.Damage;
 using DV.InventorySystem;
+using DV.LocoRestoration;
 using DV.Logic.Job;
 using DV.MultipleUnit;
 using DV.ServicePenalty.UI;
@@ -195,6 +196,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonMuDisconnectedPacket>(OnCommonMuDisconnectedPacket);
 
         netPacketProcessor.SubscribeReusable<CommonPaintThemePacket>(OnCommonPaintThemePacket);
+        netPacketProcessor.SubscribeReusable<ClientboundRestorationStateChangePacket>(OnClientboundRestorationStateChangePacket);
 
         netPacketProcessor.SubscribeReusable<ClientboundTrainControlAuthorityUpdatePacket>(OnClientboundTrainControlAuthorityUpdatePacket);
 
@@ -334,6 +336,9 @@ public class NetworkClient : NetworkManager
 
             yield return null;
         }
+
+        // Artificial delay to allow cargo to be loaded prior to applying restoration states
+        yield return new WaitForSeconds(0.5f);
 
         // Trainsets spawned, apply restoration states for demonstrators
         NetworkedCarSpawner.ApplyRestorationStates();
@@ -1303,6 +1308,35 @@ public class NetworkClient : NetworkManager
 
         LogDebug(() => $"OnCommonPaintThemePacket() [{netTrainCar?.CurrentID}, {packet.NetId}], area: {packet.TargetArea}, paint: [{paint?.AssetName}, {packet.PaintThemeId}]");
         netTrainCar?.Common_ReceivePaintThemeUpdate(packet.TargetArea, paint);
+    }
+
+    private void OnClientboundRestorationStateChangePacket(ClientboundRestorationStateChangePacket packet)
+    {
+        LogDebug(() => $"OnClientboundRestorationStateChangePacket() NetId: {packet.NetId}, NewState: {packet.NewState}, TransportCarNetIds: [{string.Join(", ", packet?.TransportCarNetIds)}]");
+
+        if (!NetworkedTrainCar.TryGet(packet.NetId, out TrainCar trainCar))
+        {
+            LogWarning($"Received restoration state change for netId: {packet.NetId}, but TrainCar was not found.");
+            return;
+        }
+
+        Log($"Received restoration state change for {trainCar?.ID}");
+
+        var controller = LocoRestorationController.GetForTrainCar(trainCar);
+        if (controller == null)
+        {
+            LogWarning($"Received restoration state change for {trainCar?.ID}, but LocoRestorationController was not found.");
+            return;
+        }
+
+        switch(packet.NewState)
+        {
+            case LocoRestorationController.RestorationState.S5_PartOrdered:
+                controller.orderPartsModule.SetUnitsToBuy(0f);
+                controller.OnPartsOrdered();
+                break;
+
+        }
     }
 
     private void OnCommonCashRegisterWithModulesActionPacket(CommonCashRegisterWithModulesActionPacket packet)

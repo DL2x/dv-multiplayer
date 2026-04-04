@@ -3,6 +3,7 @@ using DV.Customization;
 using DV.Customization.Paint;
 using DV.Garages;
 using DV.InventorySystem;
+using DV.LocoRestoration;
 using DV.Logic.Job;
 using DV.Scenarios.Common;
 using DV.ServicePenalty;
@@ -641,6 +642,20 @@ public class NetworkServer : NetworkManager
             SendPacket(sendToPlayer.Peer, packet, DeliveryMethod.ReliableUnordered);
         else
             SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, PlayerLoadingState.ReadyForTrainSets, true);
+    }
+
+    public void SendRestorationStateChange(ushort netId, LocoRestorationController.RestorationState newState, ushort[] transportCars)
+    {
+        var packet = new ClientboundRestorationStateChangePacket
+        {
+            NetId = netId,
+            NewState = newState,
+            TransportCarNetIds = transportCars
+        };
+
+        Log($"Sending restoration state change for {netId}, new state: {newState}, transport cars count: {transportCars?.Count() ?? 0}");
+
+        SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, PlayerLoadingState.ReadyForItems, true);
     }
 
     public void SendWarehouseControllerUpdate(ushort netId, bool isLoading, ushort jobNetId, ushort carNetId, uint cargoTypeNetId, WarehouseMachineController.TextPreset preset)

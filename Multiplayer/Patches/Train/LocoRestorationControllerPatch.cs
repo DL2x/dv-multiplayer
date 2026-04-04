@@ -2,6 +2,7 @@ using DV.LocoRestoration;
 using DV.ThingTypes;
 using HarmonyLib;
 using Multiplayer.Components.Networking;
+using Multiplayer.Components.Networking.Train;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -59,6 +60,18 @@ public static class LocoRestorationControllerStartPatch
 }
 
 [HarmonyPatch(typeof(LocoRestorationController))]
+public static class LocoRestorationControllerStartPostfixPatch
+{
+    [HarmonyPatch(nameof(LocoRestorationController.Start))]
+    [HarmonyPostfix]
+    private static void Start(LocoRestorationController __instance)
+    {
+        if (NetworkLifecycle.Instance.IsHost())
+            NetworkRestorationWatcher.Instance.AddController(__instance);
+    }
+}
+
+[HarmonyPatch(typeof(LocoRestorationController))]
 public static class LocoRestorationControllerInitCarForRestorationPatch
 {
     [HarmonyPatch(nameof(LocoRestorationController.InitCarForRestoration))]
@@ -109,7 +122,7 @@ public static class LocoRestorationControllerInitCarForRestorationPatch
 [HarmonyPatch(typeof(LocoRestorationController))]
 public static class LocoRestorationControllerSetStatePatch
 {
-    const float MAX_MANUAL_DISTANCE_SQR = 50f * 50f;
+    const float MAX_MANUAL_DISTANCE_SQR = 100f * 100f;
 
     [HarmonyPatch(nameof(LocoRestorationController.SetState))]
     [HarmonyTranspiler]
