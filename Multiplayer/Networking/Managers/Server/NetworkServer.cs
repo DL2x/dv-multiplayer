@@ -1242,6 +1242,16 @@ public class NetworkServer : NetworkManager
                     TurntableRotations = NetworkedTurntable.IndexedTurntables.Select(j => j.TurntableRailTrack.currentYRotation).ToArray()
                 }, DeliveryMethod.ReliableOrdered);
 
+                // Send generic switch states
+                foreach (var genericSwitch in NetworkedGenericSwitch.AllSwitches)
+                {
+                    SendPacket(peer, new CommonGenericSwitchStatePacket
+                    {
+                        NetId = genericSwitch.NetId,
+                        IsOn = genericSwitch.IsOn
+                    }, DeliveryMethod.ReliableOrdered);
+                }
+
                 break;
 
             case PlayerLoadingState.ReadyForTrainSets:
