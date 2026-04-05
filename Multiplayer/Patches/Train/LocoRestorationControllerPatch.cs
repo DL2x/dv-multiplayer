@@ -164,5 +164,16 @@ public static class LocoRestorationControllerSetStatePatch
 
         return null;
     }
+}
 
+[HarmonyPatch(typeof(LocoRestorationController))]
+public static class LocoRestorationControllerDeliverPartCoroPatch
+{
+    [HarmonyPatch(nameof(LocoRestorationController.DeliverPartCoro))]
+    [HarmonyPrefix]
+    private static bool DeliverPartCoroPatch()
+    {
+        // Only allow the host to run the DeliverPartCoro
+        return NetworkLifecycle.Instance.IsHost();
+    }
 }

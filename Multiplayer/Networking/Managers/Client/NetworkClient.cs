@@ -1329,13 +1329,59 @@ public class NetworkClient : NetworkManager
             return;
         }
 
-        switch(packet.NewState)
+        switch (packet.NewState)
         {
             case LocoRestorationController.RestorationState.S5_PartOrdered:
                 controller.orderPartsModule.SetUnitsToBuy(0f);
                 controller.OnPartsOrdered();
                 break;
 
+            case LocoRestorationController.RestorationState.S6_PartPickedUp:
+                if (packet.TransportCarNetIds == null || packet.TransportCarNetIds.Length == 0)
+                {
+                    LogError($"Received restoration state change for {trainCar?.ID}, but transport cars are empty");
+                    return;
+                }
+
+                List<Car> transportCars = [];
+                foreach (var netId in packet.TransportCarNetIds)
+                {
+                    if (!NetworkedTrainCar.TryGet(netId, out Car transportCar) || transportCar == null)
+                    {
+                        LogError($"Received restoration state change for {trainCar?.ID}, but failed to find transport car with netId {netId}");
+                        continue;
+                    }
+                    transportCars.Add(transportCar);
+                }
+                controller.OnOrderedPartLoadedCargo(transportCars);
+                break;
+
+            case LocoRestorationController.RestorationState.S7_PartDelivered:
+                if (controller.transportingCars != null && controller.transportingCars.Count > 0)
+                {
+                    foreach (var transportCar in controller.transportingCars)
+                    {
+                        trainCar.preventFastTravelWithCar = false;
+                        trainCar.preventDelete = false;
+                    }
+                }
+                controller.transportingCars = null;
+                controller.SetState(packet.NewState);
+                controller.installPartsModule.AddThingToCart();
+                break;
+
+            case LocoRestorationController.RestorationState.S8_PartInstalled:
+                controller.installPartsModule.SetUnitsToBuy(0f); 
+                controller.OnInstallPartsPaid();
+                break;
+
+            case LocoRestorationController.RestorationState.S9_LocoServiced:
+                controller.OnServiceDone();
+                break;
+
+            case LocoRestorationController.RestorationState.S10_PaintJobDone:
+                controller.OnPaintJobChanged();
+                break;
         }
     }
 
