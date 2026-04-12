@@ -108,6 +108,10 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     [Draw("Maximum Latency (ms)", VisibleOn = "SimulateLatency|true")]
     public int SimulationMaxLatency = 100;
     public bool ForceJson = false;
+#if DEBUG
+    [Draw("Export Save Data On Load", VisibleOn = "ShowAdvancedSettings|true")]
+    public bool ExportSaveOnLoad = false;
+#endif
 
     public void Draw(UnityModManager.ModEntry modEntry)
     {

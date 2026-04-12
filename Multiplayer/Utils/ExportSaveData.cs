@@ -10,14 +10,15 @@ namespace Multiplayer.Utils;
 #if DEBUG
 internal static class ExportSaveData
 {
-    public static void DumpSaveData()
+    public static void DumpSaveData(bool updateData = true)
     {
         var path = Path.Combine(Application.persistentDataPath, $"Save {DateTime.Now:yyyy-MM-dd_HH-mm-ss}.json");
 
         Multiplayer.Log($"Exporting save data to {path}...");
 
         // Ensure save data is up to date
-        SaveGameManager.Instance.UpdateInternalData();
+        if (updateData)
+            SaveGameManager.Instance.UpdateInternalData();
 
         try
         {
