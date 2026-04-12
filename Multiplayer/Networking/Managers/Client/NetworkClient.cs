@@ -1544,6 +1544,12 @@ public class NetworkClient : NetworkManager
 
     public void SendHoseConnected(Coupler coupler, Coupler otherCoupler, bool playAudio)
     {
+        if (coupler == null || otherCoupler == null)
+        {
+            LogWarning($"Failed to send HoseConnected, {(coupler ==null ? "Coupler is null" : coupler?.train?.ID)}, {(otherCoupler == null ? "Other Coupler is null" : otherCoupler?.train?.ID)}");
+            return;
+        }
+
         ushort couplerNetId = coupler.train.GetNetId();
         ushort otherCouplerNetId = otherCoupler.train.GetNetId();
 
