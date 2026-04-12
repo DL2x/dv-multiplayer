@@ -178,6 +178,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private readonly HashSet<TrainCarPaint> dirtyPaints = [];
     private readonly Dictionary<string, float> lastSentTrainDamages = [];
 
+    private Dictionary<InteriorControlsManager.ControlType, OverridableBaseControl> controlTypeToControl = [];
+    private readonly Dictionary<uint, OverridableBaseControl> portToBaseControl = [];
+
     private bool handbrakeDirty;
     private bool mainResPressureDirty;
     private bool brakeOverheatDirty;
@@ -282,6 +285,29 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             hasSimFlow = true;
             simulationFlow = simController.SimulationFlow;
 
+            // Find all train controls
+            controlTypeToControl = simController.controlsOverrider.controlsMap;
+            foreach (var kvp in controlTypeToControl)
+            {
+                var control = kvp.Value;
+                if (control == null)
+                {
+                    Multiplayer.LogWarning($"NetworkedTrainCar.Start() Control {kvp.Key} is null on car {CurrentID}");
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(control.portId))
+                {
+                    Multiplayer.LogWarning($"NetworkedTrainCar.Start() Control {kvp.Key} has no portId on car {CurrentID}");
+                    continue;
+                }
+
+                var portNetId = GetPortNetId(control.portId);
+                portToBaseControl[portNetId] = control;
+
+                Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start() Control {kvp.Key} has portId {control.portId} on car {CurrentID}");
+            }
+
             TrainCar.InteriorLoaded += OnTrainCarInteriorLoaded;
             TrainCar.InteriorAboutToBeUnloaded += OnTrainCarInteriorUnloaded;
 
@@ -292,19 +318,27 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             lastSentPortValues = new Dictionary<uint, float>(dirtyPorts.Count);
             foreach (KeyValuePair<string, Port> kvp in simulationFlow.fullPortIdToPort)
             {
-                _ = GetPortNetId(kvp.Key); //ensure this port is registered
+                var portNetId = GetPortNetId(kvp.Key);
                 if (kvp.Value.valueType == PortValueType.CONTROL || NetworkLifecycle.Instance.IsHost())
                 {
-                    Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({CurrentID}, {NetId}) Subscribing to port {kvp.Key}");
-                    kvp.Value.ValueUpdatedInternally += _ => { Common_OnPortUpdated(kvp.Value); };
+                    if (portToBaseControl.TryGetValue(portNetId, out var control))
+                    {
+                        Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({CurrentID}, {NetId}) Subscribing to control {control.ControlType} for {kvp.Key} with netId {portNetId}");
+                        control.ControlUpdated += _ => { Common_OnPortUpdated(kvp.Value, portNetId); };
+                    }
+                    else
+                    {
+                        Multiplayer.LogDebug(() => $"NetworkedTrainCar.Start({CurrentID}, {NetId}) Subscribing to port {kvp.Key}");
+                        kvp.Value.ValueUpdatedInternally += _ => { Common_OnPortUpdated(kvp.Value, portNetId); };
+                    }
                 }
             }
 
             dirtyFuses = new HashSet<uint>(simulationFlow.fullFuseIdToFuse.Count);
             foreach (KeyValuePair<string, Fuse> kvp in simulationFlow.fullFuseIdToFuse)
             {
-                _ = GetFuseNetId(kvp.Key); //ensure this fuse is registered
-                kvp.Value.StateUpdated += _ => { Common_OnFuseUpdated(kvp.Value); };
+                var fuseNetId = GetFuseNetId(kvp.Key);
+                kvp.Value.StateUpdated += _ => { Common_OnFuseUpdated(fuseNetId); };
             }
 
             firebox = simController.firebox;
@@ -1139,9 +1173,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         NetworkLifecycle.Instance.Client.SendBrakeCylinderReleased(NetId);
     }
 
-    private void Common_OnPortUpdated(Port port)
+    private void Common_OnPortUpdated(Port port, uint portNetId)
     {
-
+        //Multiplayer.LogDebug(() => $"Common_OnPortUpdated() port [{port?.id}] updated on [{CurrentID}, {NetId}]. Value: {port?.Value}, PrevValue: {port?.prevValue}, ValueType: {port?.valueType}, Tick: {NetworkLifecycle.Instance.Tick}");
         if (port.valueType != PortValueType.CONTROL && !NetworkLifecycle.Instance.IsHost())
         {
             Multiplayer.LogDebug(() => $"Common_OnPortUpdated() Ignoring non-control port update for [{port.id}] on [{CurrentID}, {NetId}]");
@@ -1153,27 +1187,26 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (float.IsNaN(port.prevValue) && float.IsNaN(port.Value))
             return;
 
-        var netId = GetPortNetId(port.id);
-        bool hasLastSent = lastSentPortValues.TryGetValue(netId, out float lastSentValue);
+        bool hasLastSent = lastSentPortValues.TryGetValue(portNetId, out float lastSentValue);
         float delta = Mathf.Abs(lastSentValue - port.Value);
 
         if (port.valueType == PortValueType.STATE)
         {
             if (!hasLastSent || lastSentValue != port.Value)
             {
-                dirtyPorts.Add(netId);
+                dirtyPorts.Add(portNetId);
             }
         }
         else
         {
             if (!hasLastSent || delta > MAX_PORT_DELTA || (port.Value == 0 && lastSentValue != 0))
             {
-                dirtyPorts.Add(netId);
+                dirtyPorts.Add(portNetId);
             }
 
             if (port.valueType == PortValueType.CONTROL)
             {
-                dirtyPorts.Add(netId);
+                dirtyPorts.Add(portNetId);
             }
         }
     }
@@ -1189,13 +1222,12 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         dirtyPaints.Add(paintController);
     }
 
-    private void Common_OnFuseUpdated(Fuse fuse)
+    private void Common_OnFuseUpdated(uint fuseNetId)
     {
         if (UnloadWatcher.isUnloading || NetworkLifecycle.Instance.IsProcessingPacket)
             return;
 
-        var netId = GetFuseNetId(fuse.id);
-        dirtyFuses.Add(netId);
+        dirtyFuses.Add(fuseNetId);
     }
 
     public void Common_UpdatePorts(CommonTrainPortsPacket packet)
