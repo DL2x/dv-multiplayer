@@ -25,6 +25,6 @@ jobs:
           git remote add upstream https://github.com/AMacro/dv-multiplayer.git || true
           git fetch upstream alpha
 
-      - name: Push alpha to incoming
+      - name: Push alpha to incomming
         run: |
           git push origin FETCH_HEAD:refs/heads/incoming --force
