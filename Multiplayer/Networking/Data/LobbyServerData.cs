@@ -61,6 +61,9 @@ namespace Multiplayer.Networking.Data
         [JsonProperty("server_info")]
         public string ServerDetails { get; set; }
 
+        public NetworkTransportMode TransportMode { get; set; } = RuntimeConfiguration.GetDefaultHostTransportMode();
+        public MultiplayerRuntimeType RuntimeType { get; set; } = RuntimeConfiguration.RuntimeType;
+
         [JsonIgnore]
         public int Ping { get; set; } = -1;
         [JsonIgnore]

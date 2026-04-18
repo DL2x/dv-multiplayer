@@ -29,6 +29,8 @@ public interface IServerBrowserGameDetails : IDisposable
     string GameVersion { get; set; }
     string MultiplayerVersion { get; set; }
     string ServerDetails { get; set; }
+    NetworkTransportMode TransportMode { get; set; }
+    MultiplayerRuntimeType RuntimeType { get; set; }
     int Ping {get; set; }
     ServerVisibility Visibility { get; set; }
     int LastSeen { get; set; }

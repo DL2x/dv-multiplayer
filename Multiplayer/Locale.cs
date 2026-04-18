@@ -128,6 +128,10 @@ public static class Locale
     public const string SERVER_HOST_DETAILS_KEY = $"{PREFIX_SERVER_HOST}/details";
     public static string SERVER_HOST_MAX_PLAYERS => Get(SERVER_HOST_MAX_PLAYERS_KEY);
     public const string SERVER_HOST_MAX_PLAYERS_KEY = $"{PREFIX_SERVER_HOST}/max_players";
+    public static string SERVER_HOST_TRANSPORT_MODE => Get(SERVER_HOST_TRANSPORT_MODE_KEY);
+    public const string SERVER_HOST_TRANSPORT_MODE_KEY = $"{PREFIX_SERVER_HOST}/transport_mode";
+    public static string[] SERVER_HOST_TRANSPORT_MODE_VALUES = [$"{SERVER_HOST_TRANSPORT_MODE_VALUES_KEY}/steam", $"{SERVER_HOST_TRANSPORT_MODE_VALUES_KEY}/direct", $"{SERVER_HOST_TRANSPORT_MODE_VALUES_KEY}/both"];
+    public const string SERVER_HOST_TRANSPORT_MODE_VALUES_KEY = $"{PREFIX_SERVER_HOST}/transport_mode/modes";
     public static string SERVER_HOST_START => Get(SERVER_HOST_START_KEY);
     public const string SERVER_HOST_START_KEY = $"{PREFIX_SERVER_HOST}/start";
 

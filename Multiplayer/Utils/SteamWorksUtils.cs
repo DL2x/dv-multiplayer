@@ -30,7 +30,7 @@ public static class SteamworksUtils
 
         try
         {
-            if (!DVSteamworks.Success)
+            if (!RuntimeConfiguration.CanUseSteamServices)
                 return false;
 
             if (!SteamClient.IsValid || !SteamClient.SteamId.IsValid)
@@ -137,17 +137,17 @@ public static class SteamworksUtils
     {
         float time = Time.time;
 
-        Multiplayer.LogDebug(() => $"JoinFromCommandLine() {DVSteamworks.Success}");
+        Multiplayer.LogDebug(() => $"JoinFromCommandLine() {RuntimeConfiguration.RuntimeType}");
 
-        if (hasJoinedCL || BuildInfo.BUILD_DESTINATION != "steam")
+        if (hasJoinedCL || !RuntimeConfiguration.CanUseSteamServices)
             yield break;
 
         hasJoinedCL = true;
 
         //allow steamworks to initialise
-        yield return new WaitUntil(() => { return DVSteamworks.Success || (Time.deltaTime - time) > 5; });
+        yield return new WaitUntil(() => { return RuntimeConfiguration.CanUseSteamServices || (Time.time - time) > 5; });
 
-        if (!DVSteamworks.Success)
+        if (!RuntimeConfiguration.CanUseSteamServices)
             yield break;
 
         var id = GetLobbyIdFromArgs();

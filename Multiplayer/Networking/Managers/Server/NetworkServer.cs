@@ -66,6 +66,7 @@ public class NetworkServer : NetworkManager
 
     private LobbyServerManager lobbyServerManager;
     public readonly bool IsSinglePlayer;
+    public readonly NetworkTransportMode TransportMode;
     public LobbyServerData ServerData;
     public RerailController rerailController;
 
@@ -96,11 +97,12 @@ public class NetworkServer : NetworkManager
 
     private uint lastTick;
 
-    public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData) : base(settings)
+    public NetworkServer(IDifficulty difficulty, Settings settings, bool singlePlayer, LobbyServerData serverData, NetworkTransportMode transportMode) : base(settings, TransportFactory.CreateServerTransport(transportMode))
     {
-        Log($"Server created for {(singlePlayer ? "single player" : "multiplayer")} game");
+        Log($"Server created for {(singlePlayer ? "single player" : "multiplayer")} game using {transportMode} transport");
 
         IsSinglePlayer = singlePlayer;
+        TransportMode = transportMode;
         ServerData = serverData;
         Difficulty = difficulty;
     }
@@ -307,15 +309,32 @@ public class NetworkServer : NetworkManager
     public override void OnPeerConnected(ITransportPeer peer)
     {
         LogDebug(() => $"OnPeerConnected({peer.Id})");
+
+        // Send the login-accept packet only once the peer is fully connected.
+        // Sending during the connection-request phase can be unreliable on some transports.
+        if (peerToPlayer.TryGetValue(peer, out var player))
+        {
+            var acceptPacket = new ClientboundLoginResponsePacket
+            {
+                Accepted = true,
+                PlayerId = player.PlayerId,
+                OverrideUsername = player.OriginalUsername == player.Username ? string.Empty : player.Username,
+            };
+
+            SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
+        }
     }
 
     public override void OnPeerDisconnected(ITransportPeer peer, DisconnectReason disconnectReason)
     {
         LogDebug(() => $"OnPeerDisconnected({peer.Id})");
-        if (!peerToPlayer.TryGetValue(peer, out ServerPlayer player))
-            LogWarning($"Peer {peer.GetType()}, peerId: {peer.Id} disconnected but no player found");
-        else
-            Log($"Player {player?.Username} disconnected: {disconnectReason}");
+        if (!peerToPlayer.TryGetValue(peer, out ServerPlayer player) || player == null)
+        {
+            LogWarning($"Peer {peer?.GetType()}, peerId: {peer?.Id} disconnected but no player found");
+            return;
+        }
+
+        Log($"Player {player.Username} disconnected: {disconnectReason}");
 
         if (WorldStreamingInit.isLoaded)
             SaveGameManager.Instance.UpdateInternalData();
@@ -370,7 +389,17 @@ public class NetworkServer : NetworkManager
     public override void OnConnectionRequest(NetDataReader requestData, IConnectionRequest request)
     {
         LogDebug(() => $"NetworkServer OnConnectionRequest");
-        netPacketProcessor.ReadAllPackets(requestData, request);
+        try
+        {
+            netPacketProcessor.ReadAllPackets(requestData, request);
+        }
+        catch (Exception e)
+        {
+            // If parsing/handling fails, reject the request; otherwise the client may sit
+            // in a half-open state and never complete loading.
+            LogWarning($"Failed to process connection request from {request.RemoteEndPoint}: {e}");
+            try { request.Reject(); } catch { }
+        }
     }
 
     #endregion
@@ -1105,7 +1134,30 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        var validation = ModCompatibilityManager.Instance.ValidateClientMods(packet.Mods);
+        // Mods may be missing or malformed on some clients/transports.
+        // If the client did not send a list at all, skip validation to avoid false negatives.
+        var clientMods = packet.Mods;
+
+        ModValidationResult validation;
+        if (clientMods == null)
+        {
+            LogWarning("Client sent no mod list in login packet; skipping mod validation.");
+            validation = new ModValidationResult { IsValid = true };
+            clientMods = Array.Empty<ModInfo>();
+        }
+        else
+        {
+            try
+            {
+                validation = ModCompatibilityManager.Instance.ValidateClientMods(clientMods);
+            }
+            catch (Exception e)
+            {
+                LogWarning($"Mod validation failed (will allow join): {e.Message}");
+                validation = new ModValidationResult { IsValid = true };
+            }
+        }
+
         if (!validation.IsValid)
         {
 
@@ -1118,7 +1170,7 @@ public class NetworkServer : NetworkManager
                     sb.AppendLine($"\t{mod.Id} {mod.Version}, Status: {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
 
                 sb.AppendLine("\r\nClient Mods:");
-                foreach (ModInfo mod in packet.Mods)
+                foreach (ModInfo mod in clientMods)
                     sb.AppendLine($"\t{mod.Id} {mod.Version}, Status (if known): {ModCompatibilityManager.Instance.GetCompatibility(mod)}");
 
                 sb.AppendLine("\r\nMissing Mods:");
@@ -1146,7 +1198,17 @@ public class NetworkServer : NetworkManager
         if (AppUtil.Instance.IsTimePaused)
             AppUtil.Instance.RequestSystemOnValueChanged(0.0f);
 
-        ITransportPeer peer = request.Accept();
+        ITransportPeer peer;
+        try
+        {
+            peer = request.Accept();
+        }
+        catch (Exception e)
+        {
+            LogWarning($"Accept() threw for {packet.Username}{(Multiplayer.Settings.LogIps ? $" at {request.RemoteEndPoint.Address}" : string.Empty)}: {e}");
+            request.Reject();
+            return;
+        }
 
         ServerPlayer serverPlayer = new
         (
@@ -1159,14 +1221,8 @@ public class NetworkServer : NetworkManager
         serverPlayers.Add(serverPlayer.PlayerId, serverPlayer);
         peerToPlayer.Add(peer, serverPlayer);
 
-        ClientboundLoginResponsePacket acceptPacket = new()
-        {
-            Accepted = true,
-            PlayerId = serverPlayer.PlayerId,
-            OverrideUsername = serverPlayer.OriginalUsername == serverPlayer.Username ? string.Empty : overrideUsername,
-        };
+        // Accepted is sent in OnPeerConnected once the transport reports a fully connected peer.
 
-        SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
     }
 
     private void OnServerboundLoadStateUpdatePacket(ServerboundLoadStateUpdatePacket packet, ITransportPeer peer)

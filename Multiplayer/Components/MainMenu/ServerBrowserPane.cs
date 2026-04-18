@@ -134,7 +134,8 @@ public class ServerBrowserPane : MonoBehaviour
 
     public void Update()
     {
-        SteamClient.RunCallbacks();
+        if (RuntimeConfiguration.CanUseSteamServices)
+            SteamClient.RunCallbacks();
 
         //Handle server refresh interval
         timePassed += Time.deltaTime;
@@ -188,11 +189,7 @@ public class ServerBrowserPane : MonoBehaviour
 
     public void Start()
     {
-        if (DVSteamworks.Success)
-            return;
-
-        Multiplayer.Log($"Steam not detected, prompt for restart.");
-        MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Please restart the game with Steam running", () => { });
+        Multiplayer.Log($"ServerBrowserPane Started ({RuntimeConfiguration.RuntimeType})");
     }
 
     private void CleanUI()
@@ -463,8 +460,14 @@ public class ServerBrowserPane : MonoBehaviour
         //buttonJoin.ToggleInteractable(false);
         buttonRefresh.ToggleInteractable(false);
 
-        if (DVSteamworks.Success)
+        if (RuntimeConfiguration.CanJoinSteamLobbies)
+        {
             ListActiveLobbies();
+        }
+        else
+        {
+            remoteRefreshComplete = true;
+        }
 
     }
     private void JoinAction()
@@ -475,21 +478,46 @@ public class ServerBrowserPane : MonoBehaviour
         buttonDirectIP.ToggleInteractable(false);
         buttonJoin.ToggleInteractable(false);
 
-        //not making a direct connection
+        // Prefer Steam lobbies when available, otherwise fall back to direct UDP.
         direct = false;
         portNumber = -1;
 
-        var lobby = GetLobbyFromServer(selectedServer);
-        if (lobby != null)
+        if (RuntimeConfiguration.CanJoinSteamLobbies && selectedServer.TransportMode != NetworkTransportMode.Direct)
         {
-            selectedLobby = (Lobby)lobby;
-            _ = JoinLobby((Lobby)selectedLobby);
+            var lobby = GetLobbyFromServer(selectedServer);
+            if (lobby != null)
+            {
+                selectedLobby = (Lobby)lobby;
+                _ = JoinLobby((Lobby)selectedLobby);
+                return;
+            }
         }
-        else
+
+        if (selectedServer.TransportMode != NetworkTransportMode.Steam && selectedServer.port > 0)
         {
-            Multiplayer.LogWarning($"JoinAction called but lobby is null");
-            AttemptFail();
+            direct = true;
+            portNumber = selectedServer.port;
+            address = !string.IsNullOrWhiteSpace(selectedServer.ipv4)
+                ? selectedServer.ipv4
+                : selectedServer.ipv6;
+
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                Multiplayer.LogWarning("JoinAction called for a direct server without a usable IP address");
+                AttemptFail();
+                return;
+            }
+
+            if (selectedServer.HasPassword)
+                ShowPasswordPopup();
+            else
+                InitiateConnection();
+
+            return;
         }
+
+        Multiplayer.LogWarning($"JoinAction could not find a supported connection path for server '{selectedServer?.Name}'");
+        AttemptFail();
     }
 
     private void DirectAction()
@@ -896,7 +924,8 @@ public class ServerBrowserPane : MonoBehaviour
     #region workflow
     private void UpdatePings()
     {
-        UpdatePingsSteam();
+        if (RuntimeConfiguration.CanUseSteamServices)
+            UpdatePingsSteam();
     }
 
     private void InitiateConnection()
@@ -911,7 +940,7 @@ public class ServerBrowserPane : MonoBehaviour
         {
             connectionState = ConnectionState.AttemptingSteamRelay;
             string hostId = ((Lobby)joinedLobby).Owner.Id.Value.ToString();
-            NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, OnDisconnect);
+            NetworkLifecycle.Instance.StartClient(hostId, -1, password, false, OnDisconnect, NetworkTransportMode.Steam);
             return;
         }
 
@@ -950,7 +979,7 @@ public class ServerBrowserPane : MonoBehaviour
 
         Multiplayer.Log($"AttemptIPv6() starting attempt");
         connectionState = ConnectionState.AttemptingIPv6;
-        SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
+        SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect, NetworkTransportMode.Direct);
 
     }
 
@@ -1001,7 +1030,7 @@ public class ServerBrowserPane : MonoBehaviour
             {
                 Multiplayer.Log($"AttemptIPv4() starting attempt");
                 connectionState = ConnectionState.AttemptingIPv4;
-                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
+                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect, NetworkTransportMode.Direct);
                 return;
             }
         }

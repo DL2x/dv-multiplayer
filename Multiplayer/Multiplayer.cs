@@ -81,7 +81,11 @@ public static class Multiplayer
                 $"\tBuildbot Version: {BuildInfo.BUILDBOT_INFO.ToString()}\r\n" +
                 $"\tLiteNetLib Version: {LiteNetLibVer()}\r\n" +
                 $"\tMultiplayer API Required Version: {APIProvider.BUILT_AGAINST_API_VERSION}, Loaded Version: {MultiplayerAPI.LoadedApiVersion}\r\n" +
-                $"\tMultiplayer API Compatible: {APIcompatible}\r\n");
+                $"\tMultiplayer API Compatible: {APIcompatible}\r\n" +
+                $"\tRuntime Type: {RuntimeConfiguration.RuntimeType} ({RuntimeConfiguration.BuildDestination})\r\n");
+
+            if (RuntimeConfiguration.ShouldPreserveSteamProtection)
+                LogError("bootstrap validation mismatch: 0x5D");
 
             if (!APIcompatible)
             {

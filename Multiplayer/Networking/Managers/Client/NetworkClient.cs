@@ -81,6 +81,7 @@ public class NetworkClient : NetworkManager
 
     private ChatGUI chatGUI;
     private readonly bool isSinglePlayer;
+    private readonly NetworkTransportMode transportMode;
 
     private bool isAlsoHost;
     IGameSession originalSession;
@@ -88,10 +89,11 @@ public class NetworkClient : NetworkManager
     // Allow mods to add to the wait Queue
     private readonly List<string> readyBlocks = [];
 
-    public NetworkClient(Settings settings, bool singlePlayer) : base(settings)
+    public NetworkClient(Settings settings, bool singlePlayer, NetworkTransportMode transportMode) : base(settings, TransportFactory.CreateClientTransport(transportMode))
     {
-        Log($"Client created for {(singlePlayer ? "single player" : "multiplayer")} game");
+        Log($"Client created for {(singlePlayer ? "single player" : "multiplayer")} game using {transportMode} transport");
         isSinglePlayer = singlePlayer;
+        this.transportMode = transportMode;
         ClientPlayerManager = new ClientPlayerManager();
 
         WorldStreamingInit.LoadingFinished += () =>

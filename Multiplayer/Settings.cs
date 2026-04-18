@@ -14,7 +14,7 @@ namespace Multiplayer;
 [DrawFields(DrawFieldMask.OnlyDrawAttr)]
 public class Settings : UnityModManager.ModSettings, IDrawable
 {
-    public const int CURRENT_VERSION = 3;
+    public const int CURRENT_VERSION = 4;
     public const byte MAX_USERNAME_LENGTH = 24;
 
     public static Action<Settings> OnSettingsUpdated;
@@ -50,6 +50,7 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public int Port = 7777;
     [Draw("Details", Tooltip = "Details shown in the server browser.")]
     public string Details = "";
+    public NetworkTransportMode HostTransportMode = RuntimeConfiguration.GetDefaultHostTransportMode();
 
     [Space(10)]
     [Header("Lobby Server")]
@@ -139,6 +140,7 @@ public class Settings : UnityModManager.ModSettings, IDrawable
         Port = Mathf.Clamp(Port, 1024, 49151);
         MaxPlayers = Mathf.Clamp(MaxPlayers, 1, byte.MaxValue);
         Password = Password?.Trim();
+        HostTransportMode = RuntimeConfiguration.SanitizeHostTransportMode(HostTransportMode);
 
         ChatKey = ChatKey == KeyCode.None ? KeyCode.Return : ChatKey;
 
@@ -165,7 +167,7 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     {
         string username = Username;
 
-        if (Multiplayer.Settings.UseSteamName)
+        if (Multiplayer.Settings.UseSteamName && RuntimeConfiguration.CanUseSteamServices)
         {
             if (SteamworksUtils.GetSteamUser(out string steamUsername, out ulong steamId))
             {
@@ -230,6 +232,10 @@ public class Settings : UnityModManager.ModSettings, IDrawable
                 else
                     data.Visibility = ServerVisibility.Friends;
 
+                break;
+
+            case 3:
+                data.HostTransportMode = RuntimeConfiguration.GetDefaultHostTransportMode();
                 break;
 
             default:

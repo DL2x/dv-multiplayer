@@ -135,3 +135,7 @@ ps/insufficient,Message when player is missing permissions,Insufficient Permissi
 ,Comms Radio,,,,,,,,,,,,,,,,,,,,,,,,,,
 cr/in_use,Message when work train is in use,Locomotive In Use,,机车正在使用中,機車正在使用中,,,,,,Lok wird benutzt
 ,,,,,,,,,,,,,,,,,,,,,,,,,,,
+host/transport_mode,Hosting mode selector label,Hosting Mode,,,,,,,,,,Host-Modus,,,,,,,,,,,,,,
+host/transport_mode/modes/steam,Steam-only hosting mode,Steam,,,,,,,,,,Steam,,,,,,,,,,,,,,
+host/transport_mode/modes/direct,Direct UDP hosting mode,Direct (IP/UDP),,,,,,,,,,Direkt (IP/UDP),,,,,,,,,,,,,,
+host/transport_mode/modes/both,Steam and direct hosting mode,Both (Steam & Direct),,,,,,,,,,Beides (Steam & Direkt),,,,,,,,,,,,,,

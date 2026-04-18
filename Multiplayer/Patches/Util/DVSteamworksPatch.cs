@@ -12,7 +12,7 @@ public static class DVSteamworksPatch
     [HarmonyPostfix]
     public static void Awake()
     {
-        if (DVSteamworks.Success)
+        if (RuntimeConfiguration.CanUseSteamServices)
             SteamNetworkingUtils.InitRelayNetworkAccess();
     }
 }

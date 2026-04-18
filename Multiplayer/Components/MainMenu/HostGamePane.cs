@@ -42,6 +42,7 @@ public class HostGamePane : MonoBehaviour
 
     SliderDV maxPlayers;
     Selector gameVisibility;
+    Selector hostTransportMode;
     ButtonDV startButton;
 
     public ISaveGame saveGame;
@@ -66,13 +67,7 @@ public class HostGamePane : MonoBehaviour
 
     public void Start()
     {
-        Multiplayer.Log("HostGamePane Started");
-
-        if (DVSteamworks.Success)
-            return;
-
-        Multiplayer.Log($"Steam not detected, prompt for restart.");
-        MainMenuThingsAndStuff.Instance.ShowOkPopup("Steam not detected. Please restart the game with Steam running", () => { });
+        Multiplayer.Log($"HostGamePane Started ({RuntimeConfiguration.RuntimeType})");
     }
 
     public void OnEnable()
@@ -278,6 +273,43 @@ public class HostGamePane : MonoBehaviour
         gameVisibility.ToggleInteractable(true);
 
         /*
+         *  Hosting transport field
+         */
+        selectorPrefab.SetActive(false);
+        go = GameObject.Instantiate(selectorPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta).transform, false);
+        selectorPrefab.SetActive(true);
+        hostTransportMode = go.GetOrAddComponent<Selector>();
+
+        if (hostTransportMode.labelTMPro?.gameObject.TryGetComponent<I2.Loc.Localize>(out var hostLoc) ?? false)
+            GameObject.DestroyImmediate(hostLoc);
+        if (hostTransportMode.labelTMPro?.gameObject.TryGetComponent<DV.Localization.Localize>(out var hostLoc2) ?? false)
+            GameObject.DestroyImmediate(hostLoc2);
+
+        DestroyImmediate(go.GetComponent<SettingChangeSource>());
+
+        go.name = "Hosting Mode";
+        hostTransportMode.initialized = false;
+        hostTransportMode.LocalizedLabel = true;
+        hostTransportMode.SetLabel(Locale.SERVER_HOST_TRANSPORT_MODE_KEY);
+        hostTransportMode.labelTMPro.GetComponent<Localize>().key = Locale.SERVER_HOST_TRANSPORT_MODE_KEY;
+
+        hostTransportMode.LocalizedValues = true;
+        if (RuntimeConfiguration.CanUseSteamServices)
+        {
+            hostTransportMode.SetValues(Locale.SERVER_HOST_TRANSPORT_MODE_VALUES.ToList());
+            hostTransportMode.SetSelectedIndex(GetSelectorIndex(RuntimeConfiguration.SanitizeHostTransportMode(Multiplayer.Settings.HostTransportMode)));
+        }
+        else
+        {
+            hostTransportMode.SetValues([Locale.SERVER_HOST_TRANSPORT_MODE_VALUES[(int)NetworkTransportMode.Direct]]);
+            hostTransportMode.SetSelectedIndex(1);
+        }
+
+        go.SetActive(true);
+        go.ResetTooltip();
+        hostTransportMode.ToggleInteractable(true);
+
+        /*
          *  Server details field 
          */
         go = GameObject.Instantiate(inputPrefab, NewContentGroup(controls, scroller.viewport.sizeDelta, 106).transform, false);
@@ -386,6 +418,32 @@ public class HostGamePane : MonoBehaviour
 
     #endregion
 
+    private static int GetSelectorIndex(NetworkTransportMode mode)
+    {
+        return mode switch
+        {
+            NetworkTransportMode.Steam => 1,
+            NetworkTransportMode.Direct => 2,
+            NetworkTransportMode.Both => 3,
+            _ => 1,
+        };
+    }
+
+    private NetworkTransportMode GetSelectedTransportMode()
+    {
+        if (!RuntimeConfiguration.CanUseSteamServices || hostTransportMode == null)
+            return NetworkTransportMode.Direct;
+
+        return hostTransportMode.SelectedIndex switch
+        {
+            1 => NetworkTransportMode.Steam,
+            2 => NetworkTransportMode.Direct,
+            3 => NetworkTransportMode.Both,
+            _ => RuntimeConfiguration.SanitizeHostTransportMode(Multiplayer.Settings.HostTransportMode),
+        };
+    }
+
+
     #region UI callbacks
     private void ValidateInputs(string _)
     {
@@ -394,7 +452,7 @@ public class HostGamePane : MonoBehaviour
         if (incompatibleMods)
             valid = false;
 
-        if (!DVSteamworks.Success)
+        if (!RuntimeConfiguration.CanHostWith(GetSelectedTransportMode()))
             valid = false;
 
         if (serverName.text.Trim() == "" || serverName.text.Length > MAX_SERVER_NAME_LEN)
@@ -460,9 +518,13 @@ public class HostGamePane : MonoBehaviour
                 serverData.GameMode = LobbyServerData.GetGameModeFromString(startGameData.session.GameMode);
             }
 
+            serverData.TransportMode = GetSelectedTransportMode();
+            serverData.RuntimeType = RuntimeConfiguration.RuntimeType;
+
             Multiplayer.Settings.ServerName = serverData.Name;
             Multiplayer.Settings.Password = password.text;
             Multiplayer.Settings.Visibility = serverData.Visibility;
+            Multiplayer.Settings.HostTransportMode = serverData.TransportMode;
             Multiplayer.Settings.Port = serverData.port;
             Multiplayer.Settings.MaxPlayers = serverData.MaxPlayers;
             Multiplayer.Settings.Details = serverData.ServerDetails;

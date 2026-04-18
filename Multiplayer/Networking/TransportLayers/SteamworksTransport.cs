@@ -42,12 +42,18 @@ public class SteamWorksTransport : ITransport
     public bool Start()
     {
         Multiplayer.LogDebug(() => $"SteamWorksTransport.Start()");
-        return true;//return Start(0);
+        return RuntimeConfiguration.CanUseSteamServices;
     }
 
     public bool Start(int port)
     {
         Multiplayer.LogDebug(() => $"SteamWorksTransport.Start({port})");
+
+        if (!RuntimeConfiguration.CanUseSteamServices)
+        {
+            Multiplayer.LogWarning("SteamWorksTransport.Start() called without Steam services");
+            return false;
+        }
 
         var server = SteamNetworkingSockets.CreateNormalSocket<SteamServerManager>(NetAddress.AnyIp((ushort)port));
         if (server != null)
@@ -106,6 +112,9 @@ public class SteamWorksTransport : ITransport
 
     public void PollEvents()
     {
+        if (!RuntimeConfiguration.CanUseSteamServices)
+            return;
+
         SteamClient.RunCallbacks();
 
         client?.Receive();
@@ -141,6 +150,9 @@ public class SteamWorksTransport : ITransport
     {
         Multiplayer.LogDebug(() => $"SteamWorksTransport.ConnectNative({address}, {port}, {data.Length})");
 
+        if (!RuntimeConfiguration.CanUseSteamServices)
+            return null;
+
         var add = NetAddress.From(address, (ushort)port);
 
 
@@ -158,6 +170,9 @@ public class SteamWorksTransport : ITransport
     public ITransportPeer ConnectRelay(string steamID, NetDataWriter data)
     {
         Multiplayer.LogDebug(() => $"SteamWorksTransport.ConnectRelay({steamID})");
+
+        if (!RuntimeConfiguration.CanUseSteamServices)
+            return null;
 
         SteamId id = new();
         if (!ulong.TryParse(steamID, out id.Value))
@@ -187,6 +202,9 @@ public class SteamWorksTransport : ITransport
 
     public void UpdateSettings(Settings settings)
     {
+        if (!RuntimeConfiguration.CanUseSteamServices)
+            return;
+
         float chance = 0f;
         if (settings.SimulatePacketLoss)
             chance = settings.SimulationPacketLossChance;

@@ -30,11 +30,10 @@ public abstract class NetworkManager
     public bool IsRunning => transport.IsRunning;
     public bool IsProcessingPacket { get; private set; }
 
-    protected NetworkManager(Settings settings)
+    protected NetworkManager(Settings settings, ITransport transport)
     {
         netPacketProcessor = new NetPacketProcessor();
-        //transport = new LiteNetLibTransport();
-        transport = new SteamWorksTransport();
+        this.transport = transport ?? throw new ArgumentNullException(nameof(transport));
 
         transport.OnConnectionRequest += OnConnectionRequest;
         transport.OnPeerConnected += OnPeerConnected;

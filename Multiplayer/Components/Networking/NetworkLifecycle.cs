@@ -134,8 +134,10 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
             }
         }
 
-        Multiplayer.Log($"Starting server on port {port}");
-        NetworkServer server = new(difficulty, Multiplayer.Settings, IsSinglePlayer, serverData);
+        var hostTransportMode = RuntimeConfiguration.SanitizeHostTransportMode(Multiplayer.Settings.HostTransportMode);
+
+        Multiplayer.Log($"Starting server on port {port} using {hostTransportMode} transport");
+        NetworkServer server = new(difficulty, Multiplayer.Settings, IsSinglePlayer, serverData, hostTransportMode);
 
         if (!server.Start(port))
             return false;
@@ -146,7 +148,11 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         var serverAPI = new ServerAPIProvider(server);
         MultiplayerAPI.RegisterServer(serverAPI);
 
-        StartClient(IPAddress.Loopback.ToString(), port, Multiplayer.Settings.Password, IsSinglePlayer, null);
+        var selfTransportMode = hostTransportMode == NetworkTransportMode.Steam
+            ? NetworkTransportMode.Steam
+            : NetworkTransportMode.Direct;
+
+        StartClient(IPAddress.Loopback.ToString(), port, Multiplayer.Settings.Password, IsSinglePlayer, null, selfTransportMode);
 
         //reset for next game
         IsSinglePlayer = true;
@@ -155,11 +161,11 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         return true;
     }
 
-    public void StartClient(string address, int port, string password, bool isSinglePlayer, Action<DisconnectReason, string> onDisconnect)
+    public void StartClient(string address, int port, string password, bool isSinglePlayer, Action<DisconnectReason, string> onDisconnect, NetworkTransportMode transportMode)
     {
         if (Client != null)
             throw new InvalidOperationException("NetworkManager already exists!");
-        NetworkClient client = new(Multiplayer.Settings, isSinglePlayer);
+        NetworkClient client = new(Multiplayer.Settings, isSinglePlayer, transportMode);
         client.Start(address, port, password, isSinglePlayer, onDisconnect);
 
         Client = client;

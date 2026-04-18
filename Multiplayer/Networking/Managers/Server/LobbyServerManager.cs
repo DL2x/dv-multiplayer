@@ -87,7 +87,7 @@ public class LobbyServerManager : MonoBehaviour
             yield break;
 
         //Create a steam lobby
-        if (DVSteamworks.Success)
+        if (RuntimeConfiguration.CanUseSteamServices && server.TransportMode != NetworkTransportMode.Direct)
         {
             CreateSteamLobby();
         }
@@ -136,7 +136,8 @@ public class LobbyServerManager : MonoBehaviour
 
         server.ServerData.id = server_id;
 
-        StartDiscoveryServer();
+        if (server.TransportMode != NetworkTransportMode.Steam)
+            StartDiscoveryServer();
     }
 
     public void OnDestroy()
