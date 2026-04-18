@@ -4,6 +4,7 @@ using Multiplayer.Utils;
 using System;
 using UnityEngine;
 using UnityModManagerNet;
+using static Multiplayer.Components.Networking.UI.PlayerListGUI;
 using static Multiplayer.Patches.Mods.RemoteDispatchPatch;
 using Console = DV.Console;
 
@@ -72,6 +73,8 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public bool ShowPingInNameTags;
     [Draw("Show Player List in Alt Mouse Mode", Tooltip = "Whether to show the player list in mouse mode.")]
     public bool ShowPlayerListInAltMouseMode = true;
+    [Draw("Player List Position", Tooltip = "Location to show the player list when it's visible.", VisibleOn = "ShowPlayerListInAltMouseMode|true")]
+    public PlayerListPosition PlayerListPosition = PlayerListPosition.TopCenter;
     [Draw("Chat Key Bind", Tooltip = "Key to show chat window.")]
     public KeyCode ChatKey = KeyCode.Return;
     [Draw("Hide Chat Messages", Tooltip = "Hide incoming chat messages.")]
