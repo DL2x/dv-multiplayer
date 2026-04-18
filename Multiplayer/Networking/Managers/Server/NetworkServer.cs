@@ -897,9 +897,9 @@ public class NetworkServer : NetworkManager
 
         if (sendToPlayer == null)
             if (excludePlayer == null)
-                SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, PlayerLoadingState.ReadyForTrainSets, excludeSelf: true);
+                SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, PlayerLoadingState.ReadyForTrainSets, excludeSelf: false);
             else
-                SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, PlayerLoadingState.ReadyForTrainSets, excludePlayer.Peer, true);
+                SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, PlayerLoadingState.ReadyForTrainSets, excludePlayer.Peer, false);
         else
             SendPacket(sendToPlayer.Peer, packet, DeliveryMethod.ReliableOrdered);
     }
