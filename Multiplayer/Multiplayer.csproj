@@ -3,8 +3,9 @@
         <TargetFramework>net48</TargetFramework>
         <LangVersion>latest</LangVersion>
         <RootNamespace>Multiplayer</RootNamespace>
-        <InformationalVersion>0.1.13.14</InformationalVersion>
+        <InformationalVersion>0.1.13.14-d</InformationalVersion>
     </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
             <PrivateAssets>all</PrivateAssets>
@@ -22,14 +23,13 @@
         <Publicize Include="DV.Utils:HingeJointAngleFix.angleRange" />
         <Publicize Include="DV.Utils:HingeJointAngleFix.startRotationInverse" />
         <Publicize Include="DV.UI" IncludeCompilerGeneratedMembers="false" />
-        <Publicize Include="DV.UIFramework" IncludeCompilerGeneratedMembers="false" />
         <Publicize Include="Facepunch.Steamworks.Win64" IncludeCompilerGeneratedMembers="false" />
     </ItemGroup>
-    
+
     <PropertyGroup>
         <NoWarn>$(NoWarn);CS0436</NoWarn>
     </PropertyGroup>
-    
+
     <!-- Derail Valley References -->
     <ItemGroup>
         <Reference Include="Assembly-CSharp" />
@@ -62,10 +62,12 @@
         <Reference Include="DV.Utils" />
         <Reference Include="DV.WeatherSystem" />
     </ItemGroup>
+
     <!-- Mod Loader -->
     <ItemGroup>
         <PackageReference Include="UnityModManager" Version="0.31.1" />
     </ItemGroup>
+
     <!-- Third-Party References -->
     <ItemGroup>
         <PackageReference Include="ErrorProne.NET.Structs" Version="0.4.0-beta.1" />
@@ -87,6 +89,7 @@
         </Reference>
         <Reference Include="WorldStreamer" />
     </ItemGroup>
+
     <!-- Unity References -->
     <ItemGroup>
         <Reference Include="Unity.TextMeshPro" />
@@ -105,24 +108,43 @@
         <Reference Include="UnityEngine.InputLegacyModule" />
         <Reference Include="VRTK" />
     </ItemGroup>
+
     <ItemGroup>
-      <Folder Include="Networking\Packets\Common\RPC\" />
+        <Folder Include="Networking\Packets\Common\RPC\" />
     </ItemGroup>
+
     <Target Name="PostBuildMacros">
         <GetAssemblyIdentity AssemblyFiles="$(TargetPath)">
             <Output TaskParameter="Assemblies" ItemName="Targets" />
         </GetAssemblyIdentity>
         <ItemGroup>
-            <VersionNumber Include="$(InformationalVersion.Split('+')[0] )" />
+            <VersionNumber Include="$(InformationalVersion.Split('+')[0])" />
         </ItemGroup>
     </Target>
+
     <Target Name="PostBuild" AfterTargets="PostBuildEvent" DependsOnTargets="PostBuildMacros">
         <!-- Sign Assemblies if in 'Release' -->
-        <Exec Condition="$(ConfigurationName) == 'Release' AND $(Cert-Thumb) != ''" Command="&quot;$(SignToolPath)SignTool.exe&quot; sign /sha1 $(Cert-Thumb) /fd SHA256 /t http://timestamp.sectigo.com &quot;$(TargetPath)&quot; &quot;$(OutDir)/LiteNetLib.dll&quot;" />
+        <Exec Condition="$(ConfigurationName) == 'Release' AND '$(CertThumb)' != ''"
+              Command="&quot;$(SignToolPath)SignTool.exe&quot; sign /sha1 $(CertThumb) /fd SHA256 /t http://timestamp.sectigo.com &quot;$(TargetPath)&quot; &quot;$(OutDir)/LiteNetLib.dll&quot;" />
+
         <!-- Copy to build folder -->
-        <Copy SourceFiles="../info.json;../locale.csv;../LICENSE;$(TargetPath);$(OutDir)/Humanizer.dll;$(OutDir)/LiteNetLib.dll" DestinationFolder="../build/" />
-        <!-- Update Json, copy to game directory and make package if in 'Release' -->
-        <Exec Condition="$(ConfigurationName) == 'Release'" Command="powershell -executionpolicy bypass -Command &quot;(../post-build.ps1 -Ver '@(VersionNumber)' -Target '$(TargetPath)' -GameDir '$(DvInstallDir)\Mods\Multiplayer')&quot;" />
-        <Exec Condition="$(ConfigurationName) == 'Debug'" Command="powershell -executionpolicy bypass -Command &quot;(../post-build.ps1 -Ver '@(VersionNumber)' -NoArchive -Target '$(TargetPath)' -GameDir '$(DvInstallDir)\Mods\Multiplayer')&quot;" />
+        <Copy SourceFiles="../info.json;../locale.csv;../LICENSE;$(TargetPath);$(OutDir)/Humanizer.dll;$(OutDir)/LiteNetLib.dll"
+              DestinationFolder="../build/" />
+
+        <!-- Release: install into Steam -->
+        <Exec Condition="$(ConfigurationName) == 'Release' and Exists('$(SteamDvInstallDir)')"
+              Command="powershell -executionpolicy bypass -Command &quot;(../post-build.ps1 -Ver '@(VersionNumber)' -Target '$(TargetPath)' -GameDir '$(SteamDvInstallDir)\Mods\Multiplayer')&quot;" />
+
+        <!-- Release: install into Oculus -->
+        <Exec Condition="$(ConfigurationName) == 'Release' and Exists('$(OculusDvInstallDir)')"
+              Command="powershell -executionpolicy bypass -Command &quot;(../post-build.ps1 -Ver '@(VersionNumber)' -Target '$(TargetPath)' -GameDir '$(OculusDvInstallDir)\Mods\Multiplayer')&quot;" />
+
+        <!-- Debug: install into Steam -->
+        <Exec Condition="$(ConfigurationName) == 'Debug' and Exists('$(SteamDvInstallDir)')"
+              Command="powershell -executionpolicy bypass -Command &quot;(../post-build.ps1 -Ver '@(VersionNumber)' -NoArchive -Target '$(TargetPath)' -GameDir '$(SteamDvInstallDir)\Mods\Multiplayer')&quot;" />
+
+        <!-- Debug: install into Oculus -->
+        <Exec Condition="$(ConfigurationName) == 'Debug' and Exists('$(OculusDvInstallDir)')"
+              Command="powershell -executionpolicy bypass -Command &quot;(../post-build.ps1 -Ver '@(VersionNumber)' -NoArchive -Target '$(TargetPath)' -GameDir '$(OculusDvInstallDir)\Mods\Multiplayer')&quot;" />
     </Target>
 </Project>
