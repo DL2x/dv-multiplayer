@@ -27,4 +27,4 @@ jobs:
 
       - name: Push alpha to incomming
         run: |
-          git push origin FETCH_HEAD:refs/heads/incoming --force
+          git push origin FETCH_HEAD:refs/heads/incomming --force
