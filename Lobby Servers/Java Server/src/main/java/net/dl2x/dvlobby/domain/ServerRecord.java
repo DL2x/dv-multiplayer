@@ -11,10 +11,9 @@ public class ServerRecord {
   private final String gameServerId;
   private final String privateKey;
   private final String address;
-  private final String ipv4;
-  private final String ipv6;
   private final int port;
   private final HostingType hostingType;
+  private final boolean privateServer;
   private final String serverName;
   private final boolean passwordProtected;
   private final int gameMode;
@@ -35,10 +34,9 @@ public class ServerRecord {
       String gameServerId,
       String privateKey,
       String address,
-      String ipv4,
-      String ipv6,
       int port,
       HostingType hostingType,
+      boolean privateServer,
       String serverName,
       boolean passwordProtected,
       int gameMode,
@@ -57,10 +55,9 @@ public class ServerRecord {
     this.gameServerId = gameServerId;
     this.privateKey = privateKey;
     this.address = address;
-    this.ipv4 = ipv4;
-    this.ipv6 = ipv6;
     this.port = port;
     this.hostingType = hostingType;
+    this.privateServer = privateServer;
     this.serverName = serverName;
     this.passwordProtected = passwordProtected;
     this.gameMode = gameMode;
@@ -83,9 +80,9 @@ public class ServerRecord {
   }
 
   public synchronized void updateState(int currentPlayers, String timePassed, Boolean ready, List<String> onlinePlayers) {
-    this.currentPlayers = currentPlayers;
-    this.timePassed = timePassed;
     this.onlinePlayers = List.copyOf(onlinePlayers);
+    this.currentPlayers = !onlinePlayers.isEmpty() ? onlinePlayers.size() : currentPlayers;
+    this.timePassed = timePassed;
     if (Boolean.TRUE.equals(ready)) {
       this.ready = true;
     }
@@ -103,16 +100,15 @@ public class ServerRecord {
   public String gameServerId() { return gameServerId; }
   public String privateKey() { return privateKey; }
   public String address() { return address; }
-  public String ipv4() { return ipv4; }
-  public String ipv6() { return ipv6; }
   public int port() { return port; }
   public HostingType hostingType() { return hostingType; }
+  public boolean privateServer() { return privateServer; }
   public String serverName() { return serverName; }
   public boolean passwordProtected() { return passwordProtected; }
   public int gameMode() { return gameMode; }
   public int difficulty() { return difficulty; }
-  public String timePassed() { return timePassed; }
-  public int currentPlayers() { return currentPlayers; }
+  public synchronized String timePassed() { return timePassed; }
+  public synchronized int currentPlayers() { return currentPlayers; }
   public int maxPlayers() { return maxPlayers; }
   public List<ModDto> requiredMods() { return requiredMods; }
   public String gameVersion() { return gameVersion; }
@@ -121,21 +117,20 @@ public class ServerRecord {
   public Instant startTime() { return startTime; }
   public Instant lastUpdateAt() { return lastUpdateAt; }
   public boolean ready() { return ready; }
-  public List<String> onlinePlayers() { return onlinePlayers; }
+  public synchronized List<String> onlinePlayers() { return List.copyOf(onlinePlayers); }
 
   public PublicServerDto toPublicDto() {
     return new PublicServerDto(
         address,
-        ipv4,
-        ipv6,
         port,
         hostingType,
+        privateServer,
         serverName,
         passwordProtected,
         gameMode,
         difficulty,
-        timePassed,
-        currentPlayers,
+        timePassed(),
+        currentPlayers(),
         maxPlayers,
         requiredMods,
         gameVersion,
@@ -144,7 +139,7 @@ public class ServerRecord {
         gameServerId,
         startTime,
         ready,
-        onlinePlayers
+        onlinePlayers()
     );
   }
 }

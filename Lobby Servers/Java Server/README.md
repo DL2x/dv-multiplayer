@@ -7,9 +7,10 @@ Spring Boot implementation of the Derail Valley lobby API for Steam, IP, Both, a
 - `hosting_type`: `dedicated`, `steam`, `ip`, `both`
 - `steam` servers are fully added, updated, timed out, and removed like all other servers
 - `steam` servers are **not** returned by `/list`
-- `/list` only returns `ready=true` non-Steam servers
+- servers with `"private": true` are **not** returned by `/list`
+- `/list` only returns `ready=true` non-Steam, non-private servers
 - separate capacity limits for public servers and Steam servers
-- add rate limit per remote IP
+- endpoint-specific rate limits per remote IP
 - ping before insert
 - regex text filter for server text and player names
 - request body size limits per endpoint
@@ -17,6 +18,7 @@ Spring Boot implementation of the Derail Valley lobby API for Steam, IP, Both, a
 - `start_time` is assigned by the API when the add request is accepted
 - `ready` starts as `false` and can only move to `true`
 - `online_players` is supported as an array of strings
+- `current_players` is derived from `online_players.length` when player names are present
 - stale entry cleanup by timeout
 - `config.json` is auto-generated on first start if it does not exist
 - `stats.json` is auto-generated on first start if it does not exist
@@ -32,27 +34,20 @@ The API accepts both old and new mod payload styles for required mods:
 - `Version` or `version`
 - `Url`, `url`, `Source`, or `source`
 
-Responses use lowercase JSON names:
-
-- `id`
-- `version`
-- `url`
-
-Unknown extra JSON fields are ignored, so mod-specific fields like `RuntimeType` and `TransportMode` do not break requests.
+Responses use lowercase JSON names.
+Unknown extra JSON fields are ignored.
 
 ## Endpoints
 
 - `GET /` -> status
 - `GET /favicon.ico` -> `204 No Content`
-- `GET /list` -> public ready server list, excluding Steam
+- `GET /list` -> public ready server list, excluding Steam and private servers
 - `GET /stats` -> current and persistent statistics
-- `POST /add` and `POST /add_game_server`
-- `POST /update` and `POST /update_game_server`
-- `POST /remove` and `POST /remove_game_server`
+- `POST /add` and `POST /add`
+- `POST /update` and `POST /update`
+- `POST /remove` and `POST /remove`
 
 ## Ready flow
-
-The intended flow is:
 
 1. Send `add` when the server process starts.
 2. The API validates text and probes the host before storing the entry.
@@ -73,19 +68,24 @@ On first start the server creates `config.json` next to the JAR if it does not a
   "cleanup-interval-seconds": 60,
   "public-server-limit": 100,
   "steam-server-limit": 100,
-  "blocked-text-regex": []
+  "blocked-text-regex": [],
+  "ping-timeout-ms": 1500,
+  "max-add-request-body-bytes": 8192,
+  "max-update-request-body-bytes": 4096,
+  "max-remove-request-body-bytes": 1024,
+  "max-stored-entry-bytes": 6144,
+  "rate-limit-seconds": {
+    "list": 1,
+    "stats": 2,
+    "add": 5,
+    "update": 1,
+    "remove": 1
+  }
 }
 ```
 
-`blocked-text-regex` contains Java regular expressions. If any expression matches `server_name`, `server_info`, a player name, or a mod field, the request is rejected.
-
-The server also creates `stats.json` automatically. That file stores:
-
-- `total_servers`
-- `max_servers`
-- `total_players`
-- `max_players`
-- `total_time_played_seconds`
+`rate-limit-seconds` defines the minimum number of seconds that must pass before the same remote IP can call the same endpoint again.
+A value of `0` disables the limit for that endpoint.
 
 ## Statistics
 
@@ -117,24 +117,6 @@ mvn clean package
 java -jar target/dv-lobby-server-0.2.0.jar
 ```
 
-## Logs
-
-Request logging is written to:
-
-```text
-logs/dv-lobby-api.log
-```
-
-Each request log entry contains:
-
-- HTTP method
-- request path
-- remote IP
-- request body
-- response status
-- response body
-- duration in milliseconds
-
 ## Example add request
 
 ```json
@@ -142,12 +124,12 @@ Each request log entry contains:
   "address": "203.0.113.42:7777",
   "port": 7777,
   "hosting_type": "ip",
+  "private": false,
   "server_name": "Test Server",
   "password_protected": false,
   "game_mode": 0,
   "difficulty": 1,
   "time_passed": "00:15",
-  "current_players": 0,
   "max_players": 8,
   "required_mods": [
     {
@@ -160,18 +142,5 @@ Each request log entry contains:
   "multiplayer_version": "0.1.0",
   "server_info": "Direct test",
   "online_players": []
-}
-```
-
-## Example update request
-
-```json
-{
-  "game_server_id": "abcd1234",
-  "private_key": "0123456789abcdef0123456789abcdef",
-  "current_players": 2,
-  "time_passed": "00:45",
-  "ready": true,
-  "online_players": ["DriverA", "DriverB"]
 }
 ```

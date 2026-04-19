@@ -8,10 +8,9 @@ import java.util.List;
 
 public record PublicServerDto(
     String address,
-    String ipv4,
-    String ipv6,
     int port,
     @JsonProperty("hosting_type") HostingType hostingType,
+    @JsonProperty("private") boolean privateServer,
     @JsonProperty("server_name") String serverName,
     @JsonProperty("password_protected") boolean passwordProtected,
     @JsonProperty("game_mode") int gameMode,

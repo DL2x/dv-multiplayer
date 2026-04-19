@@ -58,9 +58,9 @@ public class RequestSizeFilter extends OncePerRequestFilter {
 
   private int resolveLimit(String uri) {
     return switch (uri) {
-      case "/add", "/add_game_server" -> properties.maxAddRequestBodyBytes();
-      case "/update", "/update_game_server" -> properties.maxUpdateRequestBodyBytes();
-      case "/remove", "/remove_game_server" -> properties.maxRemoveRequestBodyBytes();
+      case "/add" -> properties.maxAddRequestBodyBytes();
+      case "/update" -> properties.maxUpdateRequestBodyBytes();
+      case "/remove" -> properties.maxRemoveRequestBodyBytes();
       default -> 0;
     };
   }

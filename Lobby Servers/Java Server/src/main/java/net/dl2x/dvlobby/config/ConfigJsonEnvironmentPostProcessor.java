@@ -39,6 +39,12 @@ public class ConfigJsonEnvironmentPostProcessor implements EnvironmentPostProces
     map(root, props, "public-server-limit", "lobby.public-server-limit");
     map(root, props, "steam-server-limit", "lobby.steam-server-limit");
     map(root, props, "blocked-text-regex", "lobby.blocked-text-regex");
+    map(root, props, "ping-timeout-ms", "lobby.ping-timeout-ms");
+    map(root, props, "max-add-request-body-bytes", "lobby.max-add-request-body-bytes");
+    map(root, props, "max-update-request-body-bytes", "lobby.max-update-request-body-bytes");
+    map(root, props, "max-remove-request-body-bytes", "lobby.max-remove-request-body-bytes");
+    map(root, props, "max-stored-entry-bytes", "lobby.max-stored-entry-bytes");
+    mapRateLimits(root, props);
 
     environment.getPropertySources().addFirst(new MapPropertySource("dvConfigJson", props));
   }
@@ -47,6 +53,21 @@ public class ConfigJsonEnvironmentPostProcessor implements EnvironmentPostProces
     Object value = source.get(sourceKey);
     if (value != null) {
       target.put(targetKey, value);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private void mapRateLimits(Map<String, Object> source, Map<String, Object> target) {
+    Object value = source.get("rate-limit-seconds");
+    if (!(value instanceof Map<?, ?> rawMap)) {
+      return;
+    }
+
+    for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+      if (entry.getKey() == null || entry.getValue() == null) {
+        continue;
+      }
+      target.put("lobby.rate-limit-seconds." + entry.getKey().toString(), entry.getValue());
     }
   }
 
@@ -83,6 +104,18 @@ public class ConfigJsonEnvironmentPostProcessor implements EnvironmentPostProces
     defaults.put("public-server-limit", 100);
     defaults.put("steam-server-limit", 100);
     defaults.put("blocked-text-regex", List.of());
+    defaults.put("ping-timeout-ms", 1500);
+    defaults.put("max-add-request-body-bytes", 8192);
+    defaults.put("max-update-request-body-bytes", 4096);
+    defaults.put("max-remove-request-body-bytes", 1024);
+    defaults.put("max-stored-entry-bytes", 6144);
+    defaults.put("rate-limit-seconds", new LinkedHashMap<>(Map.of(
+        "list", 1,
+        "stats", 2,
+        "add", 5,
+        "update", 1,
+        "remove", 1
+    )));
 
     try (OutputStream out = Files.newOutputStream(
         path,

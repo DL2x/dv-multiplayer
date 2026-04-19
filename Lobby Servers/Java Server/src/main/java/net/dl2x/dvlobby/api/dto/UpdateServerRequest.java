@@ -32,6 +32,10 @@ public record UpdateServerRequest(
     if (onlinePlayers == null) onlinePlayers = List.of();
   }
 
+  public int effectiveCurrentPlayers() {
+    return !onlinePlayers.isEmpty() ? onlinePlayers.size() : currentPlayers;
+  }
+
   public UpdateServerRequest normalized() {
     List<String> normalizedPlayers = onlinePlayers.stream()
         .map(value -> value == null ? null : value.trim())

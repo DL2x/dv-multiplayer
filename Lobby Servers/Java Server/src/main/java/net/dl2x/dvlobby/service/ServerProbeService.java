@@ -36,9 +36,6 @@ public class ServerProbeService {
 
   private Set<String> extractCandidates(AddServerRequest request) {
     LinkedHashSet<String> out = new LinkedHashSet<>();
-    maybeAdd(out, request.ipv4());
-    maybeAdd(out, request.ipv6());
-
     if (request.address() != null && !request.address().isBlank()) {
       String address = request.address().trim();
       if (address.startsWith("[") && address.contains("]:")) {
@@ -64,11 +61,6 @@ public class ServerProbeService {
     return out;
   }
 
-  private void maybeAdd(Set<String> out, String value) {
-    if (value != null && !value.isBlank()) {
-      out.add(value.trim());
-    }
-  }
 
   private boolean tryReachable(String host) {
     try {

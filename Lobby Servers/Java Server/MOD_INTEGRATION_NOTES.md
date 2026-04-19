@@ -1,157 +1,76 @@
 # Mod Integration Notes
 
-## `hosting_type`
+## Request schema changes
 
-The API accepts exactly these values:
+### Add request
 
-- `dedicated`
-- `steam`
-- `ip`
-- `both`
+Use `address` as the only host field.
+Do not send `ipv4` or `ipv6` anymore.
 
-## Add behavior
+Add payload fields:
 
-All hosting types can be sent to `/add*`, including `steam`.
-
-Important behavior:
-
-- `steam` is stored and updated like other server types
-- `steam` is **never** returned by `/list`
-- `ip`, `dedicated`, and `both` appear in `/list` only after `ready=true`
-- new entries start with `ready=false`
-- the API assigns `start_time` itself when the add request arrives
-
-## Update behavior
-
-Use `/update*` for all stored server types:
-
-- `steam`
-- `ip`
-- `dedicated`
-- `both`
-
-Update payload additions:
-
-- `ready` may be set to `true`
-- `ready` cannot be toggled back to `false`
-- `online_players` may be updated at any time
-
-Recommended mod flow:
-
-1. Send `/add*` as soon as the server process starts.
-2. Wait until the world is fully loaded.
-3. Send `/update*` with `ready=true`.
-4. Continue sending `/update*` for `current_players`, `time_passed`, and `online_players`.
-
-## Required mod payload compatibility
-
-The API accepts both of these payload styles for required mods:
-
-```json
-{
-  "id": "Multiplayer",
-  "version": "0.1.13.14",
-  "url": "https://example.com"
-}
-```
-
-```json
-{
-  "Id": "Multiplayer",
-  "Version": "0.1.13.14",
-  "Url": "https://example.com"
-}
-```
-
-It also accepts `source` / `Source` as aliases for `url`.
-
-The API always responds with lowercase field names.
-
-## List behavior
-
-`GET /list` only returns:
-
-- non-Steam servers
-- servers with `ready=true`
-
-Each list entry includes:
-
-- `start_time`
-- `ready`
+- `address`
+- `port`
+- `hosting_type`
+- `private`
+- `server_name`
+- `password_protected`
+- `game_mode`
+- `difficulty`
+- `time_passed`
+- `current_players` optional when `online_players` is present
+- `max_players`
+- `required_mods`
+- `game_version`
+- `multiplayer_version`
+- `server_info`
 - `online_players`
 
-## Separate limits
+`current_players` is derived from `online_players.length` when the player array is not empty.
 
-The API enforces two independent limits:
+### Update request
 
-- `public-server-limit` for `ip`, `dedicated`, and `both`
-- `steam-server-limit` for `steam`
+Continue sending:
 
-A full Steam bucket does not consume public slots, and a full public bucket does not consume Steam slots.
+- `game_server_id`
+- `private_key`
+- `time_passed`
+- `ready`
+- `online_players`
+- `current_players` optional when `online_players` is present
 
-## Stats semantics
+`ready` may only transition from `false` to `true`.
 
-`GET /stats` exposes live and persistent values.
+## List semantics
 
-Live values:
+`GET /list` only returns servers that satisfy all of the following:
 
-- `current_servers`
-- `current_players`
-- `current_servers_by_type`
+- `ready == true`
+- `hosting_type != steam`
+- `private == false`
 
-Persistent values stored in `stats.json`:
+## Rate limiting
 
-- `total_servers`
-- `max_servers`
-- `total_players`
-- `max_players`
-- `total_time_played_seconds`
+Each endpoint has its own per-IP minimum interval configured in `config.json` under `rate-limit-seconds`.
 
-The current implementation treats `total_players` as the sum of positive player-count increases over time, plus the initial player count seen on add.
-`total_time_played_seconds` is accumulated from the server's last reported `time_passed` value when the entry is removed or cleaned up.
+Example:
 
-## Validation and rejection rules
-
-Add requests are processed in this order:
-
-1. request schema validation
-2. business-rule validation
-3. regex text filter validation
-4. add rate limit
-5. host probe
-6. capacity check and insert
-
-Requests can be rejected for:
-
-- invalid `hosting_type`
-- invalid sizes or missing required fields
-- blocked regex matches in `server_name`, `server_info`, `online_players`, or `required_mods`
-- probe failures
-- reaching the per-bucket server limit
-- oversized normalized entries
-- add rate limiting
-
-## Request logging
-
-Every request is logged with:
-
-- method
-- path
-- remote IP
-- request body
-- response status
-- response body
-- elapsed time
-
-By default the log file is:
-
-```text
-logs/dv-lobby-api.log
+```json
+{
+  "rate-limit-seconds": {
+    "list": 1,
+    "stats": 2,
+    "add": 5,
+    "update": 1,
+    "remove": 1
+  }
+}
 ```
 
-## Auto-generated files
+## Compatibility
 
-If missing, the server creates:
+The API still accepts old mod field names for required mods:
 
-- `config.json`
-- `stats.json`
+- `Id` / `id`
+- `Version` / `version`
+- `Url` / `url` / `Source` / `source`

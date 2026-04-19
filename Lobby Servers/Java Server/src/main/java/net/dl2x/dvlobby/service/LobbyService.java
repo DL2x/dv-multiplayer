@@ -1,7 +1,6 @@
 package net.dl2x.dvlobby.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletRequest;
 import net.dl2x.dvlobby.api.HostingType;
 import net.dl2x.dvlobby.api.dto.AddServerRequest;
 import net.dl2x.dvlobby.api.dto.AddServerResponse;
@@ -31,7 +30,6 @@ import java.util.stream.Collectors;
 public class LobbyService {
 
   private final LobbyProperties properties;
-  private final AddRateLimiter addRateLimiter;
   private final ServerProbeService probeService;
   private final TextFilterService textFilterService;
   private final ObjectMapper objectMapper;
@@ -44,14 +42,12 @@ public class LobbyService {
 
   public LobbyService(
       LobbyProperties properties,
-      AddRateLimiter addRateLimiter,
       ServerProbeService probeService,
       TextFilterService textFilterService,
       ObjectMapper objectMapper,
       LobbyStatsStore statsStore
   ) {
     this.properties = properties;
-    this.addRateLimiter = addRateLimiter;
     this.probeService = probeService;
     this.textFilterService = textFilterService;
     this.objectMapper = objectMapper;
@@ -59,12 +55,11 @@ public class LobbyService {
     this.persistedStats = statsStore.loadOrCreate();
   }
 
-  public AddServerResponse add(AddServerRequest rawRequest, HttpServletRequest httpRequest) {
+  public AddServerResponse add(AddServerRequest rawRequest) {
     AddServerRequest request = rawRequest.normalized();
     request.validateBusinessRules();
     textFilterService.validateAddOrThrow(request);
 
-    addRateLimiter.consumeOrThrow(httpRequest);
 
     synchronized (capacityGate) {
       enforceCapacity(request.hostingType());
@@ -88,7 +83,8 @@ public class LobbyService {
     ServerRecord record = servers.get(req.gameServerId());
     if (record == null) throw new ServerNotFoundException(req.gameServerId());
     if (!secureEquals(record.privateKey(), req.privateKey())) throw new InvalidPrivateKeyException();
-    if (req.currentPlayers() > record.maxPlayers()) {
+    int effectiveCurrentPlayers = req.effectiveCurrentPlayers();
+    if (effectiveCurrentPlayers > record.maxPlayers()) {
       throw new InvalidServerUpdateException("current_players exceeds max_players");
     }
     if (req.onlinePlayers().size() > record.maxPlayers()) {
@@ -96,8 +92,8 @@ public class LobbyService {
     }
 
     int oldPlayers = record.currentPlayersSnapshot();
-    record.updateState(req.currentPlayers(), req.timePassed().trim(), req.ready(), req.onlinePlayers());
-    notePlayerObservation(oldPlayers, req.currentPlayers());
+    record.updateState(effectiveCurrentPlayers, req.timePassed().trim(), req.ready(), req.onlinePlayers());
+    notePlayerObservation(oldPlayers, effectiveCurrentPlayers);
   }
 
   public void remove(RemoveServerRequest req) {
@@ -113,6 +109,7 @@ public class LobbyService {
     return servers.values().stream()
         .filter(ServerRecord::ready)
         .filter(record -> record.hostingType() != HostingType.STEAM)
+        .filter(record -> !record.privateServer())
         .sorted(Comparator.comparing(ServerRecord::lastUpdateAt).reversed()
             .thenComparing(ServerRecord::serverName, String.CASE_INSENSITIVE_ORDER))
         .map(ServerRecord::toPublicDto)
@@ -182,16 +179,15 @@ public class LobbyService {
         UUID.randomUUID().toString().replace("-", ""),
         generatePrivateKeyHex16(),
         buildAddress(request),
-        request.ipv4(),
-        request.ipv6(),
         request.port(),
         request.hostingType(),
+        request.privateServer(),
         request.serverName(),
         request.passwordProtected(),
         request.gameMode(),
         request.difficulty(),
         request.timePassed(),
-        request.currentPlayers(),
+        request.effectiveCurrentPlayers(),
         request.maxPlayers(),
         request.effectiveMods(),
         request.gameVersion(),
@@ -204,16 +200,7 @@ public class LobbyService {
   }
 
   private String buildAddress(AddServerRequest request) {
-    if (request.address() != null && !request.address().isBlank()) {
-      return request.address().trim();
-    }
-    if (request.ipv4() != null && !request.ipv4().isBlank()) {
-      return request.ipv4().trim() + ":" + request.port();
-    }
-    if (request.ipv6() != null && !request.ipv6().isBlank()) {
-      return "[" + request.ipv6().trim() + "]:" + request.port();
-    }
-    return "unknown:" + request.port();
+    return request.address().trim();
   }
 
   private void enforceCapacity(HostingType hostingType) {

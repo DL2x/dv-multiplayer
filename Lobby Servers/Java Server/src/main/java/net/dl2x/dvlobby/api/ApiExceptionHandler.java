@@ -97,6 +97,7 @@ public class ApiExceptionHandler {
         .replace("gameServerId", "game_server_id")
         .replace("privateKey", "private_key")
         .replace("hostingType", "hosting_type")
+        .replace("privateServer", "private")
         .replace("serverName", "server_name")
         .replace("passwordProtected", "password_protected")
         .replace("gameMode", "game_mode")

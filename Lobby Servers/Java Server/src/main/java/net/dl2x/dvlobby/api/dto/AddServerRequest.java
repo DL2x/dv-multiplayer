@@ -16,14 +16,9 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AddServerRequest(
+    @NotBlank
     @Size(max = 300)
     String address,
-
-    @Size(max = 64)
-    String ipv4,
-
-    @Size(max = 128)
-    String ipv6,
 
     @Min(0) @Max(65535)
     int port,
@@ -31,6 +26,9 @@ public record AddServerRequest(
     @NotNull
     @JsonProperty("hosting_type")
     HostingType hostingType,
+
+    @JsonProperty("private")
+    boolean privateServer,
 
     @NotBlank @Size(max = 64)
     @JsonProperty("server_name")
@@ -98,17 +96,17 @@ public record AddServerRequest(
     return List.of();
   }
 
+  public int effectiveCurrentPlayers() {
+    return !onlinePlayers.isEmpty() ? onlinePlayers.size() : currentPlayers;
+  }
+
   public void validateBusinessRules() {
-    if (currentPlayers > maxPlayers) {
+    if (effectiveCurrentPlayers() > maxPlayers) {
       throw new IllegalArgumentException("current_players must not exceed max_players");
     }
 
     if (onlinePlayers.size() > maxPlayers) {
       throw new IllegalArgumentException("online_players must not exceed max_players");
-    }
-
-    if (address == null && ipv4 == null && ipv6 == null) {
-      throw new IllegalArgumentException("Either address, ipv4 or ipv6 must be provided");
     }
 
     if ((hostingType == HostingType.IP || hostingType == HostingType.BOTH || hostingType == HostingType.DEDICATED) && port <= 0) {
@@ -129,10 +127,9 @@ public record AddServerRequest(
 
     return new AddServerRequest(
         trimToNull(address),
-        trimToNull(ipv4),
-        trimToNull(ipv6),
         port,
         hostingType,
+        privateServer,
         serverName == null ? null : serverName.trim(),
         passwordProtected,
         gameMode,
