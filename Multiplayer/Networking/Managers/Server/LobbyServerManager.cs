@@ -25,9 +25,9 @@ using UnityEngine.Networking;
 namespace Multiplayer.Networking.Managers.Server;
 public class LobbyServerManager : MonoBehaviour
 {
-    private const string ENDPOINT_ADD_SERVER = "add_game_server";
-    private const string ENDPOINT_UPDATE_SERVER = "update_game_server";
-    private const string ENDPOINT_REMOVE_SERVER = "remove_game_server";
+    private const string ENDPOINT_ADD_SERVER = "add";
+    private const string ENDPOINT_UPDATE_SERVER = "update";
+    private const string ENDPOINT_REMOVE_SERVER = "remove";
 
     private readonly Regex IPv4Match = new Regex(@"(\b25[0-5]|\b2[0-4][0-9]|\b[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}");
 
@@ -189,6 +189,7 @@ public class LobbyServerManager : MonoBehaviour
         server.ServerData.RuntimeType = RuntimeConfiguration.RuntimeType;
         server.ServerData.OnlinePlayers = BuildOnlinePlayerList();
         server.ServerData.CurrentPlayers = server.ServerData.OnlinePlayers.Count;
+        server.ServerData.Private = server.ServerData.Visibility == ServerVisibility.Private;
         server.ServerData.HostingType = RuntimeConfiguration.GetApiHostingType(server.ServerData.RuntimeType, server.ServerData.TransportMode);
         server.ServerData.TimePassed = server.ServerData.TimePassed ?? "00d 00h 00m 00s";
         server.ServerData.Ready = pendingReady;

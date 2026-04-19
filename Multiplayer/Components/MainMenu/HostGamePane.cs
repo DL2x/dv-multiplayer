@@ -12,6 +12,7 @@ using Multiplayer.Networking.Data;
 using Multiplayer.Patches.MainMenu;
 using Multiplayer.Utils;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TMPro;
@@ -429,10 +430,68 @@ public class HostGamePane : MonoBehaviour
         };
     }
 
+
+    private static string NormalizeSelectorText(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        return new string(value
+            .Where(ch => !char.IsWhiteSpace(ch) && ch != '<' && ch != '>' && ch != '/')
+            .ToArray())
+            .Trim()
+            .ToLowerInvariant();
+    }
+
+    private bool TryGetTransportModeFromVisibleText(out NetworkTransportMode mode)
+    {
+        mode = RuntimeConfiguration.SanitizeHostTransportMode(Multiplayer.Settings.HostTransportMode);
+
+        if (hostTransportMode == null)
+            return false;
+
+        List<string> texts = hostTransportMode
+            .GetComponentsInChildren<TMP_Text>(true)
+            .Select(t => NormalizeSelectorText(t.text))
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct()
+            .ToList();
+
+        string steamText = NormalizeSelectorText(Locale.Get(Locale.SERVER_HOST_TRANSPORT_MODE_VALUES[(int)NetworkTransportMode.Steam]));
+        string directText = NormalizeSelectorText(Locale.Get(Locale.SERVER_HOST_TRANSPORT_MODE_VALUES[(int)NetworkTransportMode.Direct]));
+        string bothText = NormalizeSelectorText(Locale.Get(Locale.SERVER_HOST_TRANSPORT_MODE_VALUES[(int)NetworkTransportMode.Both]));
+
+        if (texts.Contains(bothText))
+        {
+            mode = NetworkTransportMode.Both;
+            return true;
+        }
+
+        if (texts.Contains(directText))
+        {
+            mode = NetworkTransportMode.Direct;
+            return true;
+        }
+
+        if (texts.Contains(steamText))
+        {
+            mode = NetworkTransportMode.Steam;
+            return true;
+        }
+
+        return false;
+    }
+
     private NetworkTransportMode GetSelectedTransportMode()
     {
         if (!RuntimeConfiguration.CanUseSteamServices || hostTransportMode == null)
             return NetworkTransportMode.Direct;
+
+        if (TryGetTransportModeFromVisibleText(out NetworkTransportMode textMode))
+        {
+            Multiplayer.Log($"Host transport resolved from selector text: {textMode} (index {hostTransportMode.SelectedIndex})");
+            return RuntimeConfiguration.SanitizeHostTransportMode(textMode);
+        }
 
         int index = hostTransportMode.SelectedIndex;
         NetworkTransportMode mode = index switch

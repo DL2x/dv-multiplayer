@@ -60,6 +60,9 @@ namespace Multiplayer.Networking.Data
         [JsonProperty("hosting_type")]
         public string HostingType { get; set; }
 
+        [JsonProperty("private")]
+        public bool Private { get; set; }
+
         [JsonProperty("start_time")]
         public string StartTime { get; set; }
 
@@ -85,6 +88,7 @@ namespace Multiplayer.Networking.Data
         {
             HostingType ??= RuntimeConfiguration.GetApiHostingType(RuntimeType, TransportMode);
             Address ??= BuildAddress(ipv4, ipv6, port);
+            Private = Private || Visibility == ServerVisibility.Private;
             TimePassed ??= "00d 00h 00m 00s";
             OnlinePlayers ??= new List<string>();
             CurrentPlayers = OnlinePlayers.Count;

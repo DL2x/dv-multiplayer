@@ -1,4 +1,5 @@
 using LiteNetLib.Utils;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,8 +10,11 @@ namespace Multiplayer.Networking.Data;
 [Serializable]
 public readonly struct ModInfo
 {
+    [JsonProperty("id")]
     public readonly string Id;
+    [JsonProperty("version")]
     public readonly string Version;
+    [JsonProperty("url")]
     public readonly string Url;
 
     public ModInfo(string id, string version, string url)

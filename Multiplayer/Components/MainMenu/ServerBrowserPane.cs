@@ -90,6 +90,7 @@ public class ServerBrowserPane : MonoBehaviour
     private const int AUTO_REFRESH_TIME = 30; //how often to refresh in auto
     private const int REFRESH_MIN_TIME = 10; //Stop refresh spam
     private bool remoteRefreshComplete;
+    private int refreshRequestId;
 
     // Connection parameters
     private string address;
@@ -361,6 +362,21 @@ public class ServerBrowserPane : MonoBehaviour
         return browserMode;
     }
 
+
+    private void ResetServerListForSourceChange()
+    {
+        remoteServers.Clear();
+        selectedServer = null;
+        serverGridView?.Clear();
+        UpdateDetailsPane();
+        buttonJoin?.ToggleInteractable(false);
+    }
+
+    private bool IsRefreshRequestCurrent(int requestId, ServerSourceMode sourceMode)
+    {
+        return requestId == refreshRequestId && GetCurrentSourceMode() == sourceMode;
+    }
+
     private void ToggleSourceMode()
     {
         if (!RuntimeConfiguration.CanJoinSteamLobbies)
@@ -372,6 +388,7 @@ public class ServerBrowserPane : MonoBehaviour
 
         browserMode = browserMode == ServerSourceMode.Steam ? ServerSourceMode.Direct : ServerSourceMode.Steam;
         UpdateSourceModeButton();
+        ResetServerListForSourceChange();
         RefreshAction();
     }
 
@@ -514,14 +531,16 @@ public class ServerBrowserPane : MonoBehaviour
 
         serverRefreshing = true;
         buttonRefresh.ToggleInteractable(false);
+        int requestId = ++refreshRequestId;
+        ServerSourceMode sourceMode = GetCurrentSourceMode();
 
-        if (GetCurrentSourceMode() == ServerSourceMode.Steam)
+        if (sourceMode == ServerSourceMode.Steam)
         {
-            ListActiveLobbies();
+            ListActiveLobbies(requestId, sourceMode);
         }
         else
         {
-            StartCoroutine(ListApiServers());
+            StartCoroutine(ListApiServers(requestId, sourceMode));
         }
 
     }
@@ -1193,7 +1212,7 @@ public class ServerBrowserPane : MonoBehaviour
     #endregion
 
 
-    private IEnumerator ListApiServers()
+    private IEnumerator ListApiServers(int requestId, ServerSourceMode sourceMode)
     {
         string baseUri = (Multiplayer.Settings.LobbyServerAddress ?? string.Empty).TrimEnd('/');
         string uri = baseUri + "/list";
@@ -1202,6 +1221,9 @@ public class ServerBrowserPane : MonoBehaviour
         request.downloadHandler = new DownloadHandlerBuffer();
 
         yield return request.SendWebRequest();
+
+        if (!IsRefreshRequestCurrent(requestId, sourceMode))
+            yield break;
 
         remoteServers.Clear();
 
@@ -1242,17 +1264,21 @@ public class ServerBrowserPane : MonoBehaviour
             Multiplayer.LogException("Failed to parse lobby server list", ex);
         }
 
-        remoteRefreshComplete = true;
+        if (IsRefreshRequestCurrent(requestId, sourceMode))
+            remoteRefreshComplete = true;
     }
 
     #region steam lobby
-    private async void ListActiveLobbies()
+    private async void ListActiveLobbies(int requestId, ServerSourceMode sourceMode)
     {
         lobbies = await SteamMatchmaking.LobbyList.WithMaxResults(100)
                                                   .FilterDistanceWorldwide()
                                                   .WithSlotsAvailable(-1)
                                                   //.WithKeyValue(SteamworksUtils.MP_MOD_KEY, string.Empty)
                                                   .RequestAsync();
+
+        if (!IsRefreshRequestCurrent(requestId, sourceMode))
+            return;
 
         Multiplayer.LogDebug(() => $"ListActiveLobbies() lobbies found: {lobbies?.Count()}");
 
@@ -1280,7 +1306,8 @@ public class ServerBrowserPane : MonoBehaviour
 
             }
         }
-        remoteRefreshComplete = true;
+        if (IsRefreshRequestCurrent(requestId, sourceMode))
+            remoteRefreshComplete = true;
     }
 
     private void UpdatePingsSteam()
