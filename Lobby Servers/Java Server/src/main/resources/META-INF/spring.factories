@@ -1,0 +1,2 @@
+org.springframework.boot.env.EnvironmentPostProcessor=\
+net.dl2x.dvlobby.config.ConfigJsonEnvironmentPostProcessor

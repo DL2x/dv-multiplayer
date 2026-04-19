@@ -309,3 +309,7 @@ MultiplayerAssets/ProjectSettings/*
 /Lobby Servers/Rust Server/target
 *.pem
 /docs
+
+
+# Java
+/Lobby Servers/Java Server/target
