@@ -1,6 +1,6 @@
 # Derail Valley Lobby Server (Spring Boot)
 
-Spring Boot implementation of the DV lobby API for Steam, IP, Both, and Dedicated hosting.
+Spring Boot implementation of the Derail Valley lobby API for Steam, IP, Both, and Dedicated hosting.
 
 ## Included behavior
 
@@ -21,11 +21,29 @@ Spring Boot implementation of the DV lobby API for Steam, IP, Both, and Dedicate
 - `config.json` is auto-generated on first start if it does not exist
 - `stats.json` is auto-generated on first start if it does not exist
 - all non-current stats survive restarts through `stats.json`
+- request and response logging to `logs/dv-lobby-api.log`
 - no test sources in the project
+
+## Compatibility details
+
+The API accepts both old and new mod payload styles for required mods:
+
+- `Id` or `id`
+- `Version` or `version`
+- `Url`, `url`, `Source`, or `source`
+
+Responses use lowercase JSON names:
+
+- `id`
+- `version`
+- `url`
+
+Unknown extra JSON fields are ignored, so mod-specific fields like `RuntimeType` and `TransportMode` do not break requests.
 
 ## Endpoints
 
 - `GET /` -> status
+- `GET /favicon.ico` -> `204 No Content`
 - `GET /list` -> public ready server list, excluding Steam
 - `GET /stats` -> current and persistent statistics
 - `POST /add` and `POST /add_game_server`
@@ -59,7 +77,7 @@ On first start the server creates `config.json` next to the JAR if it does not a
 }
 ```
 
-`blocked-text-regex` contains Java regular expressions. If any expression matches `server_name`, `server_info`, or a player name, the request is rejected.
+`blocked-text-regex` contains Java regular expressions. If any expression matches `server_name`, `server_info`, a player name, or a mod field, the request is rejected.
 
 The server also creates `stats.json` automatically. That file stores:
 
@@ -99,6 +117,24 @@ mvn clean package
 java -jar target/dv-lobby-server-0.2.0.jar
 ```
 
+## Logs
+
+Request logging is written to:
+
+```text
+logs/dv-lobby-api.log
+```
+
+Each request log entry contains:
+
+- HTTP method
+- request path
+- remote IP
+- request body
+- response status
+- response body
+- duration in milliseconds
+
 ## Example add request
 
 ```json
@@ -113,7 +149,13 @@ java -jar target/dv-lobby-server-0.2.0.jar
   "time_passed": "00:15",
   "current_players": 0,
   "max_players": 8,
-  "required_mods": [],
+  "required_mods": [
+    {
+      "id": "Multiplayer",
+      "version": "0.1.13.14",
+      "url": "https://www.nexusmods.com/derailvalley/mods/1070"
+    }
+  ],
   "game_version": "99.0",
   "multiplayer_version": "0.1.0",
   "server_info": "Direct test",

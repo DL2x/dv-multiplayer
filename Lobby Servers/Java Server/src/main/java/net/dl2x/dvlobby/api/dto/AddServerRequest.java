@@ -1,6 +1,7 @@
 package net.dl2x.dvlobby.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -13,6 +14,7 @@ import net.dl2x.dvlobby.api.HostingType;
 import java.util.ArrayList;
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record AddServerRequest(
     @Size(max = 300)
     String address,

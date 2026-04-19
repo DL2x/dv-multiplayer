@@ -37,7 +37,7 @@ public class ApiExceptionHandler {
     if (e.getCause() instanceof InvalidFormatException ife && ife.getTargetType() == HostingType.class) {
       return ResponseEntity.badRequest().body(new ErrorResponse("hosting_type: unsupported value"));
     }
-    return ResponseEntity.badRequest().body(new ErrorResponse("Invalid JSON"));
+    return ResponseEntity.badRequest().body(new ErrorResponse("invalid JSON"));
   }
 
   @ExceptionHandler(RateLimitExceededException.class)
@@ -79,10 +79,32 @@ public class ApiExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleGeneric(Exception e) {
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse("Internal server error"));
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse("internal server error"));
   }
 
   private String formatFieldError(FieldError fe) {
-    return fe.getField() + ": " + fe.getDefaultMessage();
+    return toJsonFieldPath(fe.getField()) + ": " + fe.getDefaultMessage();
+  }
+
+  private String toJsonFieldPath(String fieldPath) {
+    if (fieldPath == null || fieldPath.isBlank()) {
+      return fieldPath;
+    }
+
+    return fieldPath
+        .replace("requiredMods", "required_mods")
+        .replace("onlinePlayers", "online_players")
+        .replace("gameServerId", "game_server_id")
+        .replace("privateKey", "private_key")
+        .replace("hostingType", "hosting_type")
+        .replace("serverName", "server_name")
+        .replace("passwordProtected", "password_protected")
+        .replace("gameMode", "game_mode")
+        .replace("timePassed", "time_passed")
+        .replace("currentPlayers", "current_players")
+        .replace("maxPlayers", "max_players")
+        .replace("gameVersion", "game_version")
+        .replace("multiplayerVersion", "multiplayer_version")
+        .replace("serverInfo", "server_info");
   }
 }

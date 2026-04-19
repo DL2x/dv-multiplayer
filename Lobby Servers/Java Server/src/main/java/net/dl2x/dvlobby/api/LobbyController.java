@@ -10,11 +10,13 @@ import net.dl2x.dvlobby.api.dto.PublicServerDto;
 import net.dl2x.dvlobby.api.dto.RemoveServerRequest;
 import net.dl2x.dvlobby.api.dto.UpdateServerRequest;
 import net.dl2x.dvlobby.service.LobbyService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -32,6 +34,12 @@ public class LobbyController {
   @GetMapping("/")
   public MessageResponse root() {
     return new MessageResponse("DV Lobby API online");
+  }
+
+  @GetMapping("/favicon.ico")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void favicon() {
+    // Intentionally empty to avoid noisy 400s in browser logs.
   }
 
   @GetMapping("/list")

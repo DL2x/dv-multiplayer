@@ -43,6 +43,30 @@ Recommended mod flow:
 3. Send `/update*` with `ready=true`.
 4. Continue sending `/update*` for `current_players`, `time_passed`, and `online_players`.
 
+## Required mod payload compatibility
+
+The API accepts both of these payload styles for required mods:
+
+```json
+{
+  "id": "Multiplayer",
+  "version": "0.1.13.14",
+  "url": "https://example.com"
+}
+```
+
+```json
+{
+  "Id": "Multiplayer",
+  "Version": "0.1.13.14",
+  "Url": "https://example.com"
+}
+```
+
+It also accepts `source` / `Source` as aliases for `url`.
+
+The API always responds with lowercase field names.
+
 ## List behavior
 
 `GET /list` only returns:
@@ -50,7 +74,7 @@ Recommended mod flow:
 - non-Steam servers
 - servers with `ready=true`
 
-Each list entry now also includes:
+Each list entry includes:
 
 - `start_time`
 - `ready`
@@ -101,11 +125,29 @@ Requests can be rejected for:
 
 - invalid `hosting_type`
 - invalid sizes or missing required fields
-- blocked regex matches in `server_name`, `server_info`, or `online_players`
+- blocked regex matches in `server_name`, `server_info`, `online_players`, or `required_mods`
 - probe failures
 - reaching the per-bucket server limit
 - oversized normalized entries
 - add rate limiting
+
+## Request logging
+
+Every request is logged with:
+
+- method
+- path
+- remote IP
+- request body
+- response status
+- response body
+- elapsed time
+
+By default the log file is:
+
+```text
+logs/dv-lobby-api.log
+```
 
 ## Auto-generated files
 

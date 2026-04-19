@@ -2,8 +2,6 @@ package net.dl2x.dvlobby.service;
 
 import net.dl2x.dvlobby.api.dto.AddServerRequest;
 import net.dl2x.dvlobby.config.LobbyProperties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -14,8 +12,6 @@ import java.util.Set;
 
 @Service
 public class ServerProbeService {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(ServerProbeService.class);
 
   private final LobbyProperties properties;
 
@@ -31,11 +27,8 @@ public class ServerProbeService {
 
     for (String candidate : candidates) {
       if (tryReachable(candidate)) {
-        LOGGER.info("Server probe succeeded for hostingType={} candidate={}", request.hostingType(), candidate);
         return;
       }
-
-      LOGGER.warn("Server probe failed for hostingType={} candidate={}", request.hostingType(), candidate);
     }
 
     throw new ServerProbeFailedException("Server host did not answer ping before registration");

@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE - 10)
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class RequestLoggingFilter extends OncePerRequestFilter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestLoggingFilter.class);

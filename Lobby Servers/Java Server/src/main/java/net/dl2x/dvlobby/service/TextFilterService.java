@@ -43,7 +43,7 @@ public class TextFilterService {
       }
       rejectIfBlocked(mod.id(), "required_mods.id");
       rejectIfBlocked(mod.version(), "required_mods.version");
-      rejectIfBlocked(mod.source(), "required_mods.source");
+      rejectIfBlocked(mod.url(), "required_mods.url");
     }
   }
 

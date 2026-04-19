@@ -1,5 +1,6 @@
 package net.dl2x.dvlobby.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -8,6 +9,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record UpdateServerRequest(
     @NotBlank @Size(max = 64)
     @JsonProperty("game_server_id") String gameServerId,
