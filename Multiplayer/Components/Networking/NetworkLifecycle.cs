@@ -134,7 +134,10 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
             }
         }
 
-        var hostTransportMode = RuntimeConfiguration.SanitizeHostTransportMode(Multiplayer.Settings.HostTransportMode);
+        var requestedHostTransportMode = serverData != null
+            ? serverData.TransportMode
+            : Multiplayer.Settings.HostTransportMode;
+        var hostTransportMode = RuntimeConfiguration.SanitizeHostTransportMode(requestedHostTransportMode);
 
         Multiplayer.Log($"Starting server on port {port} using {hostTransportMode} transport");
         NetworkServer server = new(difficulty, Multiplayer.Settings, IsSinglePlayer, serverData, hostTransportMode);
@@ -143,6 +146,7 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
             return false;
 
         Server = server;
+        server.EnsureLobbyServerManager();
 
         // Register server API
         var serverAPI = new ServerAPIProvider(server);
@@ -152,7 +156,27 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
             ? NetworkTransportMode.Steam
             : NetworkTransportMode.Direct;
 
-        StartClient(IPAddress.Loopback.ToString(), port, Multiplayer.Settings.Password, IsSinglePlayer, null, selfTransportMode);
+        string selfAddress = IPAddress.Loopback.ToString();
+        int selfPort = port;
+
+        if (selfTransportMode == NetworkTransportMode.Steam)
+        {
+            if (Multiplayer.Settings.SteamId == 0)
+                SteamworksUtils.GetSteamUser(out _, out Multiplayer.Settings.SteamId);
+
+            if (Multiplayer.Settings.SteamId != 0)
+            {
+                selfAddress = Multiplayer.Settings.SteamId.ToString();
+                selfPort = -1;
+                Multiplayer.Log($"Starting self-client via Steam relay to own SteamId {selfAddress}");
+            }
+            else
+            {
+                Multiplayer.LogWarning("Steam self-client has no SteamId available, falling back to loopback address");
+            }
+        }
+
+        StartClient(selfAddress, selfPort, Multiplayer.Settings.Password, IsSinglePlayer, null, selfTransportMode);
 
         //reset for next game
         IsSinglePlayer = true;

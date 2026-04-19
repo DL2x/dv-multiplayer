@@ -85,5 +85,19 @@ public static class RuntimeConfiguration
         };
     }
 
+
+    public static string GetApiHostingType(MultiplayerRuntimeType runtimeType, NetworkTransportMode transportMode)
+    {
+        if (runtimeType == MultiplayerRuntimeType.Dedicated)
+            return "dedicated";
+
+        return transportMode switch
+        {
+            NetworkTransportMode.Steam => "steam",
+            NetworkTransportMode.Both => "both",
+            _ => "ip",
+        };
+    }
+
     public static bool CanJoinSteamLobbies => CanUseSteamServices;
 }

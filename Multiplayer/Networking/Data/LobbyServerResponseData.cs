@@ -1,15 +1,21 @@
+using Newtonsoft.Json;
+
 namespace Multiplayer.Networking.Data
 {
     public class LobbyServerResponseData
     {
- 
+        [JsonProperty("game_server_id")]
         public string game_server_id { get; set; }
+
+        [JsonProperty("private_key")]
         public string private_key { get; set; }
 
-        public LobbyServerResponseData(string game_server_id, string private_key, bool? ipv4_request = null)
+        public LobbyServerResponseData() { }
+
+        public LobbyServerResponseData(string gameServerId, string privateKey)
         {
-            this.game_server_id = game_server_id;
-            this.private_key = private_key;
+            game_server_id = gameServerId;
+            private_key = privateKey;
         }
     }
 }

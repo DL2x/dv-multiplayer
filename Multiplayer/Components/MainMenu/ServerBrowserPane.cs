@@ -6,6 +6,7 @@ using DV.UIFramework;
 using DV.Utils;
 using LiteNetLib;
 using MPAPI.Types;
+using Newtonsoft.Json;
 using Multiplayer.API;
 using Multiplayer.Components.MainMenu.ServerBrowser;
 using Multiplayer.Components.Networking;
@@ -26,6 +27,7 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Networking;
 using Color = UnityEngine.Color;
 
 namespace Multiplayer.Components.MainMenu;
@@ -49,6 +51,12 @@ public class ServerBrowserPane : MonoBehaviour
         Aborted
     }
 
+    private enum ServerSourceMode
+    {
+        Steam,
+        Direct
+    }
+
     private const int MAX_PORT_LEN = 5;
     private const int MIN_PORT = 1024;
     private const int MAX_PORT = 49151;
@@ -65,6 +73,7 @@ public class ServerBrowserPane : MonoBehaviour
     private ButtonDV buttonJoin;
     private ButtonDV buttonRefresh;
     private ButtonDV buttonDirectIP;
+    private ButtonDV buttonSourceMode;
 
     // Misc GUI Elements
     private TextMeshProUGUI serverName;
@@ -98,6 +107,7 @@ public class ServerBrowserPane : MonoBehaviour
     private Lobby[] lobbies;
 
     private bool incompatibleMods = true;
+    private ServerSourceMode browserMode = RuntimeConfiguration.CanJoinSteamLobbies ? ServerSourceMode.Steam : ServerSourceMode.Direct;
 
     #region setup
 
@@ -122,6 +132,7 @@ public class ServerBrowserPane : MonoBehaviour
 
         buttonDirectIP.ToggleInteractable(true);
         buttonRefresh.ToggleInteractable(true);
+        UpdateSourceModeButton();
 
         RefreshAction();
     }
@@ -203,7 +214,6 @@ public class ServerBrowserPane : MonoBehaviour
 
         GameObject.Destroy(this.FindChildByName("ButtonIcon OpenFolder"));
         GameObject.Destroy(this.FindChildByName("ButtonIcon Rename"));
-        GameObject.Destroy(this.FindChildByName("ButtonTextIcon Load"));
 
     }
     private void BuildUI()
@@ -310,9 +320,10 @@ public class ServerBrowserPane : MonoBehaviour
         GameObject goDirectIP = this.gameObject.UpdateButton("ButtonTextIcon Overwrite", "ButtonTextIcon Manual", Locale.SERVER_BROWSER__MANUAL_CONNECT_KEY, null, Multiplayer.AssetIndex.multiplayerIcon);
         GameObject goJoin = this.gameObject.UpdateButton("ButtonTextIcon Save", "ButtonTextIcon Join", Locale.SERVER_BROWSER__JOIN_KEY, null, Multiplayer.AssetIndex.connectIcon);
         GameObject goRefresh = this.gameObject.UpdateButton("ButtonIcon Delete", "ButtonIcon Refresh", Locale.SERVER_BROWSER__REFRESH_KEY, null, Multiplayer.AssetIndex.refreshIcon);
+        GameObject goSourceMode = this.gameObject.UpdateButton("ButtonTextIcon Load", "ButtonTextIcon SourceMode", Locale.SERVER_BROWSER__JOIN_KEY, null, Multiplayer.AssetIndex.connectIcon);
 
 
-        if (goDirectIP == null || goJoin == null || goRefresh == null)
+        if (goDirectIP == null || goJoin == null || goRefresh == null || goSourceMode == null)
         {
             Multiplayer.LogError("One or more buttons not found.");
             return;
@@ -328,8 +339,53 @@ public class ServerBrowserPane : MonoBehaviour
         buttonRefresh = goRefresh.GetComponent<ButtonDV>();
         buttonRefresh.onClick.AddListener(RefreshAction);
 
+        buttonSourceMode = goSourceMode.GetComponent<ButtonDV>();
+        buttonSourceMode.onClick.RemoveAllListeners();
+        buttonSourceMode.onClick.AddListener(ToggleSourceMode);
+        foreach (var loc in goSourceMode.GetComponentsInChildren<I2.Loc.Localize>())
+            Destroy(loc);
+        var sourceLocalize = goSourceMode.GetComponentInChildren<Localize>();
+        if (sourceLocalize != null)
+            Destroy(sourceLocalize);
+
         //Lock out the join button until a server has been selected
         buttonJoin.ToggleInteractable(false);
+        UpdateSourceModeButton();
+    }
+
+    private ServerSourceMode GetCurrentSourceMode()
+    {
+        if (!RuntimeConfiguration.CanJoinSteamLobbies)
+            return ServerSourceMode.Direct;
+
+        return browserMode;
+    }
+
+    private void ToggleSourceMode()
+    {
+        if (!RuntimeConfiguration.CanJoinSteamLobbies)
+        {
+            browserMode = ServerSourceMode.Direct;
+            UpdateSourceModeButton();
+            return;
+        }
+
+        browserMode = browserMode == ServerSourceMode.Steam ? ServerSourceMode.Direct : ServerSourceMode.Steam;
+        UpdateSourceModeButton();
+        RefreshAction();
+    }
+
+    private void UpdateSourceModeButton()
+    {
+        if (buttonSourceMode == null)
+            return;
+
+        string label = GetCurrentSourceMode() == ServerSourceMode.Steam ? "Join Source: Steam" : "Join Source: Direct";
+        TextMeshProUGUI text = buttonSourceMode.GetComponentInChildren<TextMeshProUGUI>();
+        if (text != null)
+            text.text = label;
+
+        buttonSourceMode.ToggleInteractable(RuntimeConfiguration.CanJoinSteamLobbies);
     }
 
     private void SetupServerBrowser()
@@ -457,16 +513,15 @@ public class ServerBrowserPane : MonoBehaviour
         remoteServers.Clear();
 
         serverRefreshing = true;
-        //buttonJoin.ToggleInteractable(false);
         buttonRefresh.ToggleInteractable(false);
 
-        if (RuntimeConfiguration.CanJoinSteamLobbies)
+        if (GetCurrentSourceMode() == ServerSourceMode.Steam)
         {
             ListActiveLobbies();
         }
         else
         {
-            remoteRefreshComplete = true;
+            StartCoroutine(ListApiServers());
         }
 
     }
@@ -478,11 +533,10 @@ public class ServerBrowserPane : MonoBehaviour
         buttonDirectIP.ToggleInteractable(false);
         buttonJoin.ToggleInteractable(false);
 
-        // Prefer Steam lobbies when available, otherwise fall back to direct UDP.
         direct = false;
         portNumber = -1;
 
-        if (RuntimeConfiguration.CanJoinSteamLobbies && selectedServer.TransportMode != NetworkTransportMode.Direct)
+        if (GetCurrentSourceMode() == ServerSourceMode.Steam)
         {
             var lobby = GetLobbyFromServer(selectedServer);
             if (lobby != null)
@@ -491,22 +545,15 @@ public class ServerBrowserPane : MonoBehaviour
                 _ = JoinLobby((Lobby)selectedLobby);
                 return;
             }
+
+            Multiplayer.LogWarning($"JoinAction could not find a Steam lobby for server '{selectedServer?.Name}'");
+            AttemptFail();
+            return;
         }
 
-        if (selectedServer.TransportMode != NetworkTransportMode.Steam && selectedServer.port > 0)
+        if (TryGetDirectEndpoint(selectedServer, out address, out portNumber))
         {
             direct = true;
-            portNumber = selectedServer.port;
-            address = !string.IsNullOrWhiteSpace(selectedServer.ipv4)
-                ? selectedServer.ipv4
-                : selectedServer.ipv6;
-
-            if (string.IsNullOrWhiteSpace(address))
-            {
-                Multiplayer.LogWarning("JoinAction called for a direct server without a usable IP address");
-                AttemptFail();
-                return;
-            }
 
             if (selectedServer.HasPassword)
                 ShowPasswordPopup();
@@ -516,7 +563,7 @@ public class ServerBrowserPane : MonoBehaviour
             return;
         }
 
-        Multiplayer.LogWarning($"JoinAction could not find a supported connection path for server '{selectedServer?.Name}'");
+        Multiplayer.LogWarning($"JoinAction could not find a supported direct endpoint for server '{selectedServer?.Name}'");
         AttemptFail();
     }
 
@@ -572,6 +619,26 @@ public class ServerBrowserPane : MonoBehaviour
         }
     }
     #endregion
+
+    private bool TryGetDirectEndpoint(IServerBrowserGameDetails server, out string resolvedAddress, out int resolvedPort)
+    {
+        resolvedAddress = null;
+        resolvedPort = -1;
+
+        if (server == null)
+            return false;
+
+        if (server is LobbyServerData lobbyData && LobbyServerData.TryParseAddress(lobbyData.Address, out string host, out int parsedPort, out bool isIpv6))
+        {
+            resolvedAddress = host;
+            resolvedPort = parsedPort > 0 ? parsedPort : lobbyData.port;
+            return !string.IsNullOrWhiteSpace(resolvedAddress) && resolvedPort > 0;
+        }
+
+        resolvedAddress = !string.IsNullOrWhiteSpace(server.ipv4) ? server.ipv4 : server.ipv6;
+        resolvedPort = server.port;
+        return !string.IsNullOrWhiteSpace(resolvedAddress) && resolvedPort > 0;
+    }
 
     private void UpdateDetailsPane()
     {
@@ -924,7 +991,7 @@ public class ServerBrowserPane : MonoBehaviour
     #region workflow
     private void UpdatePings()
     {
-        if (RuntimeConfiguration.CanUseSteamServices)
+        if (GetCurrentSourceMode() == ServerSourceMode.Steam && RuntimeConfiguration.CanUseSteamServices)
             UpdatePingsSteam();
     }
 
@@ -1126,6 +1193,58 @@ public class ServerBrowserPane : MonoBehaviour
     #endregion
 
 
+    private IEnumerator ListApiServers()
+    {
+        string baseUri = (Multiplayer.Settings.LobbyServerAddress ?? string.Empty).TrimEnd('/');
+        string uri = baseUri + "/list";
+
+        using UnityWebRequest request = UnityWebRequest.Get(uri);
+        request.downloadHandler = new DownloadHandlerBuffer();
+
+        yield return request.SendWebRequest();
+
+        remoteServers.Clear();
+
+        if (request.isNetworkError || request.isHttpError)
+        {
+            Multiplayer.LogError("ListApiServers failed: " + request.error + "\n" + request.downloadHandler.text);
+            remoteRefreshComplete = true;
+            yield break;
+        }
+
+        try
+        {
+            string response = request.downloadHandler.text;
+            var servers = JsonConvert.DeserializeObject<List<LobbyServerData>>(response) ?? new List<LobbyServerData>();
+
+            foreach (var server in servers)
+            {
+                if (server == null)
+                    continue;
+
+                server.NormalizeAfterDeserialization();
+                server.EnsureApiDefaults();
+
+                if (!server.Ready)
+                    continue;
+
+                if (string.Equals(server.HostingType, "steam", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (string.IsNullOrWhiteSpace(server.id))
+                    server.id = !string.IsNullOrWhiteSpace(server.Address) ? server.Address : Guid.NewGuid().ToString("N");
+
+                remoteServers.Add(server);
+            }
+        }
+        catch (Exception ex)
+        {
+            Multiplayer.LogException("Failed to parse lobby server list", ex);
+        }
+
+        remoteRefreshComplete = true;
+    }
+
     #region steam lobby
     private async void ListActiveLobbies()
     {
@@ -1148,6 +1267,9 @@ public class ServerBrowserPane : MonoBehaviour
                 LobbyServerData server = SteamworksUtils.GetLobbyData(lobby);
 
                 server.id = lobby.Id.ToString();
+                server.TransportMode = NetworkTransportMode.Steam;
+                server.RuntimeType = MultiplayerRuntimeType.Steam;
+                server.HostingType = "steam";
 
                 server.CurrentPlayers = lobby.MemberCount;
                 server.MaxPlayers = lobby.MaxMembers;

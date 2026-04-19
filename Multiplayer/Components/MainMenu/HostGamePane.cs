@@ -302,7 +302,7 @@ public class HostGamePane : MonoBehaviour
         else
         {
             hostTransportMode.SetValues([Locale.SERVER_HOST_TRANSPORT_MODE_VALUES[(int)NetworkTransportMode.Direct]]);
-            hostTransportMode.SetSelectedIndex(1);
+            hostTransportMode.SetSelectedIndex(0);
         }
 
         go.SetActive(true);
@@ -422,10 +422,10 @@ public class HostGamePane : MonoBehaviour
     {
         return mode switch
         {
-            NetworkTransportMode.Steam => 1,
-            NetworkTransportMode.Direct => 2,
-            NetworkTransportMode.Both => 3,
-            _ => 1,
+            NetworkTransportMode.Steam => 0,
+            NetworkTransportMode.Direct => 1,
+            NetworkTransportMode.Both => 2,
+            _ => 0,
         };
     }
 
@@ -434,13 +434,17 @@ public class HostGamePane : MonoBehaviour
         if (!RuntimeConfiguration.CanUseSteamServices || hostTransportMode == null)
             return NetworkTransportMode.Direct;
 
-        return hostTransportMode.SelectedIndex switch
+        int index = hostTransportMode.SelectedIndex;
+        NetworkTransportMode mode = index switch
         {
-            1 => NetworkTransportMode.Steam,
-            2 => NetworkTransportMode.Direct,
-            3 => NetworkTransportMode.Both,
+            0 => NetworkTransportMode.Steam,
+            1 => NetworkTransportMode.Direct,
+            2 => NetworkTransportMode.Both,
             _ => RuntimeConfiguration.SanitizeHostTransportMode(Multiplayer.Settings.HostTransportMode),
         };
+
+        Multiplayer.Log($"Host transport selector index: {index}, resolved mode: {mode}");
+        return RuntimeConfiguration.SanitizeHostTransportMode(mode);
     }
 
 

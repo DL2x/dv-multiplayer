@@ -20,25 +20,9 @@ public class LiteNetLibTransport : ITransport, INetEventListener
     public event Action<IPEndPoint, SocketError> OnNetworkError;
     public event Action<ITransportPeer, int> OnNetworkLatencyUpdate;
  
-    // IMPORTANT: keep a stable ITransportPeer wrapper per NetPeer.
-    // Higher layers use ITransportPeer as a dictionary key (peer -> player/state).
-    // Creating multiple wrappers for the same NetPeer breaks lookups and can stall login.
     private readonly Dictionary<NetPeer, LiteNetLibPeer> netPeerToPeer = [];
 
     private readonly NetManager netManager;
-
-    internal LiteNetLibPeer GetOrCreatePeer(NetPeer netPeer)
-    {
-        if (netPeer == null)
-            return null;
-
-        if (netPeerToPeer.TryGetValue(netPeer, out var peer) && peer != null)
-            return peer;
-
-        peer = new LiteNetLibPeer(netPeer);
-        netPeerToPeer[netPeer] = peer;
-        return peer;
-    }
 
     #region ITransport
     public LiteNetLibTransport()
@@ -86,6 +70,8 @@ public class LiteNetLibTransport : ITransport, INetEventListener
         var netPeer = netManager.Connect(address, port, data);
         var peer = GetOrCreatePeer(netPeer);
 
+        //Multiplayer.LogDebug(() => $"LiteNetLibTransport.Connect length: {data.Length}. packet: {BitConverter.ToString(data.Data)}");
+
         return peer;
     }
 
@@ -112,6 +98,9 @@ public class LiteNetLibTransport : ITransport, INetEventListener
     void INetEventListener.OnPeerDisconnected(NetPeer netPeer, DisconnectInfo disconnectInfo)
     {
         var peer = GetOrCreatePeer(netPeer);
+        if (peer == null)
+            return;
+
         OnPeerDisconnected?.Invoke(peer, disconnectInfo.Reason);
 
         netPeerToPeer.Remove(netPeer);
@@ -123,7 +112,8 @@ public class LiteNetLibTransport : ITransport, INetEventListener
     {
         //Multiplayer.LogDebug(() => $"LiteNetLibTransport.OnNetworkReceive({netPeer?.Id})");
 
-        if (netPeerToPeer.TryGetValue(netPeer, out var peer))
+        var peer = GetOrCreatePeer(netPeer);
+        if (peer != null)
         {
             //Multiplayer.LogDebug(() => $"LiteNetLibTransport.OnNetworkReceive({netPeer?.Id}) peer: {peer != null}");
             OnNetworkReceive?.Invoke(peer, reader, channelNumber, deliveryMethod);
@@ -143,7 +133,8 @@ public class LiteNetLibTransport : ITransport, INetEventListener
 
     void INetEventListener.OnNetworkLatencyUpdate(NetPeer netPeer, int latency)
     {
-        if (netPeerToPeer.TryGetValue(netPeer, out var peer))
+        var peer = GetOrCreatePeer(netPeer);
+        if (peer != null)
             OnNetworkLatencyUpdate?.Invoke(peer, latency);
     }
 
@@ -172,8 +163,19 @@ public class LiteNetLibTransport : ITransport, INetEventListener
             netPeerToPeer.Remove(pair.Key);
         }
     }
-    // Intentionally no explicit RegisterPeer API: callers should use GetOrCreatePeer
-    // so that the same wrapper instance is reused for the same NetPeer.
+    public LiteNetLibPeer GetOrCreatePeer(NetPeer netPeer)
+    {
+        if (netPeer == null)
+            return null;
+
+        if (!netPeerToPeer.TryGetValue(netPeer, out var peer) || peer == null)
+        {
+            peer = new LiteNetLibPeer(netPeer);
+            netPeerToPeer[netPeer] = peer;
+        }
+
+        return peer;
+    }
 
 }
 
