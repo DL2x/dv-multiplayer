@@ -186,7 +186,8 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
 
             NetworkLifecycle.Instance.OnTick -= OnTick;
 
-            NetworkLifecycle.Instance.Server.PlayerDisconnected -= OnPlayerDisconnect;
+            if (NetworkLifecycle.Instance.Server != null)
+                NetworkLifecycle.Instance.Server.PlayerDisconnected -= OnPlayerDisconnect;
 
             // Monitor changes to vehicles in the pit stop
             Station.pitstop.CarEntered -= OnCarPitStopEntered;
