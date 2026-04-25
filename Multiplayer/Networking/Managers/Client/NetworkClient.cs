@@ -317,7 +317,7 @@ public class NetworkClient : NetworkManager
 
         Log("Requesting cars");
         SendLoadStateUpdate(PlayerLoadingState.ReadyForTrainSets);
-        displayLoadingInfo.OnLoadingStatusChanged("Syncing Rolling Stock", false, ((float)LoadingState / (float)PlayerLoadingState.Complete) * 100);
+        displayLoadingInfo.OnLoadingStatusChanged("Syncing rolling stock", false, ((float)LoadingState / (float)PlayerLoadingState.Complete) * 100);
 
         uint lastLoggedSets = 0;
 
@@ -521,7 +521,7 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundPlayerJoinedPacket(ClientboundPlayerJoinedPacket packet)
     {
-        //Guid guid = new(packet.Guid);
+        Log($"Received player joined packet for player id: {packet.PlayerId}, username: {packet.Username}");
         ClientPlayerManager.AddPlayer(packet.PlayerId, packet.Username, packet.CrewName);
 
         ClientPlayerManager.UpdatePosition(packet.PlayerId, packet.Position, Vector3.zero, packet.Rotation, false, packet.CarID != 0, packet.CarID);
