@@ -401,7 +401,7 @@ public class NetworkedPitStopStation : IdMonoBehaviour<ushort, NetworkedPitStopS
             }
             else
             {
-                Multiplayer.LogWarning(() => $"NetworkedPitStopStation.SendResourceUpdate({module.resourceType}) [{StationName}, {NetId}], player is null, skipping send");
+                Multiplayer.LogWarning($"NetworkedPitStopStation.SendResourceUpdate({module.resourceType}) [{StationName}, {NetId}], player is null, skipping send");
             }
         }
     }

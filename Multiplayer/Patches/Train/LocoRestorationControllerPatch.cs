@@ -111,7 +111,7 @@ public static class LocoRestorationControllerInitCarForRestorationPatch
         var locoZoneBlocker = car.GetComponentInChildren<LocoZoneBlocker>(true) ?? (car?.interior?.GetComponentInChildren<LocoZoneBlocker>(true));
 
         if (locoZoneBlocker == null)
-             Multiplayer.LogWarning(() => $"LocoZoneBlocker not found for car {car.ID}");
+             Multiplayer.LogWarning($"LocoZoneBlocker not found for car {car.ID}");
 
         return locoZoneBlocker;
     }
