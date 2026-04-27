@@ -55,7 +55,8 @@ public class CullingManager : IDisposable
         if (checkCoro != null)
             CoroutineManager.Instance.Stop(checkCoro);
 
-        NetworkLifecycle.Instance.Server.PlayerDisconnected -= OnPlayerDisconnected;
+        if (NetworkLifecycle.Instance.Server != null)
+            NetworkLifecycle.Instance.Server.PlayerDisconnected -= OnPlayerDisconnected;
     }
 
     //todo: fix when merged with ModAPI branch

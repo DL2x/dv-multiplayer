@@ -109,18 +109,18 @@ public class NetworkServer : NetworkManager
 
     public override bool Start(int port)
     {
+        Log($"Starting server...");
+
         //setup paint theme lookup cache
         PaintThemeLookup.Instance.CheckInstance();
 
         WorldStreamingInit.LoadingFinished += OnLoaded;
 
-        Log($"Starting server...");
         //Try to get our static IPv6 Address we will need this for IPv6 NAT punching to be reliable
         if (IPAddress.TryParse(LobbyServerManager.GetStaticIPv6Address(), out IPAddress ipv6Address))
         {
             //start the connection, IPv4 messages can come from anywhere, IPv6 messages need to specifically come from the static IPv6
             return base.Start(IPAddress.Any, ipv6Address, port);
-
         }
 
         //we're not running IPv6, start as normal
@@ -129,6 +129,7 @@ public class NetworkServer : NetworkManager
 
     public override void Stop()
     {
+        Log($"Stopping server...");
         WorldStreamingInit.LoadingFinished -= OnLoaded;
 
         if (lobbyServerManager != null)
