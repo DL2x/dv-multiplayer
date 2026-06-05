@@ -6,6 +6,7 @@ using LiteNetLib;
 using MPAPI;
 using Multiplayer.API;
 using Multiplayer.Components.MainMenu;
+using Multiplayer.Components.DedicatedServer;
 using Multiplayer.Components.Networking;
 using Multiplayer.Editor;
 using Multiplayer.Patches.Mods;
@@ -64,6 +65,8 @@ public static class Multiplayer
         {
             File.Delete(LOG_FILE);
 
+            DedicatedServerConfig.ApplyIfNeeded(modEntry, Settings);
+
             Locale.Load(ModEntry.Path);
 
             var gameVer = BuildInfo.BUILD_VERSION_MAJOR.ToString() +
@@ -117,6 +120,7 @@ public static class Multiplayer
 
             Log("Creating NetworkManager...");
             NetworkLifecycle.CreateLifecycle();
+            DedicatedServerBootstrap.CreateIfNeeded();
 
             Log("Loading Compatibility Manager...");
             ModCompatibilityManager.Instance.CheckInstance();

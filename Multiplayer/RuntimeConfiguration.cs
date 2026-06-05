@@ -1,5 +1,7 @@
 using DV;
 using DV.Platform.Steam;
+using System;
+using System.Linq;
 using UnityEngine;
 
 namespace Multiplayer;
@@ -23,11 +25,30 @@ public static class RuntimeConfiguration
 {
     public static string BuildDestination => (BuildInfo.BUILD_DESTINATION ?? string.Empty).Trim().ToLowerInvariant();
 
+    public static bool DedicatedRequested =>
+        Application.isBatchMode
+        || BuildDestination.Contains("dedicated")
+        || HasCommandLineSwitch("-dvmp-dedicated")
+        || HasCommandLineSwitch("--dvmp-dedicated")
+        || HasCommandLineSwitch("+dvmp-dedicated");
+
+    private static bool HasCommandLineSwitch(string name)
+    {
+        try
+        {
+            return Environment.GetCommandLineArgs().Any(arg => string.Equals(arg, name, StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static MultiplayerRuntimeType RuntimeType
     {
         get
         {
-            if (Application.isBatchMode || BuildDestination.Contains("dedicated"))
+            if (DedicatedRequested)
                 return MultiplayerRuntimeType.Dedicated;
 
             if (BuildDestination.Contains("oculus"))

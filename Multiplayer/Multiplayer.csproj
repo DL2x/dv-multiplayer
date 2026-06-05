@@ -105,6 +105,14 @@
         <Reference Include="UnityEngine.InputLegacyModule" />
         <Reference Include="VRTK" />
     </ItemGroup>
+
+    <ItemGroup>
+        <DedicatedServerScripts Include="scripts\start-dedicated-server.bat;scripts\start-dedicated-server.sh" />
+        <Content Include="@(DedicatedServerScripts)">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
     <ItemGroup>
       <Folder Include="Networking\Packets\Common\RPC\" />
     </ItemGroup>
@@ -124,6 +132,8 @@
         <!-- Copy to build folder -->
         <Copy SourceFiles="../info.json;../locale.csv;../LICENSE;$(TargetPath);$(OutDir)/Humanizer.dll;$(OutDir)/LiteNetLib.dll"
               DestinationFolder="../build/" />
+        <Copy SourceFiles="@(DedicatedServerScripts)"
+              DestinationFolder="../build/scripts/" />
 
         <!-- Release: install into Steam -->
         <Exec Condition="$(ConfigurationName) == 'Release' and Exists('$(SteamDvInstallDir)')"

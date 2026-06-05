@@ -84,6 +84,7 @@ public class NetworkClient : NetworkManager
     private readonly NetworkTransportMode transportMode;
 
     private bool isAlsoHost;
+    private bool loadingScreenRemoved;
     IGameSession originalSession;
 
     // Allow mods to add to the wait Queue
@@ -382,6 +383,17 @@ public class NetworkClient : NetworkManager
 
         SendLoadStateUpdate(PlayerLoadingState.Complete);
         displayLoadingInfo.OnLoadingStatusChanged("Complete", false, ((float)LoadingState / (float)PlayerLoadingState.Complete) * 100);
+
+        // Steam + direct-IP self-hosting can occasionally complete the network sync while the
+        // game's loading overlay never receives/removes its final screen. The host is already
+        // in-game at that point (player list and pause cursor work), so remove it locally as a
+        // fallback; the normal server packet still handles remote clients.
+        if (isAlsoHost && transportMode == NetworkTransportMode.Direct)
+        {
+            yield return new WaitForSeconds(0.5f);
+            RemoveLoadingScreenAndCreateChat();
+        }
+
         yield return new WaitForSeconds(0.25f);
     }
 
@@ -638,23 +650,30 @@ public class NetworkClient : NetworkManager
     private void OnClientboundRemoveLoadingScreen(ClientboundRemoveLoadingScreenPacket packet)
     {
         Log("World sync finished, removing loading screen");
+        RemoveLoadingScreenAndCreateChat();
+    }
+
+    private void RemoveLoadingScreenAndCreateChat()
+    {
+        if (loadingScreenRemoved)
+            return;
 
         DisplayLoadingInfo displayLoadingInfo = Object.FindObjectOfType<DisplayLoadingInfo>();
         if (displayLoadingInfo == null)
         {
-            LogDebug(() => $"Received {nameof(ClientboundRemoveLoadingScreenPacket)} but couldn't find {nameof(DisplayLoadingInfo)}!");
+            LogDebug(() => $"Tried to remove loading screen but couldn't find {nameof(DisplayLoadingInfo)}!");
             return;
         }
 
+        loadingScreenRemoved = true;
         displayLoadingInfo.OnLoadingFinished();
 
         //if not single player, add in chat
-        if (!isSinglePlayer)
+        if (!isSinglePlayer && chatGUI == null)
         {
             GameObject common = GameObject.Find("[MAIN]/[GameUI]/[NewCanvasController]/Auxiliary Canvas, EventSystem, Input Module");
             if (common != null)
             {
-                //
                 GameObject chat = new("Chat GUI", typeof(ChatGUI));
                 chat.transform.SetParent(common.transform, false);
                 chatGUI = chat.GetComponent<ChatGUI>();

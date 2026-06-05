@@ -62,6 +62,7 @@ public class NetworkServer : NetworkManager
     private readonly Dictionary<byte, ServerPlayer> serverPlayers = [];             //player Id to ServerPlayer mapping
     private readonly Dictionary<byte, ITransportPeer> peers = [];                   //player Id to peer mapping
     private readonly Dictionary<ITransportPeer, ServerPlayer> peerToPlayer = [];    //peer to ServerPlayer mapping
+    private readonly HashSet<byte> acceptedLoginPacketsSent = [];                  //player ids that already received a login response
     public readonly Dictionary<byte, ServerPlayerWrapper> PlayerWrapperCache = []; //cache for ServerPlayers for API use
 
     private LobbyServerManager lobbyServerManager;
@@ -311,19 +312,30 @@ public class NetworkServer : NetworkManager
     {
         LogDebug(() => $"OnPeerConnected({peer.Id})");
 
-        // Send the login-accept packet only once the peer is fully connected.
-        // Sending during the connection-request phase can be unreliable on some transports.
-        if (peerToPlayer.TryGetValue(peer, out var player))
-        {
-            var acceptPacket = new ClientboundLoginResponsePacket
-            {
-                Accepted = true,
-                PlayerId = player.PlayerId,
-                OverrideUsername = player.OriginalUsername == player.Username ? string.Empty : player.Username,
-            };
+        // LiteNetLib can report the connected peer either before or after the
+        // connection-request handler has finished creating ServerPlayer.  Send
+        // from both paths, guarded by acceptedLoginPacketsSent, so direct/IP
+        // clients always receive their accept packet.
+        SendLoginAcceptIfReady(peer);
+    }
 
-            SendPacket(peer, acceptPacket, DeliveryMethod.ReliableUnordered);
-        }
+    private void SendLoginAcceptIfReady(ITransportPeer peer)
+    {
+        if (peer == null || !peerToPlayer.TryGetValue(peer, out var player))
+            return;
+
+        if (!acceptedLoginPacketsSent.Add(player.PlayerId))
+            return;
+
+        var acceptPacket = new ClientboundLoginResponsePacket
+        {
+            Accepted = true,
+            PlayerId = player.PlayerId,
+            OverrideUsername = player.OriginalUsername == player.Username ? string.Empty : player.Username,
+        };
+
+        Log($"Accepting player {player.Username} with id {player.PlayerId}");
+        SendPacket(peer, acceptPacket, DeliveryMethod.ReliableOrdered);
     }
 
     public override void OnPeerDisconnected(ITransportPeer peer, DisconnectReason disconnectReason)
@@ -343,6 +355,7 @@ public class NetworkServer : NetworkManager
         serverPlayers.Remove(player.PlayerId);
         peers.Remove(player.PlayerId);
         peerToPlayer.Remove(peer);
+        acceptedLoginPacketsSent.Remove(player.PlayerId);
 
         SendPacketToAll
         (
@@ -1222,7 +1235,9 @@ public class NetworkServer : NetworkManager
         serverPlayers.Add(serverPlayer.PlayerId, serverPlayer);
         peerToPlayer.Add(peer, serverPlayer);
 
-        // Accepted is sent in OnPeerConnected once the transport reports a fully connected peer.
+        // In direct/IP mode OnPeerConnected may already have fired before the
+        // player mapping exists. Send again here; duplicate sends are guarded.
+        SendLoginAcceptIfReady(peer);
 
     }
 
