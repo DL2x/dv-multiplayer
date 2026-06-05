@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net48</TargetFramework>
         <LangVersion>latest</LangVersion>
@@ -108,9 +108,10 @@
 
     <ItemGroup>
         <DedicatedServerScripts Include="scripts\start-dedicated-server.bat;scripts\start-dedicated-server.sh" />
-        <Content Include="@(DedicatedServerScripts)">
+        <None Include="@(DedicatedServerScripts)">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </Content>
+            <Link>scripts\%(Filename)%(Extension)</Link>
+        </None>
     </ItemGroup>
 
     <ItemGroup>
@@ -132,8 +133,20 @@
         <!-- Copy to build folder -->
         <Copy SourceFiles="../info.json;../locale.csv;../LICENSE;$(TargetPath);$(OutDir)/Humanizer.dll;$(OutDir)/LiteNetLib.dll"
               DestinationFolder="../build/" />
+        <MakeDir Directories="../build/scripts/" />
         <Copy SourceFiles="@(DedicatedServerScripts)"
-              DestinationFolder="../build/scripts/" />
+              DestinationFiles="@(DedicatedServerScripts->'../build/scripts/%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true" />
+
+        <!-- Also copy scripts directly into installed dev mod folders. post-build.ps1 may only deploy dll/json/csv/license. -->
+        <MakeDir Condition="Exists('$(SteamDvInstallDir)')" Directories="$(SteamDvInstallDir)\Mods\Multiplayer\scripts" />
+        <Copy Condition="Exists('$(SteamDvInstallDir)')" SourceFiles="@(DedicatedServerScripts)"
+              DestinationFiles="@(DedicatedServerScripts->'$(SteamDvInstallDir)\Mods\Multiplayer\scripts\%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true" />
+        <MakeDir Condition="Exists('$(OculusDvInstallDir)')" Directories="$(OculusDvInstallDir)\Mods\Multiplayer\scripts" />
+        <Copy Condition="Exists('$(OculusDvInstallDir)')" SourceFiles="@(DedicatedServerScripts)"
+              DestinationFiles="@(DedicatedServerScripts->'$(OculusDvInstallDir)\Mods\Multiplayer\scripts\%(Filename)%(Extension)')"
+              SkipUnchangedFiles="true" />
 
         <!-- Release: install into Steam -->
         <Exec Condition="$(ConfigurationName) == 'Release' and Exists('$(SteamDvInstallDir)')"
