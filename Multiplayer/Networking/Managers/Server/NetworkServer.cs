@@ -63,6 +63,7 @@ public class NetworkServer : NetworkManager
     private readonly Dictionary<byte, ITransportPeer> peers = [];                   //player Id to peer mapping
     private readonly Dictionary<ITransportPeer, ServerPlayer> peerToPlayer = [];    //peer to ServerPlayer mapping
     private readonly HashSet<byte> acceptedLoginPacketsSent = [];                  //player ids that already received a login response
+    private bool dedicatedReadyBannerLogged;
     public readonly Dictionary<byte, ServerPlayerWrapper> PlayerWrapperCache = []; //cache for ServerPlayers for API use
 
     private LobbyServerManager lobbyServerManager;
@@ -272,6 +273,24 @@ public class NetworkServer : NetworkManager
 
         lastTick = NetworkLifecycle.Instance.Tick;
         NetworkLifecycle.Instance.OnTick += OnTick;
+    }
+
+    private void LogDedicatedReadyBannerOnce()
+    {
+        if (dedicatedReadyBannerLogged || RuntimeConfiguration.RuntimeType != MultiplayerRuntimeType.Dedicated)
+            return;
+
+        dedicatedReadyBannerLogged = true;
+        Multiplayer.Log(@"
+============================================================
+  _____   ____  _   _ ______ 
+ |  __ \ / __ \| \ | |  ____|
+ | |  | | |  | |  \| | |__   
+ | |  | | |  | | . ` |  __|  
+ | |__| | |__| | |\  | |____ 
+ |_____/ \____/|_| \_|______|
+                             
+============================================================");
     }
 
     private void OnTick(uint tick)
@@ -1431,6 +1450,7 @@ public class NetworkServer : NetworkManager
             else
             {
                 Log($"Dedicated host player {player.Username} completed loading; keeping it server-side only.");
+                LogDedicatedReadyBannerOnce();
             }
 
             // Send existing players
