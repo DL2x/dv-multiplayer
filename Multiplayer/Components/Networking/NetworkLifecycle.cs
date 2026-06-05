@@ -70,10 +70,13 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
     protected override void Awake()
     {
         base.Awake();
-        playerList = gameObject.AddComponent<PlayerListGUI>();
-        Stats = gameObject.AddComponent<NetworkStatsGui>();
+        if (!RuntimeConfiguration.IsHeadlessDedicated)
+        {
+            playerList = gameObject.AddComponent<PlayerListGUI>();
+            Stats = gameObject.AddComponent<NetworkStatsGui>();
+        }
         //RegisterPackets();
-        WorldStreamingInit.LoadingFinished += () => { playerList.RegisterListeners(); };
+        WorldStreamingInit.LoadingFinished += () => { playerList?.RegisterListeners(); };
         Settings.OnSettingsUpdated += OnSettingsUpdated;
         SceneSwitcher.SceneRequested += OnSceneSwitchRequested;
         SceneManager.sceneLoaded += (scene, _) =>
@@ -81,7 +84,7 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
             if (scene.buildIndex != (int)DVScenes.MainMenu)
                 return;
 
-            playerList.UnRegisterListeners();
+            playerList?.UnRegisterListeners();
             TriggerMainMenuEventLater();
         };
         StartCoroutine(PollEvents());
@@ -97,9 +100,9 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         if (!IsClientRunning && !IsServerRunning)
             return;
         if (settings.ShowStats)
-            Stats.Show(Client.Statistics, Server?.Statistics);
+            Stats?.Show(Client.Statistics, Server?.Statistics);
         else
-            Stats.Hide();
+            Stats?.Hide();
     }
 
     public void TriggerMainMenuEventLater()

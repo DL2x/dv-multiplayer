@@ -535,6 +535,12 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundPlayerJoinedPacket(ClientboundPlayerJoinedPacket packet)
     {
+        if (RuntimeConfiguration.IsHeadlessDedicated && packet.PlayerId == PlayerId)
+        {
+            Log($"Headless dedicated mode: ignoring visible player spawn for local host id {packet.PlayerId}");
+            return;
+        }
+
         Log($"Received player joined packet for player id: {packet.PlayerId}, username: {packet.Username}");
         ClientPlayerManager.AddPlayer(packet.PlayerId, packet.Username, packet.CrewName);
 
@@ -565,6 +571,9 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundPlayerPositionPacket(ClientboundPlayerPositionPacket packet)
     {
+        if (RuntimeConfiguration.IsHeadlessDedicated && packet.PlayerId == PlayerId)
+            return;
+
         ClientPlayerManager.UpdatePosition(packet.PlayerId, packet.Position, packet.MoveDir, packet.RotationY, packet.IsJumping, packet.IsOnCar, packet.CarID);
     }
 
@@ -667,6 +676,15 @@ public class NetworkClient : NetworkManager
 
         loadingScreenRemoved = true;
         displayLoadingInfo.OnLoadingFinished();
+
+        // Dedicated headless servers run a loopback client to reuse normal host sync, but they
+        // must not create in-game UI. ChatGUI opens/pauses UI during construction, which makes
+        // Derail Valley capture a pause screenshot; Camera.Render crashes on Unity's NullGfxDevice.
+        if (RuntimeConfiguration.IsHeadlessDedicated)
+        {
+            Log("Headless dedicated mode: skipping chat UI creation");
+            return;
+        }
 
         //if not single player, add in chat
         if (!isSinglePlayer && chatGUI == null)
@@ -1469,6 +1487,9 @@ public class NetworkClient : NetworkManager
 
     public void SendPlayerPosition(Vector3 position, Vector3 moveDir, float rotationY, ushort carId, bool isJumping, bool isOnCar, bool reliable)
     {
+        if (RuntimeConfiguration.IsHeadlessDedicated && isAlsoHost)
+            return;
+
         //LogDebug(() => $"SendPlayerPosition({position}, {moveDir}, {rotationY}, {carId}, {isJumping}, {IsOnCar})");
 
         SendPacketToServer(new ServerboundPlayerPositionPacket

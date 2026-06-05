@@ -69,6 +69,8 @@ public static class RuntimeConfiguration
     public static bool CanUseDirectUdp => RuntimeType != MultiplayerRuntimeType.Cracked;
     public static bool ShouldPreserveSteamProtection => RuntimeType == MultiplayerRuntimeType.Cracked;
 
+    public static bool IsHeadlessDedicated => RuntimeType == MultiplayerRuntimeType.Dedicated && Application.isBatchMode;
+
     public static NetworkTransportMode GetDefaultHostTransportMode()
     {
         return RuntimeType switch

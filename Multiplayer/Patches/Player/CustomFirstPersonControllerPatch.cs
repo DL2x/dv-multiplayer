@@ -27,6 +27,15 @@ public static class CustomFirstPersonControllerPatch
     [HarmonyPostfix]
     private static void CharacterMovement(CustomFirstPersonController __instance)
     {
+        if (RuntimeConfiguration.IsHeadlessDedicated)
+        {
+            // Unity still receives keyboard state in -batchmode/-nographics on Windows.  A
+            // dedicated server must not have a controllable local host character, so disable
+            // the local first-person controller and do not register the movement tick sender.
+            __instance.enabled = false;
+            return;
+        }
+
         fps = __instance;
         isOnCar = PlayerManager.Car != null;
         car = PlayerManager.Car;
@@ -53,6 +62,9 @@ public static class CustomFirstPersonControllerPatch
 
     private static void OnTick(uint tick)
     {
+        if (RuntimeConfiguration.IsHeadlessDedicated)
+            return;
+
         if(UnloadWatcher.isUnloading)
             return;
 
@@ -87,6 +99,9 @@ public static class CustomFirstPersonControllerPatch
     [HarmonyPatch(nameof(CustomFirstPersonController.SetJumpParameters))]
     private static void SetJumpParameters()
     {
+        if (RuntimeConfiguration.IsHeadlessDedicated)
+            return;
+
         isJumping = true;
     }
 }
