@@ -1,10 +1,10 @@
 using DV;
+using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Player;
 using System.Collections.Generic;
 using System;
 using UnityEngine;
 using Object = UnityEngine.Object;
-using Multiplayer.Components.Networking;
 
 namespace Multiplayer.Networking.Managers.Client;
 
@@ -29,14 +29,8 @@ public class ClientPlayerManager
         return playerMap.TryGetValue(playerid, out player);
     }
 
-    public void AddPlayer(byte playerId, string username, string crewName)
+    public void AddPlayer(byte playerId, string username, string crewName, bool invisible = false)
     {
-        if (global::Multiplayer.RuntimeConfiguration.IsHeadlessDedicated && NetworkLifecycle.Instance?.Client?.PlayerId == playerId)
-        {
-            Multiplayer.Log($"Headless dedicated mode: suppressing visible local host player '{username}' ({playerId})");
-            return;
-        }
-
         if (playerMap.ContainsKey(playerId))
         {
             Multiplayer.LogWarning($"Player with id {playerId} already exists. Removing existing player {playerMap[playerId].Username}");
@@ -49,6 +43,7 @@ public class ClientPlayerManager
         networkedPlayer.PlayerId = playerId;
         networkedPlayer.Username = username;
         networkedPlayer.CrewName = crewName;
+        networkedPlayer.SetInvisible(invisible);
         playerMap.Add(playerId, networkedPlayer);
         OnPlayerConnected?.Invoke(networkedPlayer);
     }

@@ -73,7 +73,7 @@ public class NetworkServer : NetworkManager
 
     public IReadOnlyCollection<ServerPlayer> ServerPlayers => serverPlayers.Values;
     public IReadOnlyCollection<ServerPlayerWrapper> ServerPlayerWrappers => PlayerWrapperCache.Values;
-    public int PlayerCount => ServerPlayers.Count(player => !player.IsDedicatedHost);
+    public int PlayerCount => ServerPlayers.Count;
 
     private ITransportPeer _selfPeer;
     public ITransportPeer SelfPeer
@@ -334,25 +334,8 @@ public class NetworkServer : NetworkManager
             OverrideUsername = player.OriginalUsername == player.Username ? string.Empty : player.Username,
         };
 
-        Log($"Accepting player {player.Username} with id {player.PlayerId}{(player.IsDedicatedHost ? " (dedicated host, hidden)" : string.Empty)}");
+        Log($"Accepting player {player.Username} with id {player.PlayerId}");
         SendPacket(peer, acceptPacket, DeliveryMethod.ReliableOrdered);
-    }
-
-    private static bool IsDedicatedHostLoopbackLogin(IConnectionRequest request)
-    {
-        if (!RuntimeConfiguration.IsHeadlessDedicated)
-            return false;
-
-        try
-        {
-            // The dedicated server uses a local loopback client only to drive the existing
-            // host-loading path. That connection must not become a visible player.
-            return request?.RemoteEndPoint?.Address != null && IPAddress.IsLoopback(request.RemoteEndPoint.Address);
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     public override void OnPeerDisconnected(ITransportPeer peer, DisconnectReason disconnectReason)
@@ -1247,13 +1230,7 @@ public class NetworkServer : NetworkManager
             overrideUsername,
             packet.Username,
             guid
-        )
-        {
-            IsDedicatedHost = IsDedicatedHostLoopbackLogin(request)
-        };
-
-        if (serverPlayer.IsDedicatedHost)
-            Log($"Registered hidden dedicated host loopback player {serverPlayer.Username} with id {serverPlayer.PlayerId}");
+        );
 
         serverPlayers.Add(serverPlayer.PlayerId, serverPlayer);
         peerToPlayer.Add(peer, serverPlayer);
@@ -1430,25 +1407,19 @@ public class NetworkServer : NetworkManager
                 CrewName = player.CrewName,
                 CarID = player.CarId,
                 Position = player.RawPosition,
-                Rotation = player.RawRotationY
+                Rotation = player.RawRotationY,
+                Invisible = RuntimeConfiguration.IsHeadlessDedicated && NetworkLifecycle.Instance.IsHost(player)
             };
 
-            if (!player.IsDedicatedHost)
-            {
-                SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, PlayerLoadingState.Complete, peer);
+            SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, PlayerLoadingState.Complete, peer);
 
-                // Announce player joined
-                ChatManager.ServerMessage(player.Username + " joined the game", null, player);
-            }
-            else
-            {
-                Log($"Dedicated host loopback player {player.Username} completed loading; not announcing or spawning a visible network player.");
-            }
+            // Announce player joined
+            ChatManager.ServerMessage(player.Username + " joined the game", null, player);
 
             // Send existing players
             foreach (ServerPlayer otherPlayer in ServerPlayers)
             {
-                if (player.PlayerId == otherPlayer.PlayerId || otherPlayer.IsDedicatedHost)
+                if (player.PlayerId == otherPlayer.PlayerId)
                     continue;
 
                 SendPacket(peer, new ClientboundPlayerJoinedPacket
@@ -1458,7 +1429,8 @@ public class NetworkServer : NetworkManager
                     CrewName = otherPlayer.CrewName,
                     CarID = otherPlayer.CarId,
                     Position = otherPlayer.RawPosition,
-                    Rotation = otherPlayer.RawRotationY
+                    Rotation = otherPlayer.RawRotationY,
+                    Invisible = RuntimeConfiguration.IsHeadlessDedicated && NetworkLifecycle.Instance.IsHost(otherPlayer)
                 }, DeliveryMethod.ReliableOrdered);
             }
 
@@ -1474,9 +1446,6 @@ public class NetworkServer : NetworkManager
             LogWarning($"Received Player Position from {peer.GetType()}, peerId: {peer.Id}, but could not find matching player.");
             return;
         }
-
-        if (player.IsDedicatedHost)
-            return;
 
         player.CarId = packet.CarID;
         player.RawPosition = packet.Position;

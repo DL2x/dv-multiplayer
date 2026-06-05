@@ -535,14 +535,8 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundPlayerJoinedPacket(ClientboundPlayerJoinedPacket packet)
     {
-        if (RuntimeConfiguration.IsHeadlessDedicated && packet.PlayerId == PlayerId)
-        {
-            Log($"Headless dedicated mode: ignoring visible player spawn for local host id {packet.PlayerId}");
-            return;
-        }
-
-        Log($"Received player joined packet for player id: {packet.PlayerId}, username: {packet.Username}");
-        ClientPlayerManager.AddPlayer(packet.PlayerId, packet.Username, packet.CrewName);
+        Log($"Received player joined packet for player id: {packet.PlayerId}, username: {packet.Username}{(packet.Invisible ? " (invisible)" : string.Empty)}");
+        ClientPlayerManager.AddPlayer(packet.PlayerId, packet.Username, packet.CrewName, packet.Invisible);
 
         ClientPlayerManager.UpdatePosition(packet.PlayerId, packet.Position, Vector3.zero, packet.Rotation, false, packet.CarID != 0, packet.CarID);
     }
@@ -571,9 +565,6 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundPlayerPositionPacket(ClientboundPlayerPositionPacket packet)
     {
-        if (RuntimeConfiguration.IsHeadlessDedicated && packet.PlayerId == PlayerId)
-            return;
-
         ClientPlayerManager.UpdatePosition(packet.PlayerId, packet.Position, packet.MoveDir, packet.RotationY, packet.IsJumping, packet.IsOnCar, packet.CarID);
     }
 
