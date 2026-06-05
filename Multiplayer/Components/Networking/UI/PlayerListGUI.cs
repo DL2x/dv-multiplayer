@@ -73,18 +73,16 @@ public class PlayerListGUI : MonoBehaviour
             return new[] { "Not in game" };
 
         IReadOnlyCollection<NetworkedPlayer> players = NetworkLifecycle.Instance.Client.ClientPlayerManager.Players;
-        List<string> playerList = new();
+        string[] playerList = new string[players.Count + 1];
+        int i = 0;
         foreach (NetworkedPlayer player in players)
         {
-            if (player.Invisible)
-                continue;
-
-            playerList.Add($"{player.DisplayName} ({player.GetPing().ToString()}ms)");
+            playerList[i] = $"{player.DisplayName} ({player.GetPing().ToString()}ms)";
+            i++;
         }
 
-        // The Player of the Client is not in the PlayerManager, so we need to add it separately.
-        // On headless dedicated this GUI is not created, so this remains the real local client.
-        playerList.Add($"{LocalPlayerUsername} ({NetworkLifecycle.Instance.Client.Ping}ms)");
+        // The Player of the Client is not in the PlayerManager, so we need to add it separately
+        playerList[playerList.Length - 1] = $"{LocalPlayerUsername} ({NetworkLifecycle.Instance.Client.Ping}ms)";
         return playerList;
     }
 }

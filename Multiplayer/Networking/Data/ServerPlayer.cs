@@ -42,6 +42,7 @@ public class ServerPlayer : IDisposable
     public Vector3 RawPosition { get; set; }
     public float RawRotationY { get; set; }
     public ushort CarId { get; set; }
+    public bool IsInvisible { get; set; }
     private string _crewName;
     public string CrewName
     {

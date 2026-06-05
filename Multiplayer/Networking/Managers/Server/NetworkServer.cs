@@ -73,7 +73,7 @@ public class NetworkServer : NetworkManager
 
     public IReadOnlyCollection<ServerPlayer> ServerPlayers => serverPlayers.Values;
     public IReadOnlyCollection<ServerPlayerWrapper> ServerPlayerWrappers => PlayerWrapperCache.Values;
-    public int PlayerCount => ServerPlayers.Count;
+    public int PlayerCount => ServerPlayers.Count(p => !p.IsInvisible);
 
     private ITransportPeer _selfPeer;
     public ITransportPeer SelfPeer
@@ -1232,6 +1232,15 @@ public class NetworkServer : NetworkManager
             guid
         );
 
+        // Cheap dedicated-host invisibility: keep the local host as a normal
+        // ServerPlayer for all game systems, but mark only the first headless
+        // dedicated self-client as invisible for remote clients.
+        if (RuntimeConfiguration.IsHeadlessDedicated && !serverPlayers.Values.Any(p => p.IsInvisible))
+        {
+            serverPlayer.IsInvisible = true;
+            Log($"Marking {serverPlayer.Username} with id {serverPlayer.PlayerId} as invisible dedicated host player");
+        }
+
         serverPlayers.Add(serverPlayer.PlayerId, serverPlayer);
         peerToPlayer.Add(peer, serverPlayer);
 
@@ -1399,27 +1408,35 @@ public class NetworkServer : NetworkManager
         {
             Log($"Player {player.Username} has completed loading");
 
-            // Send the new player to all other players
-            ClientboundPlayerJoinedPacket clientboundPlayerJoinedPacket = new()
+            if (!player.IsInvisible)
             {
-                PlayerId = player.PlayerId,
-                Username = player.Username,
-                CrewName = player.CrewName,
-                CarID = player.CarId,
-                Position = player.RawPosition,
-                Rotation = player.RawRotationY,
-                Invisible = RuntimeConfiguration.IsHeadlessDedicated && NetworkLifecycle.Instance.IsHost(player)
-            };
+                // Send the new player to all other players. Dedicated host players
+                // are kept server-side only so older clients do not need any new
+                // protocol fields or client-side hiding logic.
+                ClientboundPlayerJoinedPacket clientboundPlayerJoinedPacket = new()
+                {
+                    PlayerId = player.PlayerId,
+                    Username = player.Username,
+                    CrewName = player.CrewName,
+                    CarID = player.CarId,
+                    Position = player.RawPosition,
+                    Rotation = player.RawRotationY
+                };
 
-            SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, PlayerLoadingState.Complete, peer);
+                SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, PlayerLoadingState.Complete, peer);
 
-            // Announce player joined
-            ChatManager.ServerMessage(player.Username + " joined the game", null, player);
+                // Announce player joined
+                ChatManager.ServerMessage(player.Username + " joined the game", null, player);
+            }
+            else
+            {
+                Log($"Dedicated host player {player.Username} completed loading; keeping it server-side only.");
+            }
 
             // Send existing players
             foreach (ServerPlayer otherPlayer in ServerPlayers)
             {
-                if (player.PlayerId == otherPlayer.PlayerId)
+                if (player.PlayerId == otherPlayer.PlayerId || otherPlayer.IsInvisible)
                     continue;
 
                 SendPacket(peer, new ClientboundPlayerJoinedPacket
@@ -1429,8 +1446,7 @@ public class NetworkServer : NetworkManager
                     CrewName = otherPlayer.CrewName,
                     CarID = otherPlayer.CarId,
                     Position = otherPlayer.RawPosition,
-                    Rotation = otherPlayer.RawRotationY,
-                    Invisible = RuntimeConfiguration.IsHeadlessDedicated && NetworkLifecycle.Instance.IsHost(otherPlayer)
+                    Rotation = otherPlayer.RawRotationY
                 }, DeliveryMethod.ReliableOrdered);
             }
 

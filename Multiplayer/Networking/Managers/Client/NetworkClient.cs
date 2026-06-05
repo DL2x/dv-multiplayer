@@ -535,8 +535,8 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundPlayerJoinedPacket(ClientboundPlayerJoinedPacket packet)
     {
-        Log($"Received player joined packet for player id: {packet.PlayerId}, username: {packet.Username}{(packet.Invisible ? " (invisible)" : string.Empty)}");
-        ClientPlayerManager.AddPlayer(packet.PlayerId, packet.Username, packet.CrewName, packet.Invisible);
+        Log($"Received player joined packet for player id: {packet.PlayerId}, username: {packet.Username}");
+        ClientPlayerManager.AddPlayer(packet.PlayerId, packet.Username, packet.CrewName);
 
         ClientPlayerManager.UpdatePosition(packet.PlayerId, packet.Position, Vector3.zero, packet.Rotation, false, packet.CarID != 0, packet.CarID);
     }
@@ -1478,9 +1478,6 @@ public class NetworkClient : NetworkManager
 
     public void SendPlayerPosition(Vector3 position, Vector3 moveDir, float rotationY, ushort carId, bool isJumping, bool isOnCar, bool reliable)
     {
-        if (RuntimeConfiguration.IsHeadlessDedicated && isAlsoHost)
-            return;
-
         //LogDebug(() => $"SendPlayerPosition({position}, {moveDir}, {rotationY}, {carId}, {isJumping}, {IsOnCar})");
 
         SendPacketToServer(new ServerboundPlayerPositionPacket

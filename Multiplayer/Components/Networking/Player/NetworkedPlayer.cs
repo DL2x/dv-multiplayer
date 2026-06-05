@@ -36,7 +36,6 @@ public class NetworkedPlayer : MonoBehaviour
 
     public byte PlayerId { get; set; }
     public string CrewName { get; set; }
-    public bool Invisible { get; private set; }
 
     private AnimationHandler animationHandler;
     private NameTag nameTag;
@@ -104,18 +103,6 @@ public class NetworkedPlayer : MonoBehaviour
     {
         nameTag.ShowUsername(settings.ShowNameTags);
         nameTag.ShowPing(settings.ShowNameTags && settings.ShowPingInNameTags);
-    }
-
-
-    public void SetInvisible(bool invisible)
-    {
-        Invisible = invisible;
-
-        foreach (Renderer renderer in GetComponentsInChildren<Renderer>(true))
-            renderer.enabled = !invisible;
-
-        if (nameTag != null)
-            nameTag.gameObject.SetActive(!invisible);
     }
 
     public void SetPing(int ping)

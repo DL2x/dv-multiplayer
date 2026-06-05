@@ -1,5 +1,4 @@
 using DV;
-using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Player;
 using System.Collections.Generic;
 using System;
@@ -29,7 +28,7 @@ public class ClientPlayerManager
         return playerMap.TryGetValue(playerid, out player);
     }
 
-    public void AddPlayer(byte playerId, string username, string crewName, bool invisible = false)
+    public void AddPlayer(byte playerId, string username, string crewName)
     {
         if (playerMap.ContainsKey(playerId))
         {
@@ -43,7 +42,6 @@ public class ClientPlayerManager
         networkedPlayer.PlayerId = playerId;
         networkedPlayer.Username = username;
         networkedPlayer.CrewName = crewName;
-        networkedPlayer.SetInvisible(invisible);
         playerMap.Add(playerId, networkedPlayer);
         OnPlayerConnected?.Invoke(networkedPlayer);
     }

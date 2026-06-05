@@ -11,5 +11,4 @@ public class ClientboundPlayerJoinedPacket
     public ushort CarID { get; set; }
     public Vector3 Position { get; set; }
     public float Rotation { get; set; }
-    public bool Invisible { get; set; }
 }
