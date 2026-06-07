@@ -108,7 +108,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <DedicatedServerScripts Include="scripts\start-dedicated-server.bat;scripts\start-dedicated-server.sh" />
+        <DedicatedServerScripts Include="scripts\start-dedicated-server.bat;scripts\start-dedicated-server.sh;scripts\start-dedicated-linux.sh;scripts\setup-dedicated-linux.sh;scripts\dv-dedicated.service" />
         <None Include="@(DedicatedServerScripts)">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <Link>scripts\%(Filename)%(Extension)</Link>

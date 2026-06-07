@@ -1,0 +1,37 @@
+[Unit]
+# Derail Valley Multiplayer dedicated server (headless, Wine + Xvfb).
+# Install:
+#   sudo cp dv-dedicated.service /etc/systemd/system/dv-dedicated.service
+#   # edit User= and the paths below to match your host, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now dv-dedicated
+# Logs:  journalctl -u dv-dedicated -f
+Description=Derail Valley Multiplayer dedicated server (wine/headless)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=builder
+# --- adjust these to your install ---
+Environment=HOME=/home/builder
+WorkingDirectory=/home/builder/derail_valley/game
+# Server config (override any of the script's env vars here):
+Environment=PORT=7777
+Environment=MAX_PLAYERS=8
+Environment=SERVER_NAME=Derail Valley Dedicated Server
+Environment=PUBLIC_GAME=true
+# Run the launcher (it brings up Xvfb, wine, config, logging itself):
+ExecStart=/home/builder/derail_valley/game/Mods/Multiplayer/scripts/start-dedicated-linux.sh
+# Give Unity time to flush its autosave on stop; the script traps TERM and
+# kills wine + Xvfb in its cleanup handler.
+KillSignal=SIGTERM
+TimeoutStopSec=45
+Restart=on-failure
+RestartSec=10
+# Memory is tight on an 8 GB host; do not let a runaway leak take the box down.
+# Raise/remove once the LXC has more RAM.
+MemoryMax=9G
+
+[Install]
+WantedBy=multi-user.target
