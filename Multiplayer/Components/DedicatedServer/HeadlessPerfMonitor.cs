@@ -24,6 +24,10 @@ public class HeadlessPerfMonitor : MonoBehaviour
 
     private void Update()
     {
+        // The game keeps overwriting Application.targetFrameRate from its FrameLimit pref, so we
+        // re-assert the headless FPS cap every frame (cheap: a couple of int comparisons).
+        HeadlessServerOptimizations.EnforceFrameRateCap();
+
         frames++;
         elapsed += Time.unscaledDeltaTime;
         if (elapsed < IntervalSeconds)

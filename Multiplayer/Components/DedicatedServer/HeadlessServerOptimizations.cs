@@ -17,27 +17,38 @@ public static class HeadlessServerOptimizations
 {
     private static bool applied;
 
+    /// <summary>
+    /// The frame-rate cap we want held, as a multiple of the network tick rate. -1 = no cap set.
+    /// <see cref="HeadlessPerfMonitor"/> re-asserts this every frame because the game overwrites
+    /// Application.targetFrameRate from its own FrameLimit preference after the world loads.
+    /// </summary>
+    public static int DesiredTargetFrameRate { get; private set; } = -1;
+
     public static void Apply()
     {
         if (applied)
             return;
         applied = true;
 
-        // Health readout (FPS / achieved tick rate) for headless monitoring.
+        // Health readout (FPS / tick rate) + per-frame re-assert of the FPS cap below.
         GameObject monitor = new GameObject("MultiplayerHeadlessPerfMonitor");
         Object.DontDestroyOnLoad(monitor);
         monitor.AddComponent<HeadlessPerfMonitor>();
 
+        // Cap the frame rate to a MULTIPLE of the network tick rate. The tick is one-per-frame
+        // paced to TICK_INTERVAL, so smooth (even) tick spacing -> smooth trains needs a steady FPS
+        // that divides evenly into TICK_RATE. An off-multiple/fluctuating FPS (e.g. an uncapped GPU
+        // at ~120, or a 60 cap = 2.5x 24) makes ticks land on a varying number of frames -> jitter.
+        int tickRate = NetworkLifecycle.TICK_RATE;
+        int requested = Mathf.Max(Multiplayer.Settings.HeadlessTargetFrameRate, tickRate * 2);
+        DesiredTargetFrameRate = Mathf.RoundToInt(requested / (float)tickRate) * tickRate;
+        EnforceFrameRateCap();
+
         if (!Multiplayer.Settings.HeadlessDisableRendering)
         {
-            Multiplayer.Log("Headless dedicated mode: rendering left enabled (HeadlessDisableRendering=false).");
+            Multiplayer.Log($"Headless dedicated mode: rendering left enabled, targetFrameRate={DesiredTargetFrameRate}.");
             return;
         }
-
-        // Keep the loop comfortably above the network tick rate, but stop it spinning a CPU core
-        // on empty frames once rendering is disabled.
-        QualitySettings.vSyncCount = 0;
-        Application.targetFrameRate = Mathf.Max(NetworkLifecycle.TICK_RATE * 2, Multiplayer.Settings.HeadlessTargetFrameRate);
 
         // Disable cameras so Unity skips the per-frame scene render (and the image-effect/compute
         // passes that are pure waste here). Re-applied on scene loads to catch new cameras.
@@ -45,7 +56,21 @@ public static class HeadlessServerOptimizations
         WorldStreamingInit.LoadingFinished += DisableAllCameras;
         SceneManager.sceneLoaded += OnSceneLoaded;
 
-        Multiplayer.Log($"Headless dedicated mode: scene rendering disabled, targetFrameRate={Application.targetFrameRate}.");
+        Multiplayer.Log($"Headless dedicated mode: scene rendering disabled, targetFrameRate={DesiredTargetFrameRate}.");
+    }
+
+    /// <summary>
+    /// Re-assert the FPS cap. The game sets Application.targetFrameRate from its FrameLimit pref
+    /// (default 0 = unlimited) after load, overriding our cap, so this is called every frame.
+    /// </summary>
+    public static void EnforceFrameRateCap()
+    {
+        if (DesiredTargetFrameRate <= 0)
+            return;
+        if (QualitySettings.vSyncCount != 0)
+            QualitySettings.vSyncCount = 0;
+        if (Application.targetFrameRate != DesiredTargetFrameRate)
+            Application.targetFrameRate = DesiredTargetFrameRate;
     }
 
     private static void OnSceneLoaded(Scene scene, LoadSceneMode mode) => DisableAllCameras();
