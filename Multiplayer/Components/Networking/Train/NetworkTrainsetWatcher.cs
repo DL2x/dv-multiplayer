@@ -12,6 +12,12 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
 {
     private ClientboundTrainsetPhysicsPacket cachedSendPacket;
 
+    // Reusable buffer for the per-tick physics parts of one trainset; avoids a heap
+    // allocation every time a moving/full-syncing trainset is serialised. Safe because the
+    // packet is serialised synchronously inside SendTrainsetPhysicsUpdate before the next
+    // trainset reuses it (the shared cachedSendPacket already relies on that invariant).
+    private TrainsetMovementPart[] sendBuffer = System.Array.Empty<TrainsetMovementPart>();
+
     const float DESIRED_FULL_SYNC_INTERVAL = 2f; // in seconds
     const int MAX_UNSYNC_TICKS = (int)(NetworkLifecycle.TICK_RATE * DESIRED_FULL_SYNC_INTERVAL);
     public const float VELOCITY_THRESHOLD = 0.01f;
@@ -147,8 +153,11 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
         if (!anyCarMoving && !maxTicksReached || anyCarTeleporting)
             return;
 
-        TrainsetMovementPart[] trainsetParts = new TrainsetMovementPart[set.cars.Count];
-        
+        int partCount = set.cars.Count;
+        if (sendBuffer.Length != partCount)
+            sendBuffer = new TrainsetMovementPart[partCount];
+        TrainsetMovementPart[] trainsetParts = sendBuffer;
+
         for (int i = 0; i < set.cars.Count; i++)
         {
             TrainCar trainCar = set.cars[i];

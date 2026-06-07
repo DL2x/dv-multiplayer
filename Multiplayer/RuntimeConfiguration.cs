@@ -69,7 +69,11 @@ public static class RuntimeConfiguration
     public static bool CanUseDirectUdp => RuntimeType != MultiplayerRuntimeType.Cracked;
     public static bool ShouldPreserveSteamProtection => RuntimeType == MultiplayerRuntimeType.Cracked;
 
-    public static bool IsHeadlessDedicated => RuntimeType == MultiplayerRuntimeType.Dedicated && Application.isBatchMode;
+    // A dedicated server is headless regardless of Unity's -batchmode. The supported Linux
+    // deployment runs the Windows build under Wine + Xvfb (a real GfxDevice, NOT -batchmode, so
+    // Application.isBatchMode is false). It must still skip all player/UI/render work and mark the
+    // loopback host invisible, so headless detection keys off the dedicated runtime type alone.
+    public static bool IsHeadlessDedicated => RuntimeType == MultiplayerRuntimeType.Dedicated;
 
     public static NetworkTransportMode GetDefaultHostTransportMode()
     {

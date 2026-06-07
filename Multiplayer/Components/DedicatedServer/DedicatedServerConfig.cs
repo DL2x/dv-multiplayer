@@ -29,6 +29,7 @@ public class DedicatedServerConfig
     public ServerVisibility? Visibility { get; set; }
     public bool? PublicGame { get; set; }
     public NetworkTransportMode? HostTransportMode { get; set; }
+    public LogLevel? LogLevel { get; set; }
 
     [JsonIgnore]
     public static string ConfigPath => Path.Combine(Multiplayer.ModEntry?.Path ?? string.Empty, CONFIG_FILE_NAME);
@@ -87,6 +88,11 @@ public class DedicatedServerConfig
 
         if (PublicGame.HasValue)
             settings.PublicGame = PublicGame.Value;
+
+        // Keep operationally-useful logs (joins/leaves, lobby) at Info, but the per-tick spam
+        // is already demoted to Debug, so Info no longer floods the tick thread. Operators can
+        // go quieter ("Warning"/"Error") or louder ("Debug") via "logLevel" in dedicated-server.json.
+        settings.LogLevel = LogLevel ?? global::Multiplayer.LogLevel.Info;
 
         NetworkTransportMode requestedTransport = HostTransportMode ?? NetworkTransportMode.Direct;
         settings.HostTransportMode = RuntimeConfiguration.SanitizeHostTransportMode(requestedTransport);

@@ -611,7 +611,7 @@ public class NetworkServer : NetworkManager
     public void SendDestroyTrainCar(NetworkedTrainCar netTrainCar, ITransportPeer peer = null)
     {
         //ushort netID = trainCar.GetNetId();
-        Log($"Sending DestroyTrainCarPacket for [{netTrainCar.CurrentID} {netTrainCar.NetId}]");
+        LogDebug(() => $"Sending DestroyTrainCarPacket for [{netTrainCar.CurrentID} {netTrainCar.NetId}]");
 
         if (netTrainCar.NetId == 0)
         {
@@ -655,7 +655,7 @@ public class NetworkServer : NetworkManager
 
         //LogDebug(() => $"SendCargoState({netTraincar?.CurrentID}, isLoading: {isLoading}, cargoModelIndex: {cargoModelIndex}), logicCar: {logicCar?.ID}, WareHouseMachineID: {logicCar.CargoOriginWarehouse?.ID}, warehouse track: {logicCar.CargoOriginWarehouse?.WarehouseTrack?.ID}");
 
-        Log($"Sending Cargo State for {netTraincar?.CurrentID}, isLoading: {isLoading}, cargoModelIndex: {cargoModelIndex}");
+        LogDebug(() => $"Sending Cargo State for {netTraincar?.CurrentID}, isLoading: {isLoading}, cargoModelIndex: {cargoModelIndex}");
 
         if (logicCar == null)
         {
@@ -698,7 +698,7 @@ public class NetworkServer : NetworkManager
             PaintThemeId = themeNetId
         };
 
-        Log($"Sending paint theme change for {netTraincar.CurrentID}");
+        LogDebug(() => $"Sending paint theme change for {netTraincar.CurrentID}");
 
         if (sendToPlayer != null)
             SendPacket(sendToPlayer.Peer, packet, DeliveryMethod.ReliableUnordered);
@@ -715,7 +715,7 @@ public class NetworkServer : NetworkManager
             TransportCarNetIds = transportCars
         };
 
-        Log($"Sending restoration state change for {netId}, new state: {newState}, transport cars count: {transportCars?.Count() ?? 0}");
+        LogDebug(() => $"Sending restoration state change for {netId}, new state: {newState}, transport cars count: {transportCars?.Count() ?? 0}");
 
         SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, PlayerLoadingState.ReadyForItems, true);
     }
@@ -968,7 +968,7 @@ public class NetworkServer : NetworkManager
 
     public void SendJobsCreatePacket(NetworkedStationController networkedStation, NetworkedJob[] jobs, ITransportPeer peer = null)
     {
-        Log($"Sending JobsCreatePacket for stationNetId {networkedStation.NetId} with {jobs.Count()} jobs");
+        LogDebug(() => $"Sending JobsCreatePacket for stationNetId {networkedStation.NetId} with {jobs.Count()} jobs");
 
         var packet = ClientboundJobsCreatePacket.FromNetworkedJobs(networkedStation, jobs);
 
@@ -980,13 +980,13 @@ public class NetworkServer : NetworkManager
 
     public void SendJobsUpdatePacket(uint stationNetId, NetworkedJob[] jobs)
     {
-        Multiplayer.Log($"Sending JobsUpdatePacket for stationNetId {stationNetId} with {jobs.Count()} jobs");
+        LogDebug(() => $"Sending JobsUpdatePacket for stationNetId {stationNetId} with {jobs.Count()} jobs");
         SendPacketToAll(ClientboundJobsUpdatePacket.FromNetworkedJobs(stationNetId, jobs), DeliveryMethod.ReliableOrdered, PlayerLoadingState.ReadyForJobs, excludeSelf: true);
     }
 
     public void SendTaskUpdate(ushort taskNetId, TaskState newState, float taskStartTime, float taskFinishTime)
     {
-        Multiplayer.Log($"Sending TaskUpdate for taskNetId {taskNetId}, newState {newState}");
+        LogDebug(() => $"Sending TaskUpdate for taskNetId {taskNetId}, newState {newState}");
         SendPacketToAll
         (
             new ClientboundTaskUpdatePacket
@@ -1004,7 +1004,7 @@ public class NetworkServer : NetworkManager
 
     public void SendItemsChangePacket(List<ItemUpdateData> items, ServerPlayer player)
     {
-        Log($"Sending SendItemsChangePacket with {items.Count()} items to {player.Username}");
+        LogDebug(() => $"Sending SendItemsChangePacket with {items.Count()} items to {player.Username}");
 
         if (player.Peer != null && player.Peer != SelfPeer)
         {

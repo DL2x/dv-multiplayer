@@ -255,25 +255,50 @@ public static class Multiplayer
 
     #region Logging
 
+    // Settings may not be loaded yet during very early init; default to Info then.
+    public static bool ShouldLog(LogLevel level) => (int)level <= (int)(Settings?.LogLevel ?? LogLevel.Info);
+
     public static void LogDebug(Func<object> resolver)
     {
-        if (!Settings.DebugLogging)
+        // Honour either the explicit DebugLogging toggle or a Debug LogLevel.
+        if (!(Settings?.DebugLogging ?? false) && !ShouldLog(LogLevel.Debug))
             return;
         WriteLog($"[Debug] {resolver.Invoke()}");
     }
 
     public static void Log(object msg)
     {
+        if (!ShouldLog(LogLevel.Info))
+            return;
         WriteLog($"[Info] {msg}");
+    }
+
+    // Lazy overload: the string is only built when Info logging is enabled.
+    public static void Log(Func<object> resolver)
+    {
+        if (!ShouldLog(LogLevel.Info))
+            return;
+        WriteLog($"[Info] {resolver.Invoke()}");
     }
 
     public static void LogWarning(object msg)
     {
+        if (!ShouldLog(LogLevel.Warning))
+            return;
         WriteLog($"[Warning] {msg}");
+    }
+
+    public static void LogWarning(Func<object> resolver)
+    {
+        if (!ShouldLog(LogLevel.Warning))
+            return;
+        WriteLog($"[Warning] {resolver.Invoke()}");
     }
 
     public static void LogError(object msg)
     {
+        if (!ShouldLog(LogLevel.Error))
+            return;
         WriteLog($"[Error] {msg}");
     }
 

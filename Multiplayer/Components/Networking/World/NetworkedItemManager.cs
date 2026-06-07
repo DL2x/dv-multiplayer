@@ -26,6 +26,10 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
     public const float REACH_DISTANCE_BUFFER = 0.5f;
     public float MAX_REACH_DISTANCE = 4f + REACH_DISTANCE_BUFFER;         //from the game, but we should try to look up the value
 
+    // The per-player "nearby items" proximity scan is O(players x items). Players don't move
+    // fast enough to need it at the full tick rate, so recompute it every Nth tick instead.
+    private const uint ITEM_LIST_UPDATE_TICK_INTERVAL = 6; // ~4 Hz at 24 Hz TICK_RATE
+
     //caches for item snapshots
     private List<ItemUpdateData> DestroyedItems = new List<ItemUpdateData>();
 
@@ -124,7 +128,8 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 
         if (NetworkLifecycle.Instance.IsHost())
         {
-            UpdatePlayerItemLists();
+            if (tick % ITEM_LIST_UPDATE_TICK_INTERVAL == 0)
+                UpdatePlayerItemLists();
             ProcessChanged(tick);
         }
         else

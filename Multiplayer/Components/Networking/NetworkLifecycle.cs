@@ -3,6 +3,7 @@ using DV.Utils;
 using LiteNetLib;
 using MPAPI;
 using Multiplayer.API;
+using Multiplayer.Components.DedicatedServer;
 using Multiplayer.Components.Networking.UI;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Managers.Client;
@@ -74,6 +75,10 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         {
             playerList = gameObject.AddComponent<PlayerListGUI>();
             Stats = gameObject.AddComponent<NetworkStatsGui>();
+        }
+        else
+        {
+            HeadlessServerOptimizations.Apply();
         }
         //RegisterPackets();
         WorldStreamingInit.LoadingFinished += () => { playerList?.RegisterListeners(); };

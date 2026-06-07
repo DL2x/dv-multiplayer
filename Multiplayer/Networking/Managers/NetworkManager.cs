@@ -203,7 +203,7 @@ public abstract class NetworkManager
 
     public void LogDebug(Func<object> resolver)
     {
-        if (!Multiplayer.Settings.DebugLogging)
+        if (!(Multiplayer.Settings?.DebugLogging ?? false) && !Multiplayer.ShouldLog(LogLevel.Debug))
             return;
         Multiplayer.LogDebug(() => $"{LogPrefix} {resolver.Invoke()}");
     }
@@ -213,9 +213,24 @@ public abstract class NetworkManager
         Multiplayer.Log($"{LogPrefix} {msg}");
     }
 
+    // Lazy overload: the string is only built when Info logging is enabled.
+    public void Log(Func<object> resolver)
+    {
+        if (!Multiplayer.ShouldLog(LogLevel.Info))
+            return;
+        Multiplayer.Log($"{LogPrefix} {resolver.Invoke()}");
+    }
+
     public void LogWarning(object msg)
     {
         Multiplayer.LogWarning($"{LogPrefix} {msg}");
+    }
+
+    public void LogWarning(Func<object> resolver)
+    {
+        if (!Multiplayer.ShouldLog(LogLevel.Warning))
+            return;
+        Multiplayer.LogWarning($"{LogPrefix} {resolver.Invoke()}");
     }
 
     public void LogError(object msg)
