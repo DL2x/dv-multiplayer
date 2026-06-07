@@ -187,6 +187,11 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
 
     private IEnumerator PollEvents()
     {
+        // NOTE: a fixed-timestep accumulator (multiple ticks per frame to hit a steady 24 Hz) was
+        // tried, but at a frame rate that is not a multiple of TICK_RATE it bursts ticks unevenly,
+        // and clients interpolate train positions assuming evenly-spaced ticks -> constant light
+        // jitter. One tick per frame paced to TICK_INTERVAL keeps snapshot spacing even (smoother),
+        // even though the achieved rate is a bit below 24 when FPS < ~48.
         while (!UnloadWatcher.isQuitting)
         {
             Tick++;

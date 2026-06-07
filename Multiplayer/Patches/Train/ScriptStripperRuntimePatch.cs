@@ -25,6 +25,22 @@ public static class ScriptStripperRuntimePatch
         Rigidbody[] rigidBodies = goToStrip.GetComponentsInChildren<Rigidbody>();
         Collider[] colliders = goToStrip.GetComponentsInChildren<Collider>();
 
+        // Dedicated server has no display or audio: these are built-in Unity components (NOT
+        // MonoBehaviours), so the script loop below never touches them and they keep doing
+        // per-frame work (animation evaluation, particle simulation, audio) for every vehicle.
+        Animator[] animators = goToStrip.GetComponentsInChildren<Animator>(true);
+        ParticleSystem[] particleSystems = goToStrip.GetComponentsInChildren<ParticleSystem>(true);
+        AudioSource[] audioSources = goToStrip.GetComponentsInChildren<AudioSource>(true);
+
+        for (int i = 0; i < animators.Length; i++)
+            Object.Destroy(animators[i]);
+
+        for (int i = 0; i < particleSystems.Length; i++)
+            Object.Destroy(particleSystems[i]);
+
+        for (int i = 0; i < audioSources.Length; i++)
+            Object.Destroy(audioSources[i]);
+
         for (int i = 0; i < joints.Length; i++)
         {
             Object.Destroy(joints[i]);
