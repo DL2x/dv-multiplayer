@@ -45,6 +45,9 @@ public static class HeadlessServerOptimizations
         int requested = Mathf.Max(Multiplayer.Settings.HeadlessTargetFrameRate, tickRate * 2);
         DesiredTargetFrameRate = Mathf.RoundToInt(requested / (float)tickRate) * tickRate;
         EnforceFrameRateCap();
+        // Marker so the log unambiguously shows this build's OS-sleep frame limiter is active
+        // (distinct from the older, Wine-ineffective Application.targetFrameRate approach).
+        Multiplayer.Log($"Headless dedicated mode: OS-sleep frame limiter active, capping to {DesiredTargetFrameRate} FPS.");
 
         if (!Multiplayer.Settings.HeadlessDisableRendering)
         {
