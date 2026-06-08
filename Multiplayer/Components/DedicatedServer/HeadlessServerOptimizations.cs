@@ -30,10 +30,12 @@ public static class HeadlessServerOptimizations
             return;
         applied = true;
 
-        // Health readout (FPS / tick rate) + per-frame re-assert of the FPS cap below.
-        GameObject monitor = new GameObject("MultiplayerHeadlessPerfMonitor");
+        // Health readout (FPS / tick rate) + manual frame limiter (the real FPS cap; Wine ignores
+        // Application.targetFrameRate, so a steady frame rate is held via an OS sleep instead).
+        GameObject monitor = new GameObject("MultiplayerHeadlessServer");
         Object.DontDestroyOnLoad(monitor);
         monitor.AddComponent<HeadlessPerfMonitor>();
+        monitor.AddComponent<HeadlessFrameLimiter>();
 
         // Cap the frame rate to a MULTIPLE of the network tick rate. The tick is one-per-frame
         // paced to TICK_INTERVAL, so smooth (even) tick spacing -> smooth trains needs a steady FPS
