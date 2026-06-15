@@ -187,41 +187,70 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
 
     private IEnumerator PollEvents()
     {
-        // NOTE: a fixed-timestep accumulator (multiple ticks per frame to hit a steady 24 Hz) was
-        // tried, but at a frame rate that is not a multiple of TICK_RATE it bursts ticks unevenly,
-        // and clients interpolate train positions assuming evenly-spaced ticks -> constant light
-        // jitter. One tick per frame paced to TICK_INTERVAL keeps snapshot spacing even (smoother),
-        // even though the achieved rate is a bit below 24 when FPS < ~48.
+        // On a headless dedicated server HeadlessFrameLimiter holds the frame rate steady at a
+        // multiple of TICK_RATE, so the tick is locked to the frame cadence (one tick every
+        // FramesPerTick frames) -> perfectly even snapshot spacing -> smooth trains. Real-time
+        // pacing via WaitForSecondsRealtime is too coarse there: at a steady 48 FPS, 2 frames
+        // (41.666 ms) sits on the knife-edge of TICK_INTERVAL (41.667 ms), so ticks land on 2 or 3
+        // frames unevenly (~20 TPS). On normal/uncapped hosts FramesPerTick is 0 and we keep the
+        // real-time pacing (unchanged behaviour).
+        int frameCounter = 0;
         while (!UnloadWatcher.isQuitting)
         {
-            Tick++;
-            tickTimer.Start();
+            int framesPerTick = HeadlessServerOptimizations.FramesPerTick;
 
-            tickWatchdog.Start();
-            try
+            if (framesPerTick > 0)
             {
-                if (!UnloadWatcher.isUnloading && !UnloadWatcher.isQuitting && !IsReturningToMenu)
-                    OnTick?.Invoke(Tick);
+                // Dedicated: tick on a fixed frame cadence; poll the transports every frame so
+                // packet latency stays low even on frames that run no tick.
+                if (++frameCounter >= framesPerTick)
+                {
+                    frameCounter = 0;
+                    RunSingleTick();
+                }
+
+                if (Client != null)
+                    TickManager(Client);
+                if (Server != null)
+                    TickManager(Server);
+
+                yield return null;
             }
-            catch (Exception e)
+            else
             {
-                if (!UnloadWatcher.isUnloading && !UnloadWatcher.isQuitting && !IsReturningToMenu)
-                    Multiplayer.LogError($"Exception while processing OnTick: {e}");
+                // Normal host/client: pace the tick to TICK_RATE in real time.
+                tickTimer.Start();
+                RunSingleTick();
+
+                if (Client != null)
+                    TickManager(Client);
+                if (Server != null)
+                    TickManager(Server);
+
+                float elapsedTime = tickTimer.Stop();
+                float remainingTime = Mathf.Max(0f, TICK_INTERVAL - elapsedTime);
+                yield return remainingTime < 0.001f ? null : new WaitForSecondsRealtime(remainingTime);
             }
-            finally
-            {
-                tickWatchdog.Stop(time => Multiplayer.LogWarning($"OnTick took {time} ms!"));
-            }
+        }
+    }
 
-            if (Client != null)
-                TickManager(Client);
-
-            if (Server != null)
-                TickManager(Server);
-
-            float elapsedTime = tickTimer.Stop();
-            float remainingTime = Mathf.Max(0f, TICK_INTERVAL - elapsedTime);
-            yield return remainingTime < 0.001f ? null : new WaitForSecondsRealtime(remainingTime);
+    private void RunSingleTick()
+    {
+        Tick++;
+        tickWatchdog.Start();
+        try
+        {
+            if (!UnloadWatcher.isUnloading && !UnloadWatcher.isQuitting && !IsReturningToMenu)
+                OnTick?.Invoke(Tick);
+        }
+        catch (Exception e)
+        {
+            if (!UnloadWatcher.isUnloading && !UnloadWatcher.isQuitting && !IsReturningToMenu)
+                Multiplayer.LogError($"Exception while processing OnTick: {e}");
+        }
+        finally
+        {
+            tickWatchdog.Stop(time => Multiplayer.LogWarning($"OnTick took {time} ms!"));
         }
     }
 

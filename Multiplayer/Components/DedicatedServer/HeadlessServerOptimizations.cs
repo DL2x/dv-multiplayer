@@ -24,6 +24,14 @@ public static class HeadlessServerOptimizations
     /// </summary>
     public static int DesiredTargetFrameRate { get; private set; } = -1;
 
+    /// <summary>
+    /// How many (steadily frame-limited) frames make up one network tick on a headless dedicated
+    /// server. >0 only when the frame cap is active; the tick loop then ticks once every this many
+    /// frames for perfectly even snapshot spacing. 0 = no cap -> the tick loop uses real-time pacing.
+    /// </summary>
+    public static int FramesPerTick =>
+        DesiredTargetFrameRate > 0 ? Mathf.Max(1, DesiredTargetFrameRate / NetworkLifecycle.TICK_RATE) : 0;
+
     public static void Apply()
     {
         if (applied)
