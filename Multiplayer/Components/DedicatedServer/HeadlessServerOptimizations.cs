@@ -30,7 +30,16 @@ public static class HeadlessServerOptimizations
     /// frames for perfectly even snapshot spacing. 0 = no cap -> the tick loop uses real-time pacing.
     /// </summary>
     public static int FramesPerTick =>
-        DesiredTargetFrameRate > 0 ? Mathf.Max(1, DesiredTargetFrameRate / NetworkLifecycle.TICK_RATE) : 0;
+        DesiredTargetFrameRate > 0 ? Mathf.Max(1, DesiredTargetFrameRate / EffectiveTickRate) : 0;
+
+    /// <summary>
+    /// The rate (Hz) at which the dedicated server advances its network tick. Deliberately below the
+    /// 24 Hz protocol rate (TICK_RATE) to dodge the client-side vertical-suspension resonance that
+    /// causes up/down train jitter; clients tolerate a server tick rate below TICK_RATE. Clamped to
+    /// [8, TICK_RATE].
+    /// </summary>
+    private static int EffectiveTickRate =>
+        Mathf.Clamp(Multiplayer.Settings?.HeadlessNetworkTickRate ?? NetworkLifecycle.TICK_RATE, 8, NetworkLifecycle.TICK_RATE);
 
     public static void Apply()
     {
@@ -49,13 +58,13 @@ public static class HeadlessServerOptimizations
         // paced to TICK_INTERVAL, so smooth (even) tick spacing -> smooth trains needs a steady FPS
         // that divides evenly into TICK_RATE. An off-multiple/fluctuating FPS (e.g. an uncapped GPU
         // at ~120, or a 60 cap = 2.5x 24) makes ticks land on a varying number of frames -> jitter.
-        int tickRate = NetworkLifecycle.TICK_RATE;
+        int tickRate = EffectiveTickRate;
         int requested = Mathf.Max(Multiplayer.Settings.HeadlessTargetFrameRate, tickRate * 2);
         DesiredTargetFrameRate = Mathf.RoundToInt(requested / (float)tickRate) * tickRate;
         EnforceFrameRateCap();
         // Marker so the log unambiguously shows this build's OS-sleep frame limiter is active
         // (distinct from the older, Wine-ineffective Application.targetFrameRate approach).
-        Multiplayer.Log($"Headless dedicated mode: OS-sleep frame limiter active, capping to {DesiredTargetFrameRate} FPS.");
+        Multiplayer.Log($"Headless dedicated mode: OS-sleep frame limiter active, capping to {DesiredTargetFrameRate} FPS ({EffectiveTickRate} Hz network tick, {FramesPerTick} frames/tick).");
 
         if (!Multiplayer.Settings.HeadlessDisableRendering)
         {

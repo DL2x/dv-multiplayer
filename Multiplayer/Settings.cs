@@ -93,8 +93,10 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public LogLevel LogLevel = LogLevel.Info;
     [Draw("Headless: disable rendering", Tooltip = "On a headless dedicated server, stop rendering the 3D scene (no GPU/display) to free CPU. No effect outside headless dedicated mode.", VisibleOn = "ShowAdvancedSettings|true")]
     public bool HeadlessDisableRendering = true;
-    [Draw("Headless: target FPS", Tooltip = "Frame-rate cap for the headless dedicated server. Snapped to a multiple of the 24 Hz tick rate so tick spacing stays even (smooth trains). Lower = less CPU.", VisibleOn = "ShowAdvancedSettings|true")]
+    [Draw("Headless: target FPS", Tooltip = "Frame-rate cap for the headless dedicated server. Snapped to a multiple of the network tick rate so tick spacing stays even (smooth trains). Lower = less CPU.", VisibleOn = "ShowAdvancedSettings|true")]
     public int HeadlessTargetFrameRate = 48;
+    [Draw("Headless: network tick rate", Tooltip = "Network tick rate for the dedicated server. Kept below the client's ~24 Hz suspension resonance (default 20) to avoid vertical train jitter; clients tolerate a server tick rate below the 24 Hz protocol rate.", VisibleOn = "ShowAdvancedSettings|true")]
+    public int HeadlessNetworkTickRate = 20;
     [Draw("Debug Logging", Tooltip = "Whether to log extra information. This is useful for debugging, but should otherwise be kept off.", VisibleOn = "ShowAdvancedSettings|true")]
     public bool DebugLogging;
     [Draw("Enable Log File", Tooltip = "Whether to create a separate file for logs. This is useful for debugging, but should otherwise be kept off.", VisibleOn = "ShowAdvancedSettings|true")]
